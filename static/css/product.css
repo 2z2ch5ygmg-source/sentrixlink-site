@@ -244,3 +244,7 @@
   .p-two:has(.jr--web) .p-steps--j .d,.p-two:has(.jr--mix) .p-steps--j .d{display:none}
   .p-two:has(.jr--web) .p-steps--j [aria-current="step"] .d,.p-two:has(.jr--mix) .p-steps--j [aria-current="step"] .d{display:block}
 }
+/* still comparisons (2026-11-06): stacked like the PC journeys — text on top, the side-by-side screens wide below */
+.p-two:has(.p-vis--cmp){grid-template-columns:minmax(0,1fr);row-gap:40px}
+.p-two:has(.p-vis--cmp) > .p-txt{max-width:760px;order:-1}
+.p-vis--cmp{display:block;width:100%;min-width:0}

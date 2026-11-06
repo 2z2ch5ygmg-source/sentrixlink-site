@@ -236,3 +236,7 @@ br.m,.m{display:none}
 /* home flow + product shots are real-app journeys now (2026-11-06) */
 .flow__grid .jr{min-width:0}
 .product__shot .jr--web .jr__stage{border-radius:16px}
+
+/* 2026-11-06: still sections between the moving ones — HQ screens and the roster Excel */
+.hq__in,.xls__in{gap:40px}
+@media (max-width:719px){ .hq__in,.xls__in{gap:28px} }
