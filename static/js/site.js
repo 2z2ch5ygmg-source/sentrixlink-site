@@ -144,6 +144,36 @@
     if (d) d.addEventListener('close', () => { if (d._trigger && document.contains(d._trigger)) d._trigger.focus(); });
     window.matchMedia('(min-width: 900px)').addEventListener('change', (m) => { if (m.matches) setMenu(false); });
 
+    /* 「엑셀 그대로」 sheets: fit the drawn Excel crop to its column (down to 70 % (about Excel's 75 % view); narrower
+       screens scroll sideways) and place each pin box over the cells it names (data-box="B5:C7"). */
+    const sheets = $$('.xwin__sheet');
+    const a1 = (s) => { const m = /^([A-Z]+)(\d+)$/.exec(s); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return [c, +m[2]]; };
+    const layoutSheets = () => sheets.forEach((sh) => {
+      const fit = sh.parentElement; const scroller = fit.parentElement;
+      const t = $('table', sh); const w = Math.max(sh.offsetWidth, t ? t.offsetWidth : 0), h = sh.offsetHeight;
+      const k = Math.max(0.7, Math.min(1, (scroller.clientWidth - 1) / w));
+      sh.style.transform = k < 1 ? `scale(${k})` : '';
+      fit.style.width = `${Math.floor(w * k)}px`; fit.style.height = `${Math.ceil(h * k)}px`;
+      $$('.xpin', sh).forEach((pin) => {
+        const [from, to] = pin.dataset.box.split(':').map(a1);
+        let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+        $$('td[data-a1]', sh).forEach((td) => {
+          const [c, r] = a1(td.dataset.a1);
+          if (c < from[0] || c > to[0] || r < from[1] || r > to[1]) return;
+          x1 = Math.min(x1, td.offsetLeft); y1 = Math.min(y1, td.offsetTop);
+          x2 = Math.max(x2, td.offsetLeft + td.offsetWidth); y2 = Math.max(y2, td.offsetTop + td.offsetHeight);
+        });
+        if (!isFinite(x1)) { pin.hidden = true; return; }
+        const pad = 3;
+        Object.assign(pin.style, { left: `${x1 - pad}px`, top: `${y1 - pad}px`, width: `${x2 - x1 + pad * 2}px`, height: `${y2 - y1 + pad * 2}px` });
+      });
+    });
+    if (sheets.length) {
+      layoutSheets();
+      (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(layoutSheets);
+      window.addEventListener('resize', layoutSheets);
+    }
+
     /* scroll scene: sentences light up one at a time (home problem scene) */
     const seq = $$('[data-seq]');
     if (seq.length && !reduced.matches && 'IntersectionObserver' in window) {

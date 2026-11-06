@@ -240,3 +240,7 @@ br.m,.m{display:none}
 /* 2026-11-06: still sections between the moving ones — HQ screens and the roster Excel */
 .hq__in,.xls__in{gap:40px}
 @media (max-width:719px){ .hq__in,.xls__in{gap:28px} }
+/* hero controls: the ten dashes shrink with the column so dashes + pause button always fit */
+.hero__ctrl{min-width:0}
+.hero__dashes{flex:1 1 auto;min-width:0;max-width:360px}
+.hero__dashes .dash{flex:1 1 0;min-width:8px;max-width:26px;width:auto}

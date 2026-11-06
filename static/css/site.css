@@ -308,33 +308,41 @@ a.bro:hover{color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
   .cmp__item figcaption{font-size:15px}
 }
 
-/* 「엑셀 그대로」: the real roster Excel cells next to what Sentrix HR shows */
-.xlc{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:32px;align-items:start}
-.xlc > *{min-width:0}
-.xlc__left{gap:14px}
-.xlc__right{gap:20px}
-.xl-wrap{overflow-x:auto;border-radius:12px;background:var(--surface);box-shadow:0 0 0 1px var(--line)}
-.xl{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%;min-width:680px}
-.xl th,.xl td{border:1px solid var(--line-2);padding:4px 5px;text-align:center;white-space:nowrap;height:26px}
-.xl thead th{background:#F7F7F9;font-weight:600;color:var(--muted);font-size:11px;line-height:1.3}
-.xl thead th span{display:block;font-weight:400;color:var(--muted-2)}
-.xl .xl-corner{text-align:left}
-.xl-name{background:#F7F7F9;font-weight:700;color:var(--ink);min-width:64px}
-.xl-kind{background:#F7F7F9;font-weight:500;color:var(--muted);text-align:left}
-.xl td.on{background:#E8EEF9;color:var(--ink);font-weight:600}
-.xl-sum{font-weight:700}
-.xl-note{color:var(--muted);text-align:left}
-.xl-sup .xl-name,.xl-sup .xl-kind{background:#FFF4EC}
-.xl-sup tr:first-child > *{border-top:2px solid var(--muted-2)}
-.pin{display:inline-flex;align-items:center;justify-content:center;flex:none;width:18px;height:18px;border-radius:50%;background:var(--navy);color:#fff;font-size:11px;font-weight:700;margin-right:4px;vertical-align:1px}
+/* 「엑셀 그대로」: crops of the real roster Excel drawn with its own formats (tools/excel-table.py),
+   each paired with the Sentrix HR screen it turns into. Pins sit on their own layer (site.js places them). */
+.xlc{display:flex;flex-direction:column;gap:48px}
+.xlc__row{display:grid;grid-template-columns:minmax(0,1.45fr) 32px minmax(0,1fr);gap:24px;align-items:start}
+.xlc__row > *{min-width:0}
+.xlc__xl{gap:16px}
+.xlc__row .cmp__arrow{align-self:center}
+.xwin{border-radius:10px;overflow:hidden;background:#FFFFFF;box-shadow:0 0 0 1px var(--line),0 24px 48px rgba(17,24,42,0.10)}
+.xwin__bar{height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;background:#2B2B2B}
+.xwin__bar i{width:10px;height:10px;border-radius:50%;background:#FF5F57}
+.xwin__bar i:nth-child(2){background:#FEBC2E}.xwin__bar i:nth-child(3){background:#28C840}
+.xwin__bar em{margin-left:10px;font-style:normal;font-size:12px;font-weight:600;color:#E6E6E6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xwin__scroll{overflow-x:auto;overflow-y:hidden}
+.xwin__fit{position:relative;padding-bottom:6px;box-sizing:content-box}
+.xwin__sheet{position:relative;transform-origin:0 0}
+.xs{border-collapse:collapse;table-layout:fixed;font-family:'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo',sans-serif;color:#000;line-height:1.2;font-variant-numeric:tabular-nums}
+.xs td{padding:0 4px;overflow:hidden;white-space:nowrap}
+.xs .xh th{height:22px;background:#1E1E1E;color:#E6E6E6;font-size:12px;font-weight:500;text-align:center;border-right:1px solid #3A3A3A}
+.xs th.xh-r{background:#1E1E1E;color:#E6E6E6;font-size:12px;font-weight:500;text-align:center;border-bottom:1px solid #3A3A3A}
+.xpins{position:absolute;inset:0;pointer-events:none}
+.xpin{position:absolute;border:3px solid #FF6B00;border-radius:5px;box-shadow:0 0 0 2px rgba(255,255,255,0.9)}
+.xpin[hidden]{display:none}
+.xpin b{position:absolute;left:-36px;top:-2px;width:28px;height:28px;border-radius:50%;background:#FF6B00;color:#FFFFFF;font:700 15px/28px 'Pretendard',system-ui,sans-serif;text-align:center;box-shadow:0 0 0 2px #FFFFFF,0 2px 6px rgba(0,0,0,0.25)}
+.xpin--above b{left:-2px;top:-35px}
+.xpin-key{flex:none;width:26px;height:26px;border-radius:50%;background:#FF6B00;color:#FFFFFF;font-size:14px;font-weight:700;line-height:26px;text-align:center;margin-top:1px}
 .xl-src{font-size:13px;color:var(--muted-2)}
 .xl-notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px}
 .xl-notes li{display:flex;gap:10px;font-size:15px;line-height:1.5;min-width:0}
-.xl-notes .pin{margin-top:2px}
 .xl-notes b{display:block;color:var(--ink)}
 .xl-notes span{color:var(--muted);font-size:14px}
-.xlc__right figcaption b{display:inline;font-size:inherit}
-@media (max-width:1023px){ .xlc{grid-template-columns:minmax(0,1fr)} }
+.xlc__row figcaption b{display:inline;font-size:inherit}
+@media (max-width:1279px){
+  .xlc__row{grid-template-columns:minmax(0,1fr);gap:16px}
+  .xlc__row .cmp__arrow{transform:rotate(90deg);line-height:1}
+}
 @media (max-width:719px){ .xl-notes{grid-template-columns:minmax(0,1fr)} }
 .xl .xl-note{font-size:11px}
 /* 2×2 grid: every screen in the same 1440×776 window so the rows line up (cropped captures fill from the top left) */
