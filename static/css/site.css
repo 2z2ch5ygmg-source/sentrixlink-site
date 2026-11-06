@@ -347,3 +347,10 @@ a.bro:hover{color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
 .xl .xl-note{font-size:11px}
 /* 2×2 grid: every screen in the same 1440×776 window so the rows line up (cropped captures fill from the top left) */
 .cmp--grid .shot-web img{aspect-ratio:1440/776;object-fit:cover;object-position:left top}
+/* Finance sheet: one wide window, notes beside it (stack below 1280) */
+.xlc--fin{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:24px 32px;align-items:start}
+.xlc--fin .xl-src{grid-column:1/-1}
+.xl-notes--col{grid-template-columns:minmax(0,1fr)!important}
+.xs .xh-gap,.xs .xs-gapc{background:repeating-linear-gradient(90deg,#d9d9de 0 2px,transparent 2px 5px)}
+.xs tr.xs-gap td{background:repeating-linear-gradient(0deg,#d9d9de 0 2px,transparent 2px 5px)}
+@media (max-width:1279px){.xlc--fin{grid-template-columns:minmax(0,1fr)}}
