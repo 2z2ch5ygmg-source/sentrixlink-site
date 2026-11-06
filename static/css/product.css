@@ -248,3 +248,4 @@
 .p-two:has(.p-vis--cmp){grid-template-columns:minmax(0,1fr);row-gap:40px}
 .p-two:has(.p-vis--cmp) > .p-txt{max-width:760px;order:-1}
 .p-vis--cmp{display:block;width:100%;min-width:0}
+.p-docs{margin-top:clamp(40px,6vw,72px)}

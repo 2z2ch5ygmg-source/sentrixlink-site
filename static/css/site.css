@@ -354,3 +354,6 @@ a.bro:hover{color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
 .xs .xh-gap,.xs .xs-gapc{background:repeating-linear-gradient(90deg,#d9d9de 0 2px,transparent 2px 5px)}
 .xs tr.xs-gap td{background:repeating-linear-gradient(0deg,#d9d9de 0 2px,transparent 2px 5px)}
 @media (max-width:1279px){.xlc--fin{grid-template-columns:minmax(0,1fr)}}
+.xlc--docs{display:grid;grid-template-columns:minmax(0,1fr);gap:32px}
+.xs td.xo{overflow:visible}.xs td.xo>span{position:relative;z-index:1}
+@media (max-width:719px){.xwin__bar{height:auto;min-height:30px;padding-block:6px}.xwin__bar em{white-space:normal;overflow:visible;line-height:1.3;word-break:break-all}}
