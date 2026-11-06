@@ -1,0 +1,6 @@
+/* Pages whose content is not designed yet (/security, /company, /terms, /location). */
+.stub{padding:96px 0 128px}
+.stub .wrap{gap:20px}
+.stub__note{max-width:640px;font-size:17px;line-height:1.65;color:var(--muted)}
+.stub .facts{margin-top:36px}
+@media (max-width:719px){ .stub{padding:40px 0 72px} .stub__note{font-size:16px} }
