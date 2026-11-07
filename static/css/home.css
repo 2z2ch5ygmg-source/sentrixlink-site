@@ -20,11 +20,6 @@ br.m,.m{display:none}
 .hq-static{height:100%;padding:28px;gap:8px;justify-content:center}
 .hq-static__k{font-size:14px;font-weight:600;color:var(--muted)}
 .hq-static .gt{font-size:24px}
-.scene-toggle{display:inline-flex;white-space:nowrap;flex:none;align-items:center;gap:8px;height:44px;padding:0 14px;border:0;border-radius:var(--pill);background:transparent;color:var(--muted);font-size:14px;font-weight:600}
-.scene-toggle[hidden]{display:none}
-.scene-toggle:hover{color:var(--ink);background:rgba(17,24,42,0.05)}
-.scene-toggle .i-play,.scene-toggle[aria-pressed="true"] .i-pause{display:none}
-.scene-toggle[aria-pressed="true"] .i-play{display:inline}
 @media (max-width:1279px){
   .hero__in{grid-template-columns:minmax(0,1fr) 300px minmax(0,1fr)}
   .hero__phone{--pw:300px}
