@@ -43,12 +43,28 @@
 </section>
 
 <section class="sec sec--white p-sec" aria-labelledby="reportTitle">
-<div class="wrap p-two">
-<div class="stack p-txt">
-<h2 class="h2" id="reportTitle">잠금화면에서 보고하고,<br>본사는 상황실에서<br class="p-m"> 받습니다.</h2>
-<p class="lead">급할 때는 앱을 열지 않고 잠금화면에서 단계만 누릅니다. 내용은 상황이 끝난 뒤 채우고, 본사는 그 시각부터 상황실에서 봅니다.</p>
+<!-- 2026-11-08 user: show the two ways to report (lock-screen widget / in-app) and the two kinds (간편보고 / 사후보고) -->
+<div class="wrap stack rp">
+<div class="stack p-txt rp__head">
+<h2 class="h2" id="reportTitle">보고는 두 가지 방법,<br>두 가지 방식.</h2>
+<p class="lead">급하면 잠금화면에서 버튼 한 번, 앱에서는 고르기만 하면 보고 문장이 만들어집니다. 본사는 올라온 그 시각부터 상황실에서 봅니다.</p>
 </div>
-<div class="p-vis p-vis--cmp"><div class="cmp cmp--pair"><figure class="cmp__item cmp__item--phone"><div class="cmp__phone"><div class="phone"><img src="/static/img/app/ios__ios-lock-eci2.webp" alt="근무자 잠금화면: 앱을 열지 않고 ECI 2만 누르면 그 시각으로 보고가 시작됩니다." width="804" height="1748" loading="lazy" decoding="async"></div></div><figcaption><b>근무자 잠금화면</b> 앱을 열지 않고 ECI 2만 누르면 그 시각으로 보고가 시작됩니다.</figcaption></figure><span class="cmp__arrow" aria-hidden="true">→</span><figure class="cmp__item cmp__item--web"><div class="shot-web"><div class="shot-web__bar" aria-hidden="true"><span></span><span></span><span></span><em>Sentrix</em></div><img src="/static/img/app/web__sx-lock-room.webp" alt="본사 상황실: 본사 PC 상황실에 ECI 2 사건으로 바로 들어옵니다." width="1440" height="776" loading="lazy" decoding="async"></div><figcaption><b>본사 상황실</b> 본사 PC 상황실에 ECI 2 사건으로 바로 들어옵니다.</figcaption></figure></div></div>
+<div class="rp__ways">
+<figure class="rp__way">
+<p class="rp__tag">방법 1</p>
+<h3 class="rp__h">잠금화면 위젯</h3>
+<div class="cmp__phone"><div class="phone"><img src="/static/img/app/ios__ios-lock-eci2.webp" alt="잠금화면 간편보고: ECI 1~4 단계 버튼" width="804" height="1748" loading="lazy" decoding="async"></div></div>
+<figcaption>앱을 열지 않고 ECI 단계만 누르면 그 시각으로 보고가 시작됩니다.</figcaption>
+<dl class="rp__kinds"><div><dt>간편보고</dt><dd>내용은 상황이 끝난 뒤 앱에서 채웁니다. 시각과 단계는 이미 들어가 있습니다.</dd></div></dl>
+</figure>
+<figure class="rp__way">
+<p class="rp__tag">방법 2</p>
+<h3 class="rp__h">앱 「+ 보고하기」</h3>
+<div class="cmp__phone"><div class="phone"><img src="/static/img/app/ios__ios-inc-type.webp" alt="사건 보고: 간편보고와 사후보고 중 고르고 사건 종류를 고르는 화면" width="804" height="1748" loading="lazy" decoding="async"></div></div>
+<figcaption>사건 보고를 열면 맨 위에서 방식을 고릅니다.</figcaption>
+<dl class="rp__kinds"><div><dt>간편보고</dt><dd>사건 종류를 고르고 질문마다 답을 고르면 보고 문장이 만들어집니다.</dd></div><div><dt>사후보고</dt><dd>상황이 끝난 뒤 무슨 일이 있었는지 직접 적어 올립니다.</dd></div></dl>
+</figure>
+</div>
 </div>
 </section>
 
@@ -58,7 +74,7 @@
 <h2 class="h2" id="roomTitle">지점 상황을<br>한 화면에서.</h2>
 <p class="lead">지점별 사건과 처리 상태가 함께 보여, 어디까지 처리됐는지 전화로 묻지 않습니다.</p>
 </div>
-<div class="p-vis p-vis--j"><figure class="jr jr--web" data-journey="sx-room" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__sx-inc-room.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/6</span><span class="jr__t">사건 열기</span><span class="jr__c">상황실에서 방금 들어온 사건을 엽니다.</span></figcaption><ol class="sr-only"><li><b>사건 열기</b> 상황실에서 방금 들어온 사건을 엽니다.</li><li><b>지시 적기</b> 현장에서 만든 보고 문장 아래에 지시를 적습니다.</li><li><b>알림</b> 코멘트는 그 지점 사용자에게 알림으로 갑니다.</li><li><b>조치중</b> 상태를 조치중으로 바꿉니다.</li><li><b>현장 답변</b> 팀장 답변이 같은 사건에 쌓입니다.</li><li><b>종결</b> 보고 · 지시 · 답변 기록과 함께 종결됩니다.</li></ol></figure></div>
+<div class="p-vis p-vis--j"><figure class="jr jr--web" data-journey="sx-room" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__sx-inc-room.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/6</span><span class="jr__t">사건 열기</span><span class="jr__c">상황실에서 방금 들어온 사건을 엽니다.</span></figcaption><ol class="sr-only"><li><b>사건 열기</b> 상황실에서 방금 들어온 사건을 엽니다.</li><li><b>지시 적기</b> 보고 문장 아래에 지시를 적고 Enter로 보냅니다.</li><li><b>알림</b> 코멘트는 그 지점 사용자에게 알림으로 갑니다.</li><li><b>조치중</b> 상태를 조치중으로 바꿉니다.</li><li><b>현장 답변</b> 팀장 답변이 같은 사건에 쌓입니다.</li><li><b>종결</b> 보고 · 지시 · 답변 기록과 함께 종결됩니다.</li></ol></figure></div>
 </div>
 </section>
 
