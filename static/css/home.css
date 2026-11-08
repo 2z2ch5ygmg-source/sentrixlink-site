@@ -239,3 +239,33 @@ br.m,.m{display:none}
 .hero__ctrl{min-width:0}
 .hero__dashes{flex:1 1 auto;min-width:0;max-width:360px}
 .hero__dashes .dash{flex:1 1 0;min-width:8px;max-width:26px;width:auto}
+
+/* 세 서비스 구조 (2026-11-08) */
+.trio__in{gap:40px}
+.trio__head{gap:14px;text-align:center;align-items:center}
+.trio__head .lead{max-width:40em}
+.trio__flow{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 120px minmax(0,1fr) 120px minmax(0,1fr);align-items:stretch}
+.trio__card{display:flex;flex-direction:column;gap:6px;padding:26px 24px;border-radius:20px;background:var(--bg);min-width:0}
+.trio__card img{width:auto;height:26px;align-self:flex-start;border-radius:6px}
+.trio__card b{margin-top:8px;font-size:23px;font-weight:700}
+.trio__card span{font-size:16px;font-weight:600;color:var(--ink-2)}
+.trio__card small{font-size:15px;line-height:1.55;color:var(--muted)}
+.trio__card em{margin-top:auto;padding-top:10px;font-style:normal;font-size:14px;font-weight:700;color:var(--accent-ink)}
+.trio__card--cp{box-shadow:inset 0 0 0 2px var(--navy)}
+.trio__arrow{display:flex;align-items:center;justify-content:center;position:relative}
+.trio__arrow::before{content:"";position:absolute;left:12px;right:12px;top:50%;height:2px;background:var(--accent)}
+.trio__arrow::after{content:"";position:absolute;right:10px;top:calc(50% - 6px);border:6px solid transparent;border-left:9px solid var(--accent);border-right:0}
+.trio__arrow span{position:relative;z-index:1;margin-top:-58px;padding:0 4px;font-size:13px;font-weight:700;line-height:1.35;color:var(--accent-ink);text-align:center;word-break:keep-all}
+.trio__back{text-align:center;font-size:18px;color:var(--ink-2)}
+.trio__back b{color:var(--accent-ink)}
+.trio__more{align-self:center}
+@media (max-width:1023px){
+  .trio__flow{grid-template-columns:minmax(0,1fr);gap:0}
+  .trio__arrow{height:64px}
+  .trio__arrow::before{left:50%;right:auto;top:8px;bottom:8px;width:2px;height:auto}
+  .trio__arrow::after{left:calc(50% - 6px);right:auto;top:auto;bottom:6px;border:6px solid transparent;border-top:9px solid var(--accent);border-bottom:0}
+  .trio__arrow span{margin:0 0 0 150px;text-align:left}
+}
+@media (max-width:719px){
+  .trio__arrow span{margin-left:calc(50% + 14px);font-size:12.5px}
+}

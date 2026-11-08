@@ -1,0 +1,16 @@
+/* 씨피(CP) 페이지 (2026-11-08) */
+.cp-logo{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px}
+.cp-logo img{border-radius:9px}
+.cp-logo b{font-size:22px;font-weight:700}
+.cp-soon{padding:5px 12px;border-radius:999px;background:#FFF2E8;color:var(--accent-ink);font-size:14px;font-weight:700}
+.cp-hero-phones{display:flex;justify-content:center;gap:40px;flex-wrap:wrap}
+.cp-block{gap:36px}
+.cp-txt{max-width:760px}
+.cp-step{font-size:15px;font-weight:700;color:var(--accent-ink)}
+.cp-step--navy{color:#FFB37A}
+.cp-shot{max-width:1120px}
+@media (max-width:719px){
+  .cp-shot img{height:auto}
+  .cp-hero-phones .phone{--pw:260px !important}
+  .cp-hero-phones .phone + .phone{display:none}
+}
