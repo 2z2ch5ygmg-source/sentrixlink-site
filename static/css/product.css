@@ -268,3 +268,7 @@
   .rp__way{padding:28px 20px}
   .rp__kinds > div{grid-template-columns:76px minmax(0,1fr)}
 }
+
+/* 홈에서 옮겨 온 「본사는 Sentrix HR에서」(2026-11-10) */
+.hq__in{gap:40px}
+@media (max-width:719px){ .hq__in{gap:28px} }
