@@ -36,11 +36,6 @@
 .c-seg label:has(input:focus-visible){outline:3px solid var(--accent);outline-offset:2px}
 
 /* done card */
-.c-done__steps{gap:10px}
-.c-steps4{grid-template-columns:repeat(4,minmax(0,1fr))}
-.c-done__labels{display:grid;gap:8px;font-size:15px;font-weight:600;color:var(--muted-2)}
-.c-done__labels li{min-width:0}
-.c-done__labels li[aria-current]{font-weight:700;color:var(--ink)}
 .c-done__head{gap:10px}
 .c-done__h{font-size:32px;line-height:1.3;font-weight:700;letter-spacing:-0.02em}
 .c-done__h:focus{outline:none}
@@ -96,7 +91,6 @@
   .c-card{padding:28px 20px;gap:24px}
   .c-card__h{font-size:24px}
   .c-two{grid-template-columns:minmax(0,1fr);row-gap:20px}
-  .c-done__labels{font-size:13px}
   .c-done__h{font-size:26px}
   .c-done__reply{font-size:16px}
   .c-sum__row{font-size:15px}

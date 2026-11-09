@@ -184,10 +184,12 @@ br.m,.m{display:none}
 
 /* roles */
 .roles__in{gap:40px}
-.tabs{display:flex;gap:32px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs{padding-left:6px;margin-left:-6px;display:flex;gap:20px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
-.tabs [role="tab"]{flex:none;height:52px;padding:0 2px;margin-bottom:-1px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted-2);font-size:17px;font-weight:600}
+.tabs [role="tab"]{flex:none;height:52px;padding:0 8px;margin-bottom:-1px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted-2);font-size:17px;font-weight:600}
 .tabs [role="tab"]:hover{color:var(--ink)}
+/* 탭 줄은 가로 스크롤이라 바깥 윤곽선이 위아래로 잘린다: 안쪽에 그린다 */
+.tabs [role="tab"]:focus-visible{outline:none;box-shadow:inset 0 0 0 2px var(--accent);border-radius:6px}
 .tabs [role="tab"][aria-selected="true"]{border-bottom-color:var(--ink);color:var(--ink);font-weight:700}
 .role{display:grid;grid-template-columns:420px minmax(0,1fr);column-gap:64px;align-items:center;min-height:646px}
 .role[hidden]{display:none}
@@ -209,7 +211,7 @@ br.m,.m{display:none}
 }
 @media (max-width:719px){
   .roles__in{gap:28px}
-  .tabs{gap:24px;margin:0 calc(var(--gutter) * -1);padding:0 var(--gutter)}
+  .tabs{gap:12px;margin:0 calc(var(--gutter) * -1);padding:0 var(--gutter)}
   .tabs [role="tab"]{height:48px;font-size:16px}
   .role{grid-template-columns:minmax(0,1fr);row-gap:32px}
   .role__phone{--pw:220px}

@@ -137,7 +137,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 
 /* phone frame with a real iOS capture (1206x2622 → ratio 2.174) */
-.phone{width:var(--pw,340px);aspect-ratio:340/713.6;padding:calc(var(--pw,340px) * 0.032);border-radius:calc(var(--pw,340px) * 0.158);background:var(--phone);box-shadow:inset 0 0 0 1px var(--phone-edge),0 30px 60px rgba(17,24,42,0.14);flex:none}
+.phone{width:var(--pw,340px);height:calc(var(--pw,340px) * 713.6 / 340);padding:calc(var(--pw,340px) * 0.032);border-radius:calc(var(--pw,340px) * 0.158);background:var(--phone);box-shadow:inset 0 0 0 1px var(--phone-edge),0 30px 60px rgba(17,24,42,0.14);flex:none}
 .phone img{width:100%;height:100%;border-radius:calc(var(--pw,340px) * 0.126);object-fit:cover}
 
 /* rule lists (three short facts under a line) */
@@ -305,10 +305,18 @@ a.bro:hover{color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
 /* 「엑셀 그대로」: crops of the real roster Excel drawn with its own formats (tools/excel-table.py),
    each paired with the Sentrix HR screen it turns into. Pins sit on their own layer (site.js places them). */
 .xlc{display:flex;flex-direction:column;gap:48px}
-.xlc__row{display:grid;grid-template-columns:minmax(0,1.45fr) 32px minmax(0,1fr);gap:24px;align-items:start}
+.xlc__row{display:grid;grid-template-columns:minmax(0,1fr) 32px minmax(0,1fr);gap:24px;align-items:center}
 .xlc__row > *{min-width:0}
 .xlc__xl{gap:16px}
 .xlc__row .cmp__arrow{align-self:center}
+/* 넓은 화면: 엑셀과 Sentrix 화면을 같은 폭 · 같은 가운데 줄에 두고, 번호 설명은 아래 한 줄로 뺀다 */
+@media (min-width:1280px){
+  .xlc__row .xlc__xl{display:contents}
+  .xlc__row .xwin,.xlc__row .xl-src{grid-column:1}
+  .xlc__row .xl-notes{grid-column:1/-1;grid-row:2;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .xlc__row .cmp__arrow{grid-column:2;grid-row:1}
+  .xlc__row > figure{grid-column:3;grid-row:1}
+}
 .xwin{border-radius:10px;overflow:hidden;background:#FFFFFF;box-shadow:0 0 0 1px var(--line),0 24px 48px rgba(17,24,42,0.10)}
 .xwin__bar{height:30px;display:flex;align-items:center;gap:6px;padding:0 12px;background:#2B2B2B}
 .xwin__bar i{width:10px;height:10px;border-radius:50%;background:#FF5F57}
