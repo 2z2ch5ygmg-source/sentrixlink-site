@@ -151,7 +151,9 @@
     const layoutSheets = () => sheets.forEach((sh) => {
       const fit = sh.parentElement; const scroller = fit.parentElement;
       const t = $('table', sh); const w = Math.max(sh.offsetWidth, t ? t.offsetWidth : 0), h = sh.offsetHeight;
-      const k = Math.max(0.7, Math.min(1, (scroller.clientWidth - 1) / w));
+      // 넓은 화면의 비교 줄은 오른쪽 화면과 같은 폭이라, 날짜 칸이 잘리지 않게 끝까지 맞춘다
+      const floor = sh.closest('.xlc__row') && window.innerWidth >= 1280 ? 0.5 : 0.7;
+      const k = Math.max(floor, Math.min(1, (scroller.clientWidth - 1) / w));
       sh.style.transform = k < 1 ? `scale(${k})` : '';
       fit.style.width = `${Math.floor(w * k)}px`; fit.style.height = `${Math.ceil(h * k)}px`;
       $$('.xpin', sh).forEach((pin) => {

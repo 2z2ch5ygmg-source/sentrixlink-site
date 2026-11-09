@@ -63,10 +63,6 @@ br.m,.m{display:none}
 
 /* scene containers: once scenes.js mounts a Remotion Player the card is drawn by the scene,
    so the wrapper drops its own padding/background and keeps a fixed height per breakpoint */
-.phone__screen{width:100%;height:100%;border-radius:calc(var(--pw,340px) * 0.126);overflow:hidden;background:#000}
-.phone__screen picture,.phone__screen img{width:100%;height:100%}
-.phone__screen img{border-radius:0}
-[data-scene].is-scene{padding:0;background:transparent;overflow:hidden}
 .hero__hq.is-scene{border-radius:28px;box-shadow:0 12px 32px rgba(17,24,42,0.08)}
 .chat.is-scene{height:455px}
 @media (max-width:719px){
