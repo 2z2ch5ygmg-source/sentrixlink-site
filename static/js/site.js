@@ -144,7 +144,7 @@
     if (d) d.addEventListener('close', () => { if (d._trigger && document.contains(d._trigger)) d._trigger.focus(); });
     window.matchMedia('(min-width: 900px)').addEventListener('change', (m) => { if (m.matches) setMenu(false); });
 
-    /* 「엑셀 그대로」 sheets: fit the drawn Excel crop to its column (down to 70 % (about Excel's 75 % view); narrower
+    /* 「Excel 그대로」 sheets: fit the drawn Excel crop to its column (down to 70 % (about Excel's 75 % view); narrower
        screens scroll sideways) and place each pin box over the cells it names (data-box="B5:C7"). */
     const sheets = $$('.xwin__sheet');
     const a1 = (s) => { const m = /^([A-Z]+)(\d+)$/.exec(s); let c = 0; for (const ch of m[1]) c = c * 26 + ch.charCodeAt(0) - 64; return [c, +m[2]]; };
