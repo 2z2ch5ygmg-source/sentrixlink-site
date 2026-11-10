@@ -200,3 +200,6 @@
     }
   });
 })();
+
+// 「이렇게 바뀝니다」: 보이면 줄마다 지금 → 화살표 → 바뀐 뒤 순서로 나타난다
+(function(){var f=document.querySelector('[data-fixes]');if(!f||!('IntersectionObserver' in window))return;f.classList.add('is-live');var io=new IntersectionObserver(function(e){if(e[0].isIntersecting){f.classList.add('is-in');io.disconnect();}},{threshold:.15});io.observe(f);})();

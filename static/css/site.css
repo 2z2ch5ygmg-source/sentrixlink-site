@@ -368,3 +368,6 @@ a.bro:hover{color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
 .xs td.xo{overflow:visible}.xs td.xo>span{position:relative;z-index:1}
 @media (max-width:719px){.xwin__bar{height:auto;min-height:30px;padding-block:6px}.xwin__bar em{white-space:normal;overflow:visible;line-height:1.3;word-break:break-all}}
 .bro__n{font-size:16px;font-weight:700;color:var(--ink);line-height:16px}
+
+/* 주황 원 안 번호는 흰색(.xl-notes span 색에 지지 않게) */
+.xl-notes .xpin-key,.xpins .xpin b{color:#FFFFFF}

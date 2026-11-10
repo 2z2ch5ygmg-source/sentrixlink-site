@@ -445,3 +445,36 @@ br.m,.m{display:none}
   .urgent__card{padding:22px}
   .urgent__feed{height:260px}
 }
+
+/* 11-10: 「이렇게 바뀝니다」 — 지금(흐린 줄) → 주황 화살표 → 바뀐 뒤(흰 상자) */
+.fixes ul{margin-top:10px;display:flex;flex-direction:column;gap:12px}
+.fixes__head,.fixes li{display:grid;grid-template-columns:minmax(0,1fr) 44px minmax(0,1.2fr);column-gap:16px;align-items:stretch}
+.fixes__head{margin-top:20px;font-size:14px;font-weight:700;color:var(--on-navy-3)}
+.fixes__head span:last-child{color:var(--on-navy-accent)}
+.fixes li{min-height:0;border-bottom:0}
+.fixes__now,.fixes__new{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:16px 20px;border-radius:16px;min-width:0}
+.fixes__now{background:rgba(255,255,255,.06)}
+.fixes__now small{font-size:13px;font-weight:600;color:var(--on-navy-3)}
+.fixes__now b{font-size:18px;font-weight:600;color:var(--on-navy-dim);text-decoration:line-through;text-decoration-color:rgba(255,255,255,.35)}
+.fixes__arrow{align-self:center;justify-self:center;width:40px;height:40px;border-radius:50%;background:var(--accent) no-repeat center/22px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12h13m-6-6 6 6-6 6' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}
+.fixes__new{position:relative;background:#fff;padding-right:130px}
+.fixes__new small{font-size:13px;font-weight:700;color:var(--muted)}
+.fixes__new b{font-size:19px;font-weight:700;color:var(--ink)}
+.fixes .fixes__new a{position:absolute;right:20px;top:50%;translate:0 -50%;color:var(--ink);font-size:14px}
+.fixes .fixes__new a:hover{color:var(--accent-ink)}
+.fixes.is-live li>*{opacity:0}
+.fixes.is-in li>*{animation:fix-land .34s cubic-bezier(.2,1.25,.4,1) both}
+.fixes.is-in li>:nth-child(1){animation-delay:calc(var(--i)*.4s)}
+.fixes.is-in li>:nth-child(2){animation-delay:calc(var(--i)*.4s + .14s)}
+.fixes.is-in li>:nth-child(3){animation-delay:calc(var(--i)*.4s + .28s)}
+@keyframes fix-land{from{opacity:0;translate:-16px 0}to{opacity:1;translate:0 0}}
+@media (prefers-reduced-motion:reduce){.fixes.is-live li>*{opacity:1;animation:none}}
+@media (max-width:899px){
+  .fixes__head{display:none}
+  .fixes ul{gap:22px}
+  .fixes li{grid-template-columns:minmax(0,1fr);row-gap:6px;padding:0}
+  .fixes__arrow{rotate:90deg;width:34px;height:34px}
+  .fixes__new{padding:16px 20px}
+  .fixes .fixes__new a{position:static;translate:none;margin-top:6px;text-align:left;grid-column:auto;grid-row:auto}
+  .fixes li>span{grid-column:auto;grid-row:auto}
+}
