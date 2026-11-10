@@ -9,6 +9,7 @@
 <meta name="theme-color" content="#F2F2F7">
 <link rel="icon" href="/static/img/sentrix-mark.png">
 <link rel="preload" href="/static/fonts/Pretendard-Bold.subset.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" as="image" href="/static/img/ios-lock-idle.webp"><link rel="preload" as="image" href="/static/img/ios-lock-active.webp"><link rel="preload" as="image" href="/static/img/ios-report-sheet.webp">
 <link rel="stylesheet" href="/static/css/site.css"><link rel="stylesheet" href="/static/css/home.css">
 <script>window.SL={"formKey": "b9e92fe1-3d66-457f-8d2d-3148048737d6", "preview": false}</script>
 <script src="/static/js/site.js" defer></script>
@@ -57,7 +58,7 @@
 <div class="wrap stack market__in">
 <div class="stack g16 market__head"><h2 class="h2" id="marketTitle">보안 현장은 이렇게 돌아갑니다</h2><p class="lead">고객사가 경비업체에 맡긴 현장의 모자란 인원을 협력업체 · 프리랜서 팀이 단기 근무자로 채웁니다.</p></div>
 <ol class="chain2"><li><span class="chain2__ic"><svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#11182A"><path d="M8 42V9a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v33M30 18h8a2 2 0 0 1 2 2v22M4 42h40"/><path d="M14 14h3M21 14h3M14 21h3M21 21h3M14 28h3M21 28h3M35 25h.01M35 31h.01"/></g><path d="M16 42v-7h6v7" stroke="#FF6B00"/></svg></span><b>발주처</b><small>고객사 · 건물 · 행사</small></li><li><span class="chain2__ic"><svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M24 5 9 10.5V22c0 9.5 6.4 16.8 15 20 8.6-3.2 15-10.5 15-20V10.5z" stroke="#11182A"/><path d="m17 23.5 5 5 9-10" stroke="#FF6B00"/></svg></span><b>경비업체</b><small>현장을 맡아 운영</small></li><li><span class="chain2__ic"><svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#11182A"><path d="M17 13V9.5a2.5 2.5 0 0 1 2.5-2.5h7a2.5 2.5 0 0 1 2.5 2.5V13"/><path d="M27 39H8a3 3 0 0 1-3-3V16a3 3 0 0 1 3-3h30a3 3 0 0 1 3 3v8"/><path d="M5 23c6 3 12.5 4.5 19 4.5 3 0 6-.3 9-.9"/></g><circle cx="37" cy="36" r="8" stroke="#FF6B00" fill="#fff"/><path d="M37 32v8M33 36h8" stroke="#FF6B00"/></svg></span><b>협력업체</b><small>모자란 인원을 채움</small></li><li><span class="chain2__ic"><svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#11182A"><circle cx="24" cy="19" r="5"/><path d="M15 41c0-5.5 4-9.3 9-9.3s9 3.8 9 9.3"/><circle cx="11" cy="23" r="4"/><path d="M3.5 39c0-4.4 3.2-7.4 7.5-7.4 1.4 0 2.6.3 3.7.9"/><circle cx="37" cy="23" r="4"/><path d="M44.5 39c0-4.4-3.2-7.4-7.5-7.4-1.4 0-2.6.3-3.7.9"/></g><path d="M24 13V4.5h7.5l-2 2.75 2 2.75H24" stroke="#FF6B00"/></svg></span><b>프리랜서 팀</b><small>팀장이 사람을 모음</small></li><li class=is-last><span class="chain2__ic"><svg viewBox="0 0 48 48" width="40" height="40" fill="none" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#11182A"><circle cx="19" cy="15" r="7"/><path d="M5 41c0-8 6.2-13.5 14-13.5 2.3 0 4.5.5 6.4 1.4"/></g><circle cx="35.5" cy="35.5" r="8.5" stroke="#FF6B00" fill="#fff"/><path d="M35.5 31v4.5l3 2" stroke="#FF6B00"/></svg></span><b>단기 근무자</b><small>거의 매일 바뀜</small></li></ol>
-<p class="market__note">단계를 거칠수록 <strong>소속이 섞인 인력</strong>이 한 현장에 들어오고, 기록은 <span>단톡방</span><span>엑셀</span><span>구인방</span>으로 흩어집니다.</p>
+<p class="market__note">단계를 거칠수록 <strong>소속이 섞인 인력</strong>이 한 현장에 들어오고, 기록은 <span>단톡방</span><span>Excel</span><span>구인방</span>으로 흩어집니다.</p>
 </div>
 </section>
 
@@ -94,14 +95,14 @@
 <h2 class="h2 products__h" id="productsTitle">현장은 Sentrix가,<br>사람과 근무는 Sentrix HR이.</h2>
 <div class="products__grid">
 <article class="stack product">
-<img class="product__logo" src="/static/img/sentrix-wordmark.png" alt="Sentrix" width="150" height="20">
+<img loading="lazy" decoding="async" class="product__logo" src="/static/img/sentrix-wordmark.png" alt="Sentrix" width="150" height="20">
 <p class="product__claim">현장에서 일어난 일을,<br>본사가 바로 압니다.</p>
 <ul class="product__list"><li>사건 보고와 상황실</li><li>요청과 승인</li><li>지원 인력 · 출퇴근</li><li>대시보드 · 사건 통계</li></ul>
 <div class="product__shot"><figure class="jr jr--web" data-journey="home-sx" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__sx-inc-room.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/3</span><span class="jr__t">상황실</span><span class="jr__c">현장 보고가 본사 상황실 맨 위에 들어옵니다.</span></figcaption><ol class="sr-only"><li><b>상황실</b> 현장 보고가 본사 상황실 맨 위에 들어옵니다.</li><li><b>사건 상세</b> 현장에서 만든 보고 문장이 그대로 있습니다.</li><li><b>종결</b> 지시와 답변 기록과 함께 종결됩니다.</li></ol></figure></div>
 <a class="more" href="/sentrix/">Sentrix 자세히 보기</a>
 </article>
 <article class="stack product">
-<img class="product__logo" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR" width="199" height="20">
+<img loading="lazy" decoding="async" class="product__logo" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR" width="199" height="20">
 <p class="product__claim">근무표부터 월말 자료까지,<br>사람과 근무를 한곳에서.</p>
 <ul class="product__list"><li>근무표 엑셀 양식</li><li>출퇴근 · 휴가 · 잔업</li><li>월말 정산 엑셀</li><li>경비원 서류 자동 작성</li></ul>
 <div class="product__shot"><figure class="jr jr--web" data-journey="home-hr" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__hr-sched-s3.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/3</span><span class="jr__t">스케줄 업로드</span><span class="jr__c">근무표 엑셀을 올리면 바뀌는 칸만 보여 줍니다.</span></figcaption><ol class="sr-only"><li><b>스케줄 업로드</b> 근무표 엑셀을 올리면 바뀌는 칸만 보여 줍니다.</li><li><b>월간 근무표</b> 반영한 칸이 월간 근무표에 바로 생깁니다.</li><li><b>월말 Finance</b> 월말엔 팀장이 고친 칸만 골라 확인합니다.</li></ol></figure></div>
@@ -201,11 +202,11 @@
 <p class="lead">현장 기록(Sentrix)과 근무 · 정산(Sentrix HR)이 채용(씨피)까지 이어져, 근무 평가가 다음 채용의 근거가 됩니다.</p>
 </div>
 <ol class="trio__flow">
-<li class="trio__card"><img src="/static/img/sentrix-mark.png" alt="" width="27" height="24"><b>Sentrix</b><span>사건 · 현장 운영</span><small>보고 · 상황실 · 출퇴근 · 지원 인력 요청</small></li>
+<li class="trio__card"><img loading="lazy" decoding="async" src="/static/img/sentrix-mark.png" alt="" width="27" height="24"><b>Sentrix</b><span>사건 · 현장 운영</span><small>보고 · 상황실 · 출퇴근 · 지원 인력 요청</small></li>
 <li class="trio__arrow" aria-hidden="true"><span>지원 요청 →<br>급구 공고</span></li>
-<li class="trio__card trio__card--cp"><img src="/static/img/cp-mark.png" alt="" width="28" height="28"><b>씨피(CP)</b><span>보안 · 행사 인력 채용</span><small>급구 공고 · 지원 · 확정 · 근무 후 평가</small><em>2027년 1~2월 출시 예정</em></li>
+<li class="trio__card trio__card--cp"><img loading="lazy" decoding="async" src="/static/img/cp-mark.png" alt="" width="28" height="28"><b>씨피(CP)</b><span>보안 · 행사 인력 채용</span><small>급구 공고 · 지원 · 확정 · 근무 후 평가</small><em>2027년 1~2월 출시 예정</em></li>
 <li class="trio__arrow" aria-hidden="true"><span>확정 인원 →<br>근무표 · 출퇴근</span></li>
-<li class="trio__card"><img src="/static/img/sentrix-hr-mark.png" alt="" width="27" height="24"><b>Sentrix HR</b><span>인력 · 근무 관리</span><small>근무표 · 승인 · 월말 정산 엑셀 · 경비원 서류</small></li>
+<li class="trio__card"><img loading="lazy" decoding="async" src="/static/img/sentrix-hr-mark.png" alt="" width="27" height="24"><b>Sentrix HR</b><span>인력 · 근무 관리</span><small>근무표 · 승인 · 월말 정산 엑셀 · 경비원 서류</small></li>
 </ol>
 <div class="trio__more2 trio__more2--one">
 <figure class="stack trio__loop"><figcaption><b>한 번의 급구가 다음 채용의 근거로 돌아옵니다.</b></figcaption><div class="trio__scene trio__scene--loop" data-scene="loop" role="img" aria-label="지원 인력 요청, 급구 공고, 평가 보고 확정, 출근과 사건 보고, 근태와 정산, 근무 후 평가가 한 계정 안에서 도는 순환"></div></figure>
@@ -229,8 +230,8 @@
 <div class="stack role__body">
 <div class="stack g8"><p class="role__h">본사는 PC 한 화면에서<br>전 지점을 봅니다.</p><p class="role__sub">PC 웹에서 씁니다.</p></div>
 <div class="role__cols">
-<div class="stack role__col"><img src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>상황실 · 사건 처리 상태</li><li>요청 승인 · 지원 인력</li><li>대시보드 · 사건 통계</li><li>공지</li></ul></div>
-<div class="stack role__col"><img src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>경비원 명부로 직원 등록</li><li>근무표 확인</li><li>휴가 · 잔업 승인</li><li>월말 정산 엑셀 · 경비원 서류</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>상황실 · 사건 처리 상태</li><li>요청 승인 · 지원 인력</li><li>대시보드 · 사건 통계</li><li>공지</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>경비원 명부로 직원 등록</li><li>근무표 확인</li><li>휴가 · 잔업 승인</li><li>월말 정산 엑셀 · 경비원 서류</li></ul></div>
 </div>
 </div>
 </div>
@@ -240,8 +241,8 @@
 <div class="stack role__body">
 <div class="stack g8"><p class="role__h">팀장은 자기 지점을<br>현장과 책상에서 챙깁니다.</p><p class="role__sub">iPhone 앱과 PC 웹에서 씁니다.</p></div>
 <div class="role__cols">
-<div class="stack role__col"><img src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>사건 보고와 상태 변경</li><li>요청 작성</li><li>새 기기 승인</li></ul></div>
-<div class="stack role__col"><img src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>근무표 엑셀 적용</li><li>예외 판정 · 잔업 승인</li><li>월말 제출</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>사건 보고와 상태 변경</li><li>요청 작성</li><li>새 기기 승인</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>근무표 엑셀 적용</li><li>예외 판정 · 잔업 승인</li><li>월말 제출</li></ul></div>
 </div>
 </div>
 </div>
@@ -251,8 +252,8 @@
 <div class="stack role__body">
 <div class="stack g8"><p class="role__h">부팀장은 팀장 일을<br>나눠 맡습니다.</p><p class="role__sub">iPhone 앱과 PC 웹에서 씁니다.</p></div>
 <div class="role__cols">
-<div class="stack role__col"><img src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>사건 보고와 상태 변경</li><li>요청 작성</li></ul></div>
-<div class="stack role__col"><img src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>근무표 엑셀 적용</li><li>출퇴근 기록 확인</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>사건 보고와 상태 변경</li><li>요청 작성</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>근무표 엑셀 적용</li><li>출퇴근 기록 확인</li></ul></div>
 </div>
 </div>
 </div>
@@ -262,8 +263,8 @@
 <div class="stack role__body">
 <div class="stack g8"><p class="role__h">근무자는 iPhone 하나로<br>출근부터 보고까지.</p><p class="role__sub">iPhone 앱과 모바일 웹에서 씁니다.</p></div>
 <div class="role__cols">
-<div class="stack role__col"><img src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>출퇴근 찍기</li><li>잠금화면 사건 보고</li><li>상황실 · 요청 보기</li><li>공지 · 무전</li></ul></div>
-<div class="stack role__col"><img src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>내 근무표 · 출퇴근 기록</li><li>휴가 · 정정 요청</li><li>증명서 발급</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-wordmark.png" alt="Sentrix에서" width="105" height="14"><ul><li>출퇴근 찍기</li><li>잠금화면 사건 보고</li><li>상황실 · 요청 보기</li><li>공지 · 무전</li></ul></div>
+<div class="stack role__col"><img loading="lazy" decoding="async" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR에서" width="139" height="14"><ul><li>내 근무표 · 출퇴근 기록</li><li>휴가 · 정정 요청</li><li>증명서 발급</li></ul></div>
 </div>
 </div>
 </div>
