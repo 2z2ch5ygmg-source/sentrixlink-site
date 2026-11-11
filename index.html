@@ -34,12 +34,14 @@
 <main id="main">
 <section class="hero">
 <div class="hero__in">
-<h1 class="hero__h h1"><span class="hero__l">현장에서 올린<br class="d"> 보고 한 건이</span><br class="m"> <span class="hero__r">본사 상황실에<br>바로 닿습니다.</span></h1>
+<h1 class="hero__h h1"><span class="hero__l">현장에서 올린<br class="d"> 보고 한 건이</span><br class="m"> <span class="hero__r">본사 상황실에<br> 바로 닿습니다.</span></h1>
 <div class="hero__logos" aria-hidden="true">
 <img src="/static/img/sentrix-wordmark.png" alt="" width="120" height="16">
 <img src="/static/img/sentrix-hr-wordmark.png" alt="" width="159" height="16">
 </div>
 <p class="hero__lead lead"><span class="d">Sentrix는 현장 운영을, Sentrix HR은 인력과 근무를 맡습니다. </span>보고부터 월말 근무 자료까지 다시 적지 않습니다.</p>
+<div class="hero__cta"><a class="btn btn--primary btn--lg" href="/contact/">도입 문의</a><a class="btn btn--secondary btn--lg" href="https://intro.sentrixlink.kr/" target="_blank" rel="noopener">제품설명서 보기<span class="sr-only"> (새 창)</span></a></div>
+<div class="hero__stage" aria-hidden="true"></div>
 <div class="hero__phone phone">
 <div class="phone__screen" data-scene="hero-phone" role="img" aria-label="근무자가 잠금화면에서 ECI 3 보고를 시작해 끝내고, 간편보고를 올리는 iPhone 화면">
 <picture><source srcset="/static/img/ios-report-summary.webp" type="image/webp"><img src="/static/img/ios-report-summary.png" alt="iPhone 앱에서 간편보고 내용을 확인하고 올리는 화면" width="720" height="1565" fetchpriority="high"></picture>
@@ -93,22 +95,20 @@
 <section class="sec products" aria-labelledby="productsTitle">
 <div class="wrap stack products__in">
 <h2 class="h2 products__h" id="productsTitle">현장은 Sentrix가,<br>사람과 근무는 Sentrix HR이.</h2>
-<div class="products__grid">
-<article class="stack product">
+<div class="tabs ptabs" role="tablist" aria-label="제품"><button type="button" role="tab" id="ptab-sx" aria-controls="ppanel-sx" aria-selected="true" tabindex="0" data-action="select-tab">Sentrix · 현장 운영</button><button type="button" role="tab" id="ptab-hr" aria-controls="ppanel-hr" aria-selected="false" tabindex="-1" data-action="select-tab">Sentrix HR · 인력과 근무</button></div>
+<div class="products__stage"><article class="product product--tab" role="tabpanel" id="ppanel-sx" aria-labelledby="ptab-sx"><div class="stack product__txt">
 <img loading="lazy" decoding="async" class="product__logo" src="/static/img/sentrix-wordmark.png" alt="Sentrix" width="150" height="20">
 <p class="product__claim">현장에서 일어난 일을,<br>본사가 바로 압니다.</p>
 <ul class="product__list"><li>사건 보고와 상황실</li><li>요청과 승인</li><li>지원 인력 · 출퇴근</li><li>대시보드 · 사건 통계</li></ul>
-<div class="product__shot"><figure class="jr jr--web" data-journey="home-sx" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__sx-inc-room.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/3</span><span class="jr__t">상황실</span><span class="jr__c">현장 보고가 본사 상황실 맨 위에 들어옵니다.</span></figcaption><ol class="sr-only"><li><b>상황실</b> 현장 보고가 본사 상황실 맨 위에 들어옵니다.</li><li><b>사건 상세</b> 현장에서 만든 보고 문장이 그대로 있습니다.</li><li><b>종결</b> 지시와 답변 기록과 함께 종결됩니다.</li></ol></figure></div>
+
 <a class="more" href="/sentrix/">Sentrix 자세히 보기</a>
-</article>
-<article class="stack product">
+</div><div class="product__shot"><figure class="jr jr--web" data-journey="home-sx" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__sx-inc-room.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/3</span><span class="jr__t">상황실</span><span class="jr__c">현장 보고가 본사 상황실 맨 위에 들어옵니다.</span></figcaption><ol class="sr-only"><li><b>상황실</b> 현장 보고가 본사 상황실 맨 위에 들어옵니다.</li><li><b>사건 상세</b> 현장에서 만든 보고 문장이 그대로 있습니다.</li><li><b>종결</b> 지시와 답변 기록과 함께 종결됩니다.</li></ol></figure></div></article><article class="product product--tab" role="tabpanel" id="ppanel-hr" aria-labelledby="ptab-hr" hidden><div class="stack product__txt">
 <img loading="lazy" decoding="async" class="product__logo" src="/static/img/sentrix-hr-wordmark.png" alt="Sentrix HR" width="199" height="20">
 <p class="product__claim">근무표부터 월말 자료까지,<br>사람과 근무를 한곳에서.</p>
 <ul class="product__list"><li>근무표 Excel 양식</li><li>출퇴근 · 휴가 · 잔업</li><li>월말 정산 Excel</li><li>경비원 서류 자동 작성</li></ul>
-<div class="product__shot"><figure class="jr jr--web" data-journey="home-hr" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__hr-sched-s3.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/3</span><span class="jr__t">스케줄 업로드</span><span class="jr__c">근무표 Excel을 올리면 바뀌는 칸만 보여 줍니다.</span></figcaption><ol class="sr-only"><li><b>스케줄 업로드</b> 근무표 Excel을 올리면 바뀌는 칸만 보여 줍니다.</li><li><b>월간 근무표</b> 반영한 칸이 월간 근무표에 바로 생깁니다.</li><li><b>월말 Finance</b> 월말엔 팀장이 고친 칸만 골라 확인합니다.</li></ol></figure></div>
+
 <a class="more" href="/sentrix-hr/">Sentrix HR 자세히 보기</a>
-</article>
-</div>
+</div><div class="product__shot"><figure class="jr jr--web" data-journey="home-hr" data-loop><div class="jr__stage"><img class="jr__still jr__still--web" src="/static/img/app/web__hr-sched-s3.webp" alt="" loading="lazy" decoding="async"></div><figcaption class="jr__cap"><span class="jr__n">1/3</span><span class="jr__t">스케줄 업로드</span><span class="jr__c">근무표 Excel을 올리면 바뀌는 칸만 보여 줍니다.</span></figcaption><ol class="sr-only"><li><b>스케줄 업로드</b> 근무표 Excel을 올리면 바뀌는 칸만 보여 줍니다.</li><li><b>월간 근무표</b> 반영한 칸이 월간 근무표에 바로 생깁니다.</li><li><b>월말 Finance</b> 월말엔 팀장이 고친 칸만 골라 확인합니다.</li></ol></figure></div></article></div>
 <p class="products__note">두 제품을 함께 쓰는 것이 기본이며, 계정은 하나로 씁니다.</p>
 </div>
 </section>

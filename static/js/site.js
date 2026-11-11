@@ -203,3 +203,15 @@
 
 // 「이렇게 바뀝니다」: 보이면 줄마다 지금 → 화살표 → 바뀐 뒤 순서로 나타난다
 (function(){var f=document.querySelector('[data-fixes]');if(!f||!('IntersectionObserver' in window))return;f.classList.add('is-live');var io=new IntersectionObserver(function(e){if(e[0].isIntersecting){f.classList.add('is-in');io.disconnect();}},{threshold:.15});io.observe(f);})();
+
+// 시안: 스크롤하면 구역 안 요소가 아래에서 부드럽게 올라온다(줄어든 움직임 설정이면 끔)
+(function(){
+  if(!('IntersectionObserver' in window)||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(document.body.dataset.page!=='home')return;
+  document.documentElement.classList.add('js-rv');
+  var groups=['.sec .wrap > *','.hero__cta','.hero__stage','.products__stage','.trio__flow > li','.urgent__figs > *','.urgent__stats > *','.why__grid > *','.flex__pts > li','.steps > li','.road2 > li','.xlc__row','.facts > li'];
+  var seen=new Set(), els=[];
+  groups.forEach(function(g){document.querySelectorAll(g).forEach(function(e,i){ if(seen.has(e)||e.closest('[hidden]'))return; if(e.matches('.sec .wrap > *')&&e.querySelector('.xlc,.trio__flow,.urgent__figs,.steps,.road2,.why__grid'))return; seen.add(e); e.classList.add('rv'); if(!e.matches('.sec .wrap > *'))e.style.setProperty('--rv-d',Math.min(i,5)*80+'ms'); els.push(e);});});
+  var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){x.target.classList.add('rv-in');io.unobserve(x.target);}});},{rootMargin:'0px 0px -6% 0px',threshold:0});
+  els.forEach(function(e){io.observe(e);});
+})();
