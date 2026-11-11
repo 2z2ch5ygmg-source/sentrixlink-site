@@ -1,0 +1,84 @@
+/* 캡처 대신 쓰는 그림(2026-11-11): B 기능 한 장면(.scn) · C 흐름 그림(.flw). 마크업은 tools/bc_scenes.py */
+
+/* ---------- B 기능 한 장면 ---------- */
+.scn{margin:0;display:flex;flex-direction:column;gap:14px;width:100%;max-width:620px;min-width:0}
+.scn__card{background:#fff;border:1px solid var(--line-3);border-radius:28px;padding:26px 30px 6px;box-shadow:0 24px 60px rgba(17,24,42,.06)}
+.scn__head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--line-3)}
+.scn__head b{font-size:20px;font-weight:800;color:var(--ink)}
+.scn__head em{font-style:normal;color:var(--accent-ink);font-variant-numeric:tabular-nums}
+.scn__head span{font-size:14px;color:var(--muted-2);text-align:right}
+.scn__row{display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;column-gap:16px;padding:18px 0;border-bottom:1px solid var(--line-3)}
+.scn__row:last-child{border-bottom:0}
+.scn__ic{width:48px;height:48px;border-radius:50%;background:var(--bg);display:grid;place-items:center}
+.scn__t{display:flex;flex-direction:column;gap:3px;min-width:0}
+.scn__t b{font-size:19px;font-weight:700;line-height:1.35;color:var(--ink);transition:color .3s}
+.scn__t span{font-size:15px;color:var(--muted-2)}
+.scn__t span:empty{display:none}
+.scn__act{display:grid;justify-items:end}
+.scn__btn,.scn__done{grid-area:1/1;height:44px;display:flex;align-items:center;justify-content:center;border-radius:999px;font-size:16px;font-weight:700;white-space:nowrap;transition:opacity .35s,transform .35s cubic-bezier(.2,.7,.2,1)}
+.scn__btn{padding:0 22px;background:var(--navy);color:#fff}
+.scn__done{padding:0 18px;border:2px solid var(--accent);color:var(--accent-ink);font-weight:800;opacity:0;transform:scale(.88)}
+.scn__row.is-done .scn__btn{opacity:0;transform:scale(.88)}
+.scn__row.is-done .scn__done{opacity:1;transform:none}
+.scn__row.is-done.is-todo .scn__t b{color:var(--muted)}
+.scn__val{font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.scn__foot{display:flex;align-items:center;gap:10px;margin:0;padding-left:6px;font-size:16px;font-weight:700;color:var(--ink-2)}
+.scn__note{margin:0;padding-left:6px;font-size:13px;color:var(--hint)}
+.sec--navy .scn__foot{color:var(--on-navy)}
+.sec--navy .scn__note{color:var(--on-navy-3)}
+@media (prefers-reduced-motion:reduce){.scn__btn,.scn__done,.scn__t b{transition:none}}
+@media (max-width:719px){
+  .scn__card{padding:20px 18px 4px;border-radius:22px}
+  .scn__head b{font-size:18px}
+  .scn__row{grid-template-columns:40px minmax(0,1fr) auto;column-gap:12px;padding:14px 0}
+  .scn__ic{width:40px;height:40px}
+  .scn__ic svg{width:22px;height:22px}
+  .scn__t b{font-size:16px}
+  .scn__t span{font-size:13.5px}
+  .scn__btn,.scn__done{height:38px;font-size:14.5px}
+  .scn__btn{padding:0 15px} .scn__done{padding:0 12px}
+  .scn__val{font-size:16px}
+  .scn__foot{font-size:14.5px}
+}
+
+/* ---------- C 흐름 그림 ---------- */
+.flw{margin:0;display:flex;flex-direction:column;gap:14px;width:100%;min-width:0;container-type:inline-size}
+.flw__grid{display:grid;grid-template-columns:minmax(0,1fr) 64px minmax(0,1.05fr) 64px minmax(0,1fr);align-items:center}
+.flw__col{display:flex;flex-direction:column;gap:12px;min-width:0}
+.flw__lab{padding-left:4px;font-size:14px;font-weight:700;color:var(--muted-2)}
+.flw__item{display:flex;flex-direction:column;gap:3px;padding:18px 20px;border-radius:20px;background:#fff;border:1px solid var(--line-3);min-width:0}
+.flw__item b{font-size:18px;font-weight:700;color:var(--ink)}
+.flw__item span{font-size:14.5px;color:var(--muted-2)}
+.flw__item--out{flex-direction:row;align-items:center;gap:14px}
+.flw__hub{display:flex;flex-direction:column;align-items:center;gap:12px;padding:34px 22px;border-radius:28px;background:#fff;box-shadow:0 24px 60px rgba(17,24,42,.08);text-align:center;min-width:0}
+.flw__hub b{font-size:22px;font-weight:800;line-height:1.3;color:var(--ink)}
+.flw__hub span{font-size:15px;color:var(--muted)}
+.flw__arr{display:flex;justify-content:center;padding-top:28px}
+.flw__svg{width:52px;height:24px;stroke:var(--accent);stroke-width:3}
+.flw__line{stroke-dasharray:6 7;animation:flw-dash 1s linear infinite}
+@keyframes flw-dash{to{stroke-dashoffset:-13}}
+/* 들어옴 → 가운데 → 나감 순서로 칸이 켜진다 */
+.flw__col--in .flw__item,.flw__hub,.flw__col--out .flw__item{animation:flw-on 4.8s ease-in-out infinite}
+.flw__hub{animation-delay:1.2s}
+.flw__col--out .flw__item{animation-delay:2.4s}
+.flw__col--in .flw__item:nth-of-type(2){animation-delay:.3s}
+.flw__col--out .flw__item:nth-of-type(2){animation-delay:2.7s}
+@keyframes flw-on{0%,30%,100%{box-shadow:0 0 0 0 rgba(255,107,0,0)}12%{box-shadow:0 0 0 3px rgba(255,107,0,.35)}}
+.sec--navy .flw__lab{color:var(--on-navy-3)}
+@media (prefers-reduced-motion:reduce){.flw__line,.flw__item,.flw__hub{animation:none}}
+@container (max-width:760px){
+  .flw__grid{grid-template-columns:minmax(0,1fr);row-gap:6px}
+  .flw__arr{padding:0;transform:rotate(90deg);height:44px;align-items:center}
+  .flw__hub{padding:26px 18px}
+}
+
+/* 놓이는 자리: 흐름 그림은 글 아래 전체 폭, 한 장면 카드는 가운데 */
+.p-two:has(.p-vis--flw){grid-template-columns:minmax(0,1fr);row-gap:40px}
+.p-two:has(.p-vis--flw) > .p-txt{max-width:760px;order:-1}
+.p-vis--flw{display:block;width:100%;min-width:0}
+.p-vis--bc{display:flex;justify-content:center;width:100%;min-width:0}
+.product__shot--bc,.role__visual--bc{display:flex;justify-content:center;min-width:0}
+@media (max-width:719px){ .scn__head{flex-direction:column;align-items:flex-start;gap:4px} .scn__head span{text-align:left} }
+/* HR 본사 구역: 제목 왼쪽 · 카드 오른쪽(제목 왼쪽에 카드만 가운데로 떠 보이지 않게) */
+@media (min-width:1024px){ .hq__in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,620px);column-gap:72px;align-items:center} }
+@media (min-width:1024px){ .cp-block:has(.p-vis--bc){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,620px);column-gap:72px;align-items:center} }

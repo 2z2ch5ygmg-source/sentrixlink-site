@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>씨피(CP) — 근무 평가로 믿고 뽑는 보안 · 행사 인력 채용 | Sentrix Link</title>
+<title>씨피(CP) — 긴급 고용도 실시간으로 채용 | Sentrix Link</title>
 <meta name="description" content="씨피(CP)는 급구 공고, 지원, 확정, 근무 후 평가까지 이어지는 보안 · 행사 인력 채용 앱입니다. 지난 근무의 별점과 근무 횟수로 지원자를 비교해 뽑고, 근무할수록 평가와 신뢰지수가 쌓입니다. 2027년 1~2월 출시 예정.">
 <link rel="canonical" href="https://sentrixlink.kr/cp/">
 <meta name="theme-color" content="#F2F2F7">
 <link rel="icon" href="/static/img/sentrix-mark.png">
 <link rel="preload" href="/static/fonts/Pretendard-Bold.subset.woff2" as="font" type="font/woff2" crossorigin>
 
-<link rel="stylesheet" href="/static/css/site.css"><link rel="stylesheet" href="/static/css/product.css"><link rel="stylesheet" href="/static/css/cp.css">
+<link rel="stylesheet" href="/static/css/site.css?v=9a5e250f"><link rel="stylesheet" href="/static/css/product.css?v=d740f23d"><link rel="stylesheet" href="/static/css/cp.css?v=2401a1d4"><link rel="stylesheet" href="/static/css/bc.css?v=32faf515">
 <script>window.SL={"formKey": "b9e92fe1-3d66-457f-8d2d-3148048737d6", "preview": false}</script>
-<script src="/static/js/site.js" defer></script>
+<script src="/static/js/site.js?v=4f146e8f" defer></script>
 </head>
 <body data-page="cp">
 <a class="skip" href="#main">본문으로 건너뛰기</a>
@@ -36,12 +36,16 @@
 <div class="wrap stack p-hero__in">
 <div class="stack p-hero__head">
 <p class="cp-logo"><img src="/static/img/cp-mark.png" alt="" width="36" height="36"><b>씨피(CP)</b><span class="cp-soon">2027년 1~2월 출시 예정</span></p>
-<h1 class="p-h1" id="pTitle">근무 평가로<br class="p-m"> 믿고 뽑는<br>보안 · 행사 인력 채용.</h1>
-<p class="lead p-hero__lead">급구 공고부터 지원, 확정, 근무 후 평가까지. 지난 근무의 기록이 다음 채용의 근거가 됩니다.</p>
+<h1 class="p-h1" id="pTitle">긴급 고용도<br>실시간으로 채용.</h1>
+<p class="lead p-hero__lead">원하는 프로필 클릭으로 채용 끝.</p>
 </div>
-<div class="cp-hero-phones">
-<div class="phone" style="--pw:300px"><img src="/static/img/cp/cpi-02-short.webp" alt="씨피 급구 화면: 지금 Hot한 공고 목록" width="402" height="874"></div>
-<div class="phone" style="--pw:300px"><img src="/static/img/cp/cpi-14-profile.webp" alt="씨피 내 정보: 평점 4.9 · 출근율 100% · 근무 27회 · 신뢰지수" width="402" height="874"></div>
+<div class="cp-live">
+<div class="phone cp-live__ph" style="--pw:280px"><img src="/static/img/cp/cpi-02-short.webp" alt="씨피 급구 화면: 지금 Hot한 공고 목록" width="402" height="874"></div>
+<figure class="cp-feed" aria-label="실시간 급구 공고 예시">
+<figcaption class="cp-feed__head"><b><i class="cp-feed__dot" aria-hidden="true"></i>실시간 급구</b><span>예시 화면입니다</span></figcaption>
+<ol class="cp-feed__list" data-cp-feed></ol>
+</figure>
+<div class="phone cp-live__ph cp-live__ph--r" style="--pw:280px"><img src="/static/img/cp/cpi-14-profile.webp" alt="씨피 내 정보: 평점 4.9 · 출근율 100% · 근무 27회 · 신뢰지수" width="402" height="874"></div>
 </div>
 </div>
 </section>
@@ -51,9 +55,10 @@
 <div class="stack p-txt cp-txt">
 <p class="cp-step">모집자 · PC</p>
 <h2 class="h2" id="postTitle">급구 공고는<br class="p-m"> 정해진 칸으로.</h2>
-<p class="lead">근무일 · 시작 시간 · 인원 · 일급 · 장소 · 하는 일 · 복장을 칸에 맞춰 넣습니다. 오른쪽에서 구직자에게 보일 화면을 보면서 쓰고, 급하면 「급구 고정」으로 목록 위에 올립니다.</p>
+<p class="lead">급하면 「급구 고정」으로 목록 위에 올립니다.</p>
 </div>
-<figure class="shot-web cp-shot"><div class="shot-web__bar"><span></span><span></span><span></span><em>씨피(CP) · 공고 쓰기</em></div><picture><source media="(max-width:719px)" srcset="/static/img/cp/cpw-urgent-m.webp"><img src="/static/img/cp/cpw-urgent.webp" alt="공고 쓰기 화면: 담당자, 노출 신청에서 급구 고정을 고른 상태" width="1320" height="882" loading="lazy"></picture></figure>
+<div class="p-vis p-vis--bc"><figure class="scn" data-scn aria-label="급구 공고 쓰기 예시 그림"><div class="scn__card"><div class="scn__head"><b>급구 공고 쓰기</b><span>모집자 · PC</span></div><ol class="scn__rows"><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <path d="M26 39H9a3 3 0 0 1-3-3V12a3 3 0 0 1 3-3h26a3 3 0 0 1 3 3v8M6 18h32M14 5v7M30 5v7"></path> <path d="M12 25h4M20 25h4M12 31h4"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>근무일 · 시작</b><span>11월 14일 (금) · 07:00</span></span><span class="scn__val">2명</span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <rect x="5" y="7" width="30" height="30" rx="3"></rect> <path d="M5 16h30M5 26.5h30M16 7v30"></path> </g> <circle cx="36" cy="36" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M36 31.5v8M32.5 36.5l3.5 3.5 3.5-3.5" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>일급</b><span>정해진 칸에 숫자로</span></span><span class="scn__val">13만 원</span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <path d="M8 42V9a2 2 0 0 1 2-2h18a2 2 0 0 1 2 2v33M30 18h8a2 2 0 0 1 2 2v22M4 42h40"></path> <path d="M14 14h3M21 14h3M14 21h3M21 21h3M14 28h3M21 28h3M35 25h.01M35 31h.01"></path> </g> <path d="M16 42v-7h6v7" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>장소 · 하는 일 · 복장</b><span>코엑스 C홀 · 출입 통제 · 검정 정장</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="24" cy="24" r="18" stroke="#0e1a33"></circle> <path d="m16 24.5 5.5 5.5L32.5 19" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>급구 고정</b><span>목록 맨 위에 올립니다</span></span><span class="scn__act"><span class="scn__btn">켜기</span><span class="scn__done">켜짐</span></span></li></ol></div><p class="scn__foot"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6B00" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>구직자에게는 정해진 칸 그대로 보입니다</p><figcaption class="scn__note">예시 그림입니다.</figcaption></figure>
+</div>
 </div>
 </section>
 
@@ -61,10 +66,11 @@
 <div class="wrap p-two p-two--flip">
 <div class="stack p-txt">
 <p class="cp-step">근무자 · iPhone</p>
-<h2 class="h2" id="applyTitle">보고, 고르고,<br>바로 지원합니다.</h2>
-<p class="lead">급구 탭에서 공고를 열면 일급 · 시간 · 장소 · 하는 일 · 복장이 한 화면에 보입니다. 도착할 수 있는 시간을 골라 바로 지원합니다.</p>
+<h2 class="h2" id="applyTitle">보고, 고르고,<br>바로 지원.</h2>
+<p class="lead">도착할 수 있는 시간만 고르면 지원 끝.</p>
 </div>
-<div class="p-vis"><div class="phone" style="--pw:320px"><img src="/static/img/cp/cpi-03-detail.webp" alt="공고 상세: 일급 130,000원, 시간, 장소, 하는 일, 복장" width="402" height="874" loading="lazy"></div></div>
+<div class="p-vis p-vis--bc"><figure class="scn" data-scn data-max="1" aria-label="출입 통제 요원 · 일급 13만 예시 그림"><div class="scn__card"><div class="scn__head"><b>출입 통제 요원 · 일급 13만</b><span>코엑스 · 도착 가능 시간</span></div><ol class="scn__rows"><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="24" cy="24" r="18" stroke="#0e1a33"></circle> <path d="m16 24.5 5.5 5.5L32.5 19" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>지금 바로</b><span>13km · 도착 즉시</span></span><span class="scn__act"><span class="scn__btn">고르기</span><span class="scn__done">지원 완료</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <path d="M26 39H9a3 3 0 0 1-3-3V12a3 3 0 0 1 3-3h26a3 3 0 0 1 3 3v8M6 18h32M14 5v7M30 5v7"></path> <path d="M12 25h4M20 25h4M12 31h4"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>30분 뒤</b><span></span></span><span class="scn__act"><span class="scn__btn">고르기</span><span class="scn__done">지원 완료</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <path d="M26 39H9a3 3 0 0 1-3-3V12a3 3 0 0 1 3-3h26a3 3 0 0 1 3 3v8M6 18h32M14 5v7M30 5v7"></path> <path d="M12 25h4M20 25h4M12 31h4"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>1시간 뒤</b><span></span></span><span class="scn__act"><span class="scn__btn">고르기</span><span class="scn__done">지원 완료</span></span></li></ol></div><p class="scn__foot"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6B00" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>시간만 고르면 지원 끝</p><figcaption class="scn__note">예시 그림입니다.</figcaption></figure>
+</div>
 </div>
 </section>
 
@@ -72,10 +78,11 @@
 <div class="wrap stack cp-block">
 <div class="stack p-txt cp-txt">
 <p class="cp-step">모집자 · PC</p>
-<h2 class="h2" id="compareTitle">경력 소개가 아니라<br>지난 근무로 고릅니다.</h2>
-<p class="lead">지원자마다 씨피에서 받은 별점, 근무 횟수, 이수증 확인이 나란히 보입니다. 확정 요청을 보내고 근무자가 최종 수락하면 채용이 확정되고, 그때 담당 연락처가 열립니다.</p>
+<h2 class="h2" id="compareTitle">경력 소개 대신<br>지난 근무 평가로.</h2>
+<p class="lead">별점 · 근무 횟수 · 이수증 확인이 나란히 보입니다.</p>
 </div>
-<figure class="shot-web cp-shot"><div class="shot-web__bar"><span></span><span></span><span></span><em>씨피(CP) · 지원자 관리</em></div><picture><source media="(max-width:719px)" srcset="/static/img/cp/cpw-compare-m.webp"><img src="/static/img/cp/cpw-compare.webp" alt="지원자 관리: 김민준 별점 4.9 · 씨피 근무 27회 · 교육 이수증 확인됨" width="1410" height="939" loading="lazy"></picture></figure>
+<div class="p-vis p-vis--bc"><figure class="scn" data-scn data-max="2" aria-label="지원자 3명 예시 그림"><div class="scn__card"><div class="scn__head"><b>지원자 3명</b><span>코엑스 출입 통제 · 2명</span></div><ol class="scn__rows"><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="19" cy="15" r="7"></circle> <path d="M5 41c0-8 6.2-13.5 14-13.5 2.3 0 4.5.5 6.4 1.4"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>김민준</b><span>★ 4.9 · 근무 27회 · 이수증 확인</span></span><span class="scn__act"><span class="scn__btn">확정 요청</span><span class="scn__done">확정</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="19" cy="15" r="7"></circle> <path d="M5 41c0-8 6.2-13.5 14-13.5 2.3 0 4.5.5 6.4 1.4"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>이서연</b><span>★ 4.7 · 근무 12회 · 이수증 확인</span></span><span class="scn__act"><span class="scn__btn">확정 요청</span><span class="scn__done">확정</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="19" cy="15" r="7"></circle> <path d="M5 41c0-8 6.2-13.5 14-13.5 2.3 0 4.5.5 6.4 1.4"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>정하은</b><span>첫 근무 · 이수증 확인</span></span><span class="scn__act"><span class="scn__btn">확정 요청</span><span class="scn__done">확정</span></span></li></ol></div><p class="scn__foot"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6B00" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>원하는 프로필 클릭으로 채용 끝</p><figcaption class="scn__note">예시 그림입니다.</figcaption></figure>
+</div>
 </div>
 </section>
 
@@ -83,10 +90,11 @@
 <div class="wrap p-two">
 <div class="stack p-txt">
 <p class="cp-step cp-step--navy">모집자 · iPhone</p>
-<h2 class="h2" id="reviewTitle">근무가 끝나면<br>한 사람씩 평가합니다.</h2>
-<p class="lead">그날 일한 사람마다 별점과 메모를 남깁니다. 별점이 낮으면 이유를 꼭 적어, 다음 모집자가 무엇이 문제였는지 압니다. 평가는 업체 이름으로 남습니다.</p>
+<h2 class="h2" id="reviewTitle">근무가 끝나면<br>한 사람씩 평가.</h2>
+<p class="lead">별점이 낮으면 이유를 꼭 남깁니다.</p>
 </div>
-<div class="p-vis"><div class="phone" style="--pw:320px"><img src="/static/img/cp/cpi-13-review-saved.webp" alt="근무자 평가: 사람마다 별점과 메모, 낮은 별점은 메모 필수" width="402" height="874" loading="lazy"></div></div>
+<div class="p-vis p-vis--bc"><figure class="scn" data-scn aria-label="오늘 근무 평가 예시 그림"><div class="scn__card"><div class="scn__head"><b>오늘 근무 평가</b><span>코엑스 · 3명</span></div><ol class="scn__rows"><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="18" cy="15" r="7"></circle> <path d="M4 41c0-8 6.2-13.5 14-13.5 2.5 0 4.9.6 6.9 1.6"></path> </g> <path d="m36 25 3 6 6.5.9-4.7 4.6 1.1 6.5-5.9-3.1-5.9 3.1 1.1-6.5-4.7-4.6 6.5-.9z" stroke="#ff6b00" fill="#fff"></path></svg></span><span class="scn__t"><b>김민준</b><span>★★★★★</span></span><span class="scn__act"><span class="scn__btn">남기기</span><span class="scn__done">남김</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="18" cy="15" r="7"></circle> <path d="M4 41c0-8 6.2-13.5 14-13.5 2.5 0 4.9.6 6.9 1.6"></path> </g> <path d="m36 25 3 6 6.5.9-4.7 4.6 1.1 6.5-5.9-3.1-5.9 3.1 1.1-6.5-4.7-4.6 6.5-.9z" stroke="#ff6b00" fill="#fff"></path></svg></span><span class="scn__t"><b>이서연</b><span>★★★★☆</span></span><span class="scn__act"><span class="scn__btn">남기기</span><span class="scn__done">남김</span></span></li><li class="scn__row is-todo"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="18" cy="15" r="7"></circle> <path d="M4 41c0-8 6.2-13.5 14-13.5 2.5 0 4.9.6 6.9 1.6"></path> </g> <path d="m36 25 3 6 6.5.9-4.7 4.6 1.1 6.5-5.9-3.1-5.9 3.1 1.1-6.5-4.7-4.6 6.5-.9z" stroke="#ff6b00" fill="#fff"></path></svg></span><span class="scn__t"><b>정하은</b><span>★★☆☆☆ · 사유: 30분 지각</span></span><span class="scn__act"><span class="scn__btn">남기기</span><span class="scn__done">남김</span></span></li></ol></div><p class="scn__foot"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6B00" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>별점이 낮으면 이유를 꼭 남깁니다</p><figcaption class="scn__note">예시 그림입니다.</figcaption></figure>
+</div>
 </div>
 </section>
 
@@ -95,9 +103,10 @@
 <div class="stack p-txt">
 <p class="cp-step">근무자 · iPhone</p>
 <h2 class="h2" id="trustTitle">일할수록<br>신뢰가 쌓입니다.</h2>
-<p class="lead">평점 · 출근율 · 근무 횟수 · 신뢰지수와 뱃지가 내 정보에 모입니다. 받은 평가는 다음 지원에서 모집자가 보는 근거가 되고, 근무 이력이 곧 포트폴리오가 됩니다.</p>
+<p class="lead">평가와 근무 이력이 곧 포트폴리오가 됩니다.</p>
 </div>
-<div class="p-vis"><div class="phone" style="--pw:320px"><img src="/static/img/cp/cpi-14-profile.webp" alt="내 정보: 평점 4.9 · 출근율 100% · 근무 27회 · 신뢰지수 90.5 · 대표 뱃지" width="402" height="874" loading="lazy"></div></div>
+<div class="p-vis p-vis--bc"><figure class="scn" data-scn aria-label="내 정보 · 민준 예시 그림"><div class="scn__card"><div class="scn__head"><b>내 정보 · 민준</b><span>근무자</span></div><ol class="scn__rows"><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="18" cy="15" r="7"></circle> <path d="M4 41c0-8 6.2-13.5 14-13.5 2.5 0 4.9.6 6.9 1.6"></path> </g> <path d="m36 25 3 6 6.5.9-4.7 4.6 1.1 6.5-5.9-3.1-5.9 3.1 1.1-6.5-4.7-4.6 6.5-.9z" stroke="#ff6b00" fill="#fff"></path></svg></span><span class="scn__t"><b>평점</b><span>받은 평가 12건</span></span><span class="scn__val">4.9</span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M24 44s15-13.4 15-25a15 15 0 1 0-30 0c0 11.6 15 25 15 25z" stroke="#0e1a33"></path> <path d="m17.5 19 4.5 4.5 8.5-9" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>출근율</b><span>확정된 근무 중</span></span><span class="scn__val">100%</span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <path d="M24 42H11a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h17l8 8v8"></path> <path d="M28 6v8h8M14 18h8M14 25h10M14 32h6"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>근무 횟수</b><span>씨피에서 끝낸 근무</span></span><span class="scn__val">27회</span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M24 5 9 10.5V22c0 9.5 6.4 16.8 15 20 8.6-3.2 15-10.5 15-20V10.5z" stroke="#0e1a33"></path> <path d="m17 23.5 5 5 9-10" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>신뢰지수</b><span>평가 · 출근 · 이력</span></span><span class="scn__val">90.5</span></li></ol></div><p class="scn__foot"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6B00" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>일한 기록이 다음 지원의 근거가 됩니다</p><figcaption class="scn__note">예시 그림입니다.</figcaption></figure>
+</div>
 </div>
 </section>
 
@@ -106,15 +115,16 @@
 <div class="stack p-txt">
 <p class="cp-step">근무자 · 모집자</p>
 <h2 class="h2" id="commTitle">현장 이야기는<br>커뮤니티에서.</h2>
-<p class="lead">업계 이야기 · 현장 정보 · 질문 게시판에서 교대 인수인계, 복장 규정 같은 현장 정보를 나눕니다. 출시 때는 커뮤니티와 무료 공고부터 엽니다.</p>
+<p class="lead">교대 인수인계, 복장 규정 같은 현장 정보를 나눕니다.</p>
 </div>
-<div class="p-vis"><div class="phone" style="--pw:320px"><img src="/static/img/cp/cpi-18-community.webp" alt="커뮤니티: 게시판 목록과 HOT 글" width="402" height="874" loading="lazy"></div></div>
+<div class="p-vis p-vis--bc"><figure class="scn" data-scn aria-label="커뮤니티 예시 그림"><div class="scn__card"><div class="scn__head"><b>커뮤니티</b><span>근무자 · 모집자</span></div><ol class="scn__rows"><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <path d="M24 42H11a3 3 0 0 1-3-3V9a3 3 0 0 1 3-3h17l8 8v8"></path> <path d="M28 6v8h8M14 18h8M14 25h10M14 32h6"></path> </g> <circle cx="35.5" cy="35.5" r="8.5" stroke="#ff6b00" fill="#fff"></circle> <path d="M35.5 31v4.5l3 2" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>야간 교대 인수인계 체크리스트</b><span>현장 정보</span></span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 8.2 4.8 36a4 4 0 0 0 3.5 6h31.4a4 4 0 0 0 3.5-6L27.4 8.2a3.9 3.9 0 0 0-6.8 0z" stroke="#0e1a33"></path> <path d="M24 18v10M24 34.5h.01" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>행사장 복장 규정 질문</b><span>질문</span></span></li><li class="scn__row"><span class="scn__ic"><svg width="26" height="26" viewBox="0 0 48 48" fill="none" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#0e1a33"> <circle cx="24" cy="19" r="5"></circle> <path d="M15 41c0-5.5 4-9.3 9-9.3s9 3.8 9 9.3"></path> <circle cx="11" cy="23" r="4"></circle> <path d="M3.5 39c0-4.4 3.2-7.4 7.5-7.4 1.4 0 2.6.3 3.7.9"></path> <circle cx="37" cy="23" r="4"></circle> <path d="M44.5 39c0-4.4-3.2-7.4-7.5-7.4-1.4 0-2.6.3-3.7.9"></path> </g> <path d="M24 13V4.5h7.5l-2 2.75 2 2.75H24" stroke="#ff6b00"></path></svg></span><span class="scn__t"><b>이번 주 전시회 근무 후기</b><span>업계 이야기</span></span></li></ol></div><p class="scn__foot"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF6B00" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>현장 정보는 게시판에서 나눕니다</p><figcaption class="scn__note">예시 그림입니다.</figcaption></figure>
+</div>
 </div>
 </section>
 
 <section class="sec p-sec p-y112" aria-labelledby="linkTitle">
 <div class="wrap stack p-block">
-<div class="stack p-txt"><h2 class="h2" id="linkTitle">Sentrix · Sentrix HR과<br class="p-m"> 이어집니다.</h2></div>
+<div class="stack p-txt"><h2 class="h2" id="linkTitle">확정된 근무는<br>Sentrix · Sentrix HR로.</h2></div>
 <ul class="p-rules p-rules--3">
 <li><strong>현장 결원 → 급구 공고</strong><span>Sentrix 지원 요청을 씨피 급구 공고로 올립니다. 자동 연결은 2028년 목표입니다.</span></li>
 <li><strong>확정 → 근무 기록</strong><span>확정 인원은 Sentrix 확정 명단과 Sentrix HR 근무표 · 출퇴근으로 이어집니다.</span></li>
@@ -129,6 +139,8 @@
 <a class="more p-next__a" href="/contact/">문의하기</a>
 </div>
 </section>
+<script src="/static/js/cp.js?v=9c2475f6" defer></script>
+<script src="/static/js/bc.js?v=c6c7d276" defer></script>
 
 </main>
 <footer class="site-footer">
