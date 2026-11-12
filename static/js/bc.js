@@ -23,3 +23,21 @@
     document.addEventListener('visibilitychange', function () { document.hidden ? stop() : run(); });
   });
 })();
+/* 홈 급구 통화 카드: 한 통씩 「연결 중…」 → 결과. 다 돌려도 확정 0명(2026-11-11). */
+(function () {
+  var fig = document.querySelector('[data-calls]');
+  if (!fig || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var rows = Array.prototype.slice.call(fig.querySelectorAll('.calls__row'));
+  var i = 0, timer = null, seen = false;
+  function reset() { rows.forEach(function (r) { r.classList.add('is-wait'); r.classList.remove('is-dial'); r.querySelector('.calls__st').textContent = ''; }); i = 0; }
+  function tick() {
+    if (i >= rows.length) { timer = setTimeout(function () { reset(); tick(); }, 3200); return; }
+    var r = rows[i], st = r.querySelector('.calls__st');
+    r.classList.remove('is-wait'); r.classList.add('is-dial'); st.textContent = '연결 중…';
+    timer = setTimeout(function () { r.classList.remove('is-dial'); st.textContent = r.dataset.final; i++; timer = setTimeout(tick, 450); }, 1100);
+  }
+  function run() { if (!timer && seen && !document.hidden) { reset(); tick(); } }
+  function stop() { clearTimeout(timer); timer = null; rows.forEach(function (r) { r.classList.remove('is-wait', 'is-dial'); r.querySelector('.calls__st').textContent = r.dataset.final; }); }
+  new IntersectionObserver(function (es) { seen = es[0].isIntersecting; seen ? run() : stop(); }, {threshold: 0.4}).observe(fig);
+  document.addEventListener('visibilitychange', function () { document.hidden ? stop() : run(); });
+})();
