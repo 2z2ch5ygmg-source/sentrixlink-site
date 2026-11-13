@@ -232,6 +232,9 @@
 .sec--navy .p-steps--j button:hover .v{color:#fff}
 @media (max-width:1023px){ .p-hero__vis--j .jr--mix .jr__stage,.p-hero__vis--j .jr--web .jr__stage{height:500px} }
 @media (max-width:719px){ .p-hero__vis--j .jr--mix .jr__stage{height:440px} .p-hero__vis--j .jr--web .jr__stage{height:auto;aspect-ratio:1440/806} }
+/* phone widths: the stage keeps one shape (440 high at a 390 viewport) so a PC-screen beat frames the same region on every phone;
+   with a fixed height the visible part of the capture changed with the viewport width and cut the highlighted cell */
+@media (max-width:599px){ .p-hero__vis--j .jr--mix .jr__stage{height:auto;aspect-ratio:350/440;max-height:560px} }
 /* sections whose journey shows PC screens: text on top, the scene wide underneath (PC captures need the width) */
 .p-two:has(.jr--web),.p-two:has(.jr--mix){grid-template-columns:minmax(0,1fr);row-gap:40px}
 .p-two:has(.jr--web) > .p-txt,.p-two:has(.jr--mix) > .p-txt{max-width:760px;order:-1}
