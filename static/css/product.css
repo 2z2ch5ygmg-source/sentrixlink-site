@@ -272,3 +272,8 @@
 /* 홈에서 옮겨 온 「본사는 Sentrix HR에서」(2026-11-10) */
 .hq__in{gap:40px}
 @media (max-width:719px){ .hq__in{gap:28px} }
+
+/* 2026-11-13: 아직 출시 전(12월 출시 예정)임을 제품 페이지 첫 화면에 밝힌다. 씨피의 .cp-soon과 같은 모양 */
+.p-logo{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px 14px}
+.p-soon{padding:5px 12px;border-radius:999px;background:#FFF2E8;color:var(--accent-ink);font-size:14px;font-weight:700}
+@media (max-width:719px){ .p-logo{justify-content:flex-start} }

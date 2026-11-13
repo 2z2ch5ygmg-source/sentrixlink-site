@@ -4,3 +4,9 @@
 .stub__note{max-width:640px;font-size:17px;line-height:1.65;color:var(--muted)}
 .stub .facts{margin-top:36px}
 @media (max-width:719px){ .stub{padding:40px 0 72px} .stub__note{font-size:16px} }
+
+/* 2026-11-13 회사 소개: 이미 공개된 사실만 */
+.co{display:flex;flex-direction:column;max-width:640px;margin:8px 0 12px;border-top:1px solid var(--line)}
+.co div{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+.co dt{font-size:15px;font-weight:700;color:var(--muted)}
+.co dd{margin:0;font-size:17px;font-weight:600;color:var(--ink)}

@@ -682,3 +682,12 @@ br.m,.m{display:none}
 .chatx__day span{padding:4px 12px;border-radius:999px;background:rgba(17,24,42,.08);font-size:12px;color:var(--muted)}
 .chatx__list{padding-top:16px}
 .chatx__body{mask-image:linear-gradient(transparent,#000 7%,#000 82%,transparent)}
+
+/* 2026-11-13: 업계 구조 구역을 급구 구역 안 한 줄로 줄임 */
+.urgent__chain{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font-size:18px;font-weight:700;color:var(--on-navy)}
+.urgent__chain i{font-style:normal;font-weight:400;color:var(--on-navy-3)}
+.urgent__chain b{padding:4px 12px;border-radius:999px;box-shadow:inset 0 0 0 2px var(--accent);font-weight:700}
+.urgent__chain em{flex:1 1 100%;font-style:normal;font-size:16px;font-weight:500;color:var(--on-navy-2)}
+.role__note{font-size:14px;font-weight:600;color:var(--accent-ink)}
+@media (max-width:719px){ .urgent__chain{font-size:16px;gap:6px 8px} .urgent__chain em{font-size:15px} }
+@media (min-width:900px){ .urgent__chain{justify-content:center;text-align:center;margin-top:-16px} }
