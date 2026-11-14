@@ -253,12 +253,16 @@ select.in{appearance:none;-webkit-appearance:none;padding-right:44px;background-
 /* real-app journeys (<!--journey ID--> in pages, played by scenes.js). The stage height is fixed per
    layout so the Player can draw at real CSS px; below it a one-line caption follows the beat. */
 .jr{margin:0;display:flex;flex-direction:column;gap:14px;min-width:0}
-.jr__stage{position:relative;height:560px;border-radius:var(--radius-card);overflow:hidden;display:flex;align-items:center;justify-content:center}
+/* 2026-11-14: 기기(브라우저 창 · 휴대폰) 뒤에 판을 깔지 않는다. 무대는 투명하고 자르지 않아서 기기 그림자가 밖으로 자연스럽게 번진다
+   (무대 끝에서 잘린 그림자가 기기 둘레에 옅은 판처럼 보였다). 안쪽 겹들은 장면 플레이어가 만드는 틀이다 */
+.jr__stage{position:relative;height:560px;display:flex;align-items:center;justify-content:center}
+.jr__stage.is-scene > div,.jr__stage.is-scene > div > div,.jr__stage .__remotion-player{overflow:visible!important}
 .jr--web .jr__stage{height:auto;aspect-ratio:1440/806}
 .jr--mix .jr__stage{height:540px}
 .jr__still{display:block;max-width:100%;max-height:100%}
-.jr__still--phone{height:calc(100% - 20px);width:auto;border-radius:34px;box-shadow:0 0 0 8px #1C1C1E,0 24px 48px rgba(17,24,42,0.16)}
-.jr__still--web,.jr__still--excel{width:calc(100% - 20px);border-radius:12px;box-shadow:0 0 0 1px var(--line),0 24px 48px rgba(17,24,42,0.10)}
+.jr__still--phone{height:calc(100% - 28px);width:auto;border-radius:34px;box-shadow:0 0 0 8px #1C1C1E,0 22px 28px -12px rgba(17,24,42,0.32)}
+.jr__still--web,.jr__still--excel{width:100%;border-radius:12px;box-shadow:0 0 0 1px var(--line),0 18px 40px -16px rgba(17,24,42,0.22)}
+@media (max-width:599px){ .jr__still--phone{height:calc(100% - 36px)} .jr__still--web,.jr__still--excel{width:calc(100% - 20px)} }
 .jr__stage.is-scene{display:block}
 .jr__cap{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;min-height:52px;font-size:16px;line-height:1.5;color:var(--muted)}
 .jr__n{font-size:13px;font-weight:600;color:var(--muted-2);font-variant-numeric:tabular-nums}
@@ -269,7 +273,6 @@ select.in{appearance:none;-webkit-appearance:none;padding-right:44px;background-
 .sec--navy .jr__n{color:var(--on-navy-3)}
 @media (max-width:1023px){ .jr--mix .jr__stage{height:500px} .jr--phone .jr__stage{height:520px} }
 @media (max-width:719px){
-  .jr__stage{border-radius:22px}
   .jr--phone .jr__stage{height:460px}
   .jr--mix .jr__stage{height:440px}
   .jr__cap{font-size:15px;min-height:68px}
