@@ -1,0 +1,143 @@
+/* 2026-11-14 2차 묶음: 구역 정리로 새로 생긴 부품과 다듬기. home.css · product.css 뒤에 읽힌다. */
+
+/* ---------- 공통 ---------- */
+.soon{align-self:flex-start;padding:5px 12px;border-radius:var(--pill);background:#FFF2E8;color:var(--accent-ink);font-size:14px;font-weight:700}
+
+/* Excel 그림: 넓은 판(번호 상자) / 휴대폰용 좁은 판(번호 없이) */
+.xfig{margin:0;display:flex;flex-direction:column;gap:16px;min-width:0}
+.xfig__narrow{display:none}
+.xfig__notes{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+@media (max-width:719px){
+  .xfig__wide{display:none}
+  .xfig__narrow{display:block}
+  .xfig__notes .xpin-key{display:none}
+  .xfig__notes{grid-template-columns:minmax(0,1fr)}
+}
+/* 번호 동그라미: 주황 바탕 위 흰 숫자는 대비가 모자라(2.9) 남색으로 */
+.xl-notes .xpin-key,.xpins .xpin b{color:var(--navy)}
+
+/* 단추 카드의 plain 판: 누르는 단추처럼 보이지 않게, 기다리는 상태 글이 결과 글로 바뀌기만 한다 */
+.scn--plain .scn__btn{padding:0 4px;background:transparent;color:var(--muted-2);font-weight:600}
+.scn--plain .scn__done{border:0;padding:0 4px;color:var(--accent-ink)}
+
+/* ---------- 홈 ---------- */
+.film__who{font-size:clamp(14px,1.05vw,17px);font-weight:700;color:var(--muted-2);letter-spacing:-0.01em}
+@media (max-width:719px){ .film__who{font-size:13px} }
+
+/* 문제 → 바뀐 뒤: 흰 칸 전체가 설명서로 가는 링크 */
+.fixes a.fixes__new{position:relative;text-decoration:none;color:var(--ink);padding-right:64px;text-align:left;white-space:normal;transition:box-shadow .2s}
+.fixes a.fixes__new:hover{color:var(--ink);box-shadow:inset 0 0 0 2px var(--accent)}
+.fixes a.fixes__new:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:16px}
+.fixes__go{position:absolute;right:20px;top:50%;width:28px;height:28px;translate:0 -50%;border-radius:50%;background:var(--bg) no-repeat center/16px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2311182A' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E")}
+@media (max-width:899px){ .fixes a.fixes__new{padding:16px 60px 16px 20px} }
+
+/* 씨피 구역: 문제 표에서 옮겨 온 두 줄 */
+.cpfix__pts{display:flex;flex-direction:column;gap:14px;width:100%;max-width:460px}
+.cpfix__pts li{display:flex;flex-direction:column;gap:2px;padding-top:14px;border-top:1px solid var(--line-2)}
+.cpfix__pts span{font-size:14px;font-weight:600;color:var(--muted-2)}
+.cpfix__pts b{font-size:19px;font-weight:700;line-height:1.4}
+@media (max-width:719px){ .cpfix__pts b{font-size:17px} }
+
+/* 세 서비스 카드: 한 줄 주장과 자세히 보기 */
+.trio__flow--full .trio__card{gap:6px;padding:28px 26px 22px}
+.trio__claim{margin-top:14px;font-size:24px;line-height:1.35;font-weight:700;letter-spacing:-0.01em}
+.trio__flow--full .trio__card small{margin-top:6px}
+.trio__flow--full .trio__card em{margin-top:auto;padding-top:18px}
+.trio__flow--full .trio__card .more{margin-top:2px}
+.products__note{font-size:15px;color:var(--muted)}
+@media (max-width:1199px){ .trio__claim{font-size:21px} }
+
+/* 역할 표 */
+.rtable{width:100%;border-collapse:collapse;text-align:left}
+.rtable th,.rtable td{padding:22px 20px 22px 0;vertical-align:top;border-top:1px solid var(--line-2)}
+.rtable thead th{padding:0 20px 14px 0;border-top:0;font-size:14px;font-weight:700;color:var(--muted-2);white-space:nowrap}
+.rtable thead img{display:inline-block;width:auto;height:13px;vertical-align:-1px;margin-right:3px}
+.rtable tbody th{width:17%;font-size:22px;font-weight:700;white-space:nowrap}
+.rtable td:nth-child(2){width:21%;font-size:16px;font-weight:600;line-height:1.5;color:var(--ink-2)}
+.rtable ul{display:flex;flex-direction:column;gap:6px;font-size:16px;line-height:1.5;color:var(--ink-2)}
+.rtable small{display:block;margin-top:10px;font-size:14px;font-weight:600;color:var(--accent-ink)}
+@media (max-width:899px){
+  .rtable,.rtable tbody,.rtable tr,.rtable th,.rtable td{display:block;width:auto}
+  .rtable thead{display:none}
+  .rtable tr{padding:22px 0;border-top:1px solid var(--line-2)}
+  .rtable th,.rtable td{padding:0;border:0}
+  .rtable tbody th{width:auto;font-size:20px}
+  .rtable td{margin-top:12px}
+  .rtable td:nth-child(2){width:auto;margin-top:4px;font-size:15px;color:var(--muted)}
+  .rtable td::before{content:attr(data-h);display:block;margin-bottom:6px;font-size:13px;font-weight:700;color:var(--muted-2)}
+  .rtable td:nth-child(2)::before{display:none}
+  .rtable ul{font-size:15px;gap:4px}
+}
+
+/* 시작 구역 끝의 단추 */
+.start__cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.sec--navy .btn--primary{background:#fff;color:var(--ink)}
+.sec--navy .btn--primary:hover{background:#E9EAF0;color:var(--ink)}
+.sec--navy .btn--secondary{background:transparent;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
+.sec--navy .btn--secondary:hover{color:#fff;box-shadow:inset 0 0 0 1px #fff}
+
+/* 플렉서 한 주: 휴대폰에서는 4칸 + 3칸(「일 · 쉬는 날」이 셋째 줄에 혼자 남지 않게) */
+@media (max-width:719px){ .flex__week ol{grid-template-columns:repeat(4,minmax(0,1fr))} .flex__week li{min-height:88px;padding:10px} .flex__week li b{font-size:19px} .flex__week li span{font-size:13.5px} }
+
+/* ---------- 제품 페이지 ---------- */
+.p-try{gap:40px}
+.p-try__head{max-width:760px}
+.p-rules--5{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1023px){ .p-rules--5{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:28px} }
+@media (max-width:719px){ .p-rules--5{grid-template-columns:minmax(0,1fr);gap:18px} .p-try{gap:24px} }
+
+/* 통계 그림: 숫자 없는 그래프 넷 */
+.chartfig{margin:0;display:flex;flex-direction:column;gap:14px;width:100%;max-width:620px;min-width:0}
+.chartfig__grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.chartfig__grid li{display:flex;flex-direction:column;gap:18px;padding:26px 26px 22px;border:1px solid var(--line-3);border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(17,24,42,.06)}
+.chartfig__grid svg{width:100%;max-width:200px;height:auto}
+.chartfig__grid b{font-size:19px;font-weight:700}
+@media (max-width:719px){ .chartfig__grid{gap:10px} .chartfig__grid li{padding:18px 16px 16px;gap:12px;border-radius:18px} .chartfig__grid b{font-size:16px} }
+
+/* 사용 환경 한 줄, 상태 표시, 순서 한 줄 */
+.p-env{display:flex;flex-wrap:wrap;gap:12px 48px;padding-top:24px;border-top:1px solid var(--line)}
+.p-env li{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;font-size:16px;line-height:1.6}
+.p-env strong{font-weight:700}
+.p-env span{color:var(--muted)}
+.p-env3{margin-top:8px;padding-top:8px}
+.p-state{align-self:flex-start;margin-top:4px;font-style:normal;font-size:13px;font-weight:700;color:var(--accent-ink)}
+.p-chain{display:flex;flex-wrap:wrap;gap:10px 0;font-size:17px;font-weight:700;line-height:1.5}
+.p-chain li{display:flex;align-items:center}
+.p-chain li + li::before{content:"";width:22px;height:22px;margin:0 14px;background:no-repeat center/20px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FF6B00' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E")}
+@media (max-width:719px){ .p-env li{font-size:15px} .p-chain{flex-direction:column;gap:0;font-size:16px} .p-chain li + li::before{display:block;margin:4px 0 4px 2px;rotate:90deg} .p-chain li + li{flex-direction:column;align-items:flex-start} }
+
+/* 맨 아래 띠의 링크와 단추 */
+.p-next__links{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;flex:none}
+@media (max-width:719px){ .p-next__links{gap:10px 12px} }
+
+/* 씨피: 무엇인지 한 줄 */
+.cp-what{font-size:16px;font-weight:600;color:var(--muted)}
+
+/* 첫 화면: 넓은 화면에서는 왼쪽에 로고 · 제목 · 한 줄, 오른쪽에 영상(1366×768에서도 영상과 설명 줄이 첫 화면에 들어오게) */
+@media (min-width:1100px){
+  .p-hero:has(.p-hero__in--split){padding:56px 0 72px}
+  .p-hero__in--split{display:grid;grid-template-columns:minmax(0,0.78fr) minmax(0,1.22fr);align-items:center;gap:56px}
+  .p-hero__in--split .p-hero__head{align-items:flex-start;text-align:left;gap:20px}
+  .p-hero__in--split .p-logo{justify-content:flex-start}
+  .p-hero__in--split .p-h1{font-size:clamp(40px,3.5vw,56px)}
+  .p-hero__in--split .p-hero__vis--j{max-width:none;margin:0}
+  .p-hero__in--split .p-hero__vis--j .jr--mix .jr__stage,.p-hero__in--split .p-hero__vis--j .jr--web .jr__stage{height:min(500px,calc(100svh - var(--header-h) - 240px));min-height:400px}
+}
+
+/* 흰 칸 링크는 예전 「설명서 보기」 글 링크의 자리 규칙을 받지 않는다 */
+.fixes a.fixes__new{grid-column:auto;grid-row:auto;font-size:inherit;font-weight:inherit;translate:none}
+
+/* Excel 그림은 표 폭만큼만(창 오른쪽에 빈 흰 칸이 남지 않게). 가운데 정렬 구역에서는 가운데로 */
+.xfig{max-width:940px;width:100%}
+.xfig .xwin{width:fit-content;max-width:100%}
+.xls__in .xfig{margin-inline:auto}
+
+/* 흐름 그림: 양쪽 작은 제목을 같은 줄에(칸 수가 달라도), 가운데 칸에도 양옆과 같은 얇은 테두리 */
+.flw__hub{border:1px solid var(--line-3)}
+@container (min-width:761px){
+  .flw__grid{align-items:stretch}
+  .flw__col{position:relative;justify-content:center;padding-top:32px}
+  .flw__lab{position:absolute;left:0;top:0}
+  .flw__arr{padding-top:32px;align-items:center}
+  .flw__hub{align-self:center;margin-top:32px}
+}

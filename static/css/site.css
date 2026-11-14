@@ -85,7 +85,7 @@ button{font:inherit;color:inherit;cursor:pointer}
   .brand img{height:21px}
   .gnav,.hactions .btn--secondary{display:none}
   .hactions{gap:4px}
-  .hactions .btn--primary{height:40px;padding:0 16px;font-size:14px}
+  .hactions .btn--primary{height:44px;padding:0 16px;font-size:14px}
   .menu-btn{display:inline-flex}
   .mnav{position:fixed;inset:var(--header-h) 0 0 0;z-index:49;background:var(--surface);padding:8px var(--gutter) calc(32px + env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain}
   .mnav[data-open="true"]{display:flex;flex-direction:column;gap:24px}
@@ -109,7 +109,14 @@ button{font:inherit;color:inherit;cursor:pointer}
 @media (max-width:719px){
   .flinks li{padding:0 10px}
   .flinks li:nth-child(4){padding-left:0;border-left:0}
+  .flinks a{min-height:44px}
 }
+/* 휴대폰 메뉴(2026-11-14): 열려 있으면 줄 세 개 대신 ✕, 지금 보는 페이지는 굵게 + 주황 점 */
+.menu-btn__close{display:none}
+.menu-btn[aria-expanded="true"] .menu-btn__open{display:none}
+.menu-btn[aria-expanded="true"] .menu-btn__close{display:block}
+.mnav li a[aria-current="page"]{font-weight:700}
+.mnav li a[aria-current="page"]::before{content:"";flex:none;width:8px;height:8px;margin-right:10px;border-radius:50%;background:var(--accent)}
 
 /* product-language parts: progress dashes, ECI bars, cards */
 .dash{display:block;width:36px;height:6px;border-radius:3px;background:var(--accent)}
