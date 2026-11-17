@@ -72,7 +72,11 @@
   // 배지: 짧은 말만 보이고, 누르면(PC는 마우스도) 전체 이유가 펼쳐짐
   function badge(t) {
     const [ic, tone] = KIND[t.k] || ["alert", "info"];
-    return `<details class="bdg t-${tone}"><summary title="${esc(t.d)}">${ico(ic)}<span>${esc(t.t)}</span></summary><p>${esc(t.d)}</p></details>`;
+    // 챔프가 걸린 배지는 글 대신 초상화 + 한 줄(cap). 전체 문장은 화면 낭독용으로만 둔다
+    const pop = t.ids && t.ids.length
+      ? `<div class="bdg-pop"><div class="bdg-ch">${t.ids.map((id) => `<span class="pc">${icon(id).replace(/ title="[^"]*"/, "")}<span>${esc(CH[id].ko)}</span></span>`).join("")}</div>${t.cap ? `<p class="bdg-cap">${esc(t.cap)}</p>` : ""}<span class="sr-only">${esc(t.d)}</span></div>`
+      : `<div class="bdg-pop"><p class="bdg-cap">${esc(t.d)}</p></div>`;
+    return `<details class="bdg t-${tone}"><summary>${ico(ic)}<span>${esc(t.t)}</span></summary>${pop}</details>`;
   }
   // 추천 카드 장단점 문장 → 아이콘 + 짧은 말
   function shortTag(g, good) {
@@ -787,6 +791,13 @@
   document.body.appendChild(hc);
   let hcFor = null;
   const pcPointer = matchMedia("(hover: hover) and (pointer: fine) and (min-width: 761px)");
+  // PC: 배지에 마우스를 올리면 초상화 팝업을 열고, 벗어나면 닫는다(휴대폰은 눌러서 펼침)
+  document.addEventListener("mouseover", (ev) => { if (!pcPointer.matches) return; const b = ev.target.closest && ev.target.closest(".bdg"); if (b && !b.open) {
+    b.open = true; b.dataset.hov = "1";
+    const pop = b.querySelector(".bdg-pop");
+    if (pop) { pop.classList.remove("flip"); if (pop.getBoundingClientRect().right > document.documentElement.clientWidth - 8) pop.classList.add("flip"); }
+  } });
+  document.addEventListener("mouseout", (ev) => { const b = ev.target.closest && ev.target.closest(".bdg"); if (b && b.dataset.hov && !b.contains(ev.relatedTarget)) { b.open = false; delete b.dataset.hov; } });
   function hcAllowed() { return pcPointer.matches && S.tab === "live" && !!curStep(); }
   function showHover(el) {
     if (!hcAllowed() || !CH[el.dataset.id]) return;
