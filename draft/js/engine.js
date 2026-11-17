@@ -85,7 +85,41 @@ window.Engine = (function () {
     return COMP_KEYS.map((k) => ({ key: k, score: ids.reduce((s, id) => s + fit(CH[id], k), 0) }))
       .sort((a, b) => b.score - a.score);
   }
-  const lanesCounter = (a, b) => (COUNTERS[b] || []).includes(a); // a가 b 상대로 유리
+  // ---- 메타 자료(tools/meta.py → js/meta.js) ----
+  // a가 b를 라인에서 만났을 때 a의 승률 (op.gg 라인 상대 전적)
+  function muWr(a, b) {
+    const M = window.META;
+    if (!M || !M.mu) return null;
+    const ma = M.mu[a];
+    if (ma) for (const r in ma) { const x = ma[r][b]; if (x) return { wr: x[0], g: x[1] }; }
+    const mb = M.mu[b];
+    if (mb) for (const r in mb) { const x = mb[r][a]; if (x) return { wr: 100 - x[0], g: x[1] }; }
+    return null;
+  }
+  // a가 b 상대로 유리: 전적이 충분하면 실제 승률(52.5%↑), 아니면 기본 카운터 표
+  function lanesCounter(a, b) {
+    const d = muWr(a, b);
+    if (d && d.g >= 150) return d.wr >= 52.5;
+    return (COUNTERS[b] || []).includes(a);
+  }
+  const TIER_SCORE = { 0: 1, 1: 1, 2: 0.75, 3: 0.5, 4: 0.3, 5: 0.15 };
+  function metaInfo(id, role) {
+    const M = window.META;
+    if (!M) return null;
+    const pro = M.pro && M.pro[id];
+    const sq = M.soloq && M.soloq[id] && (M.soloq[id][role] || Object.values(M.soloq[id])[0]);
+    if (!pro && !sq) return null;
+    const prio = pro ? pro.prio : 0;
+    const score = Math.min(1, prio / 60) * 0.6 + (sq ? TIER_SCORE[sq.tier] || 0.1 : 0.1) * 0.4;
+    return { prio, rp: pro ? pro.rp : 0, games: pro ? pro.p + pro.b : 0, tier: sq ? sq.tier : null, br: sq ? sq.br : 0, wr: sq ? sq.wr : null, score };
+  }
+  function metaText(m) {
+    if (!m) return "";
+    const a = [];
+    if (m.prio) a.push(`대회 밴픽 우선도 ${Math.round(m.prio)}%`);
+    if (m.tier) a.push(`솔랭 ${m.tier}티어`);
+    return a.join(" · ");
+  }
 
   // 팀 챔프폭으로 조합 하나 만들기 (exclude: 쓸 수 없는 챔프, fixed: {role:id})
   function buildComp(team, key, exclude, fixed) {
@@ -269,6 +303,8 @@ window.Engine = (function () {
         for (const id of myComfort) if (lanesCounter(c.id, id) && k < 2) { k++; s += 4; reasons.push({ t: "카운터 차단", d: `우리 ${ko(id)} 상대로 강함`, v: 4 }); }
       }
       if (c.pos.length >= 2 && onRole) s += 1;
+      const mi = onRole ? metaInfo(c.id, c.pos.find((r) => oppOpen.includes(r))) : null;
+      if (mi && mi.score >= 0.5) { const v = mi.score * (s >= 10 ? 4 : 7); s += v; reasons.push({ t: "메타 강세", d: metaText(mi), v }); }
       if (s < 3) continue;
       reasons.sort((a, b) => b.v - a.v);
       res.push({ id: c.id, score: s, label: reasons[0] ? reasons[0].t : "견제", reasons, tgt });
@@ -316,6 +352,8 @@ window.Engine = (function () {
         if (lv) { s += lv * 9; reasons.push({ t: lv >= 2.9 ? "숙련도 높음" : `숙련도 ${LEVEL_KO[e.lv]}`, d: `${ROLE_KO[r]} ${team.players[r].riot.split("#")[0]} · ${statText(e)}`, v: lv * 9 }); }
         else s -= teamHasPools(team) ? 8 : 0;
         if (!c.pos.includes(r)) s -= 4;
+        const mi = metaInfo(c.id, r);
+        if (mi && mi.score >= 0.45) { const v = mi.score * 4; s += v; reasons.push({ t: "메타 강세", d: metaText(mi), v }); }
         if (dir) {
           const f = fit(c, dir);
           if (f >= 2) { s += f * 2.5; reasons.push({ t: `${COMPS[dir].short} 조합`, d: `${COMPS[dir].name}에 맞음`, v: f * 2.5, comp: true }); }
@@ -407,6 +445,9 @@ window.Engine = (function () {
     const bansLeft = ORDER.some(([, t], i) => t === "ban" && i >= state.draft.idx);
     const outlook = {};
     ROLES.forEach((r) => (outlook[r] = roleOutlook(state, who, r)));
+    const oppWho = who === "our" ? "enemy" : "our";
+    const oppTeamP = teamOf(state, oppWho);
+    const oppAvailP = new Set(available(state, oppWho).map((c) => c.id));
     const scored = open.map((r) => {
       const o = outlook[r];
       const why = [];
@@ -420,15 +461,33 @@ window.Engine = (function () {
       const bannedMains = o.mains.filter((m) => m.st !== "가능").map((m) => `${ko(m.id)}(${m.st})`);
       if (bannedMains.length) why.push(`주력 ${bannedMains.join("·")} 잘림`);
       const solo = r === "T" ? 2.5 : r === "M" ? 1.2 : 0;
-      if (!o.enemyLaner && solo) {
+      // 상대 같은 라인 선수가 실제로 꺼낼 수 있는 챔프 중 우리 1순위의 카운터가 있는지
+      let safe = false;
+      if (o.best && !o.enemyLaner) {
+        const theirs = Object.entries(poolMap(oppTeamP, r)).filter(([id, e]) => oppAvailP.has(id) && e.score >= 0.2).map(([id]) => id);
+        const threats = theirs.filter((id) => lanesCounter(id, o.best.id));
+        if (theirs.length >= 2 && !threats.length) {
+          safe = true; u += 1.5;
+          why.push(`상대 ${ROLE_KO[r]} 챔프폭에 ${bestName} 카운터 없음 → 먼저 뽑아도 안전`);
+        } else if (threats.length) {
+          u -= 1;
+          why.push(`상대가 ${j(threats.slice(0, 2).map(ko).join("·"), "으로", "로")} ${bestName} 카운터 가능 → 뒤에`);
+        }
+      }
+      if (!o.enemyLaner && solo && !safe) {
         u -= solo;
         if (o.best && (COUNTERS[o.best.id] || []).length >= 3) u -= 1;
         why.push(r === "T" ? "탑은 상대 탑을 보고 카운터로 뽑기" : "미드는 상대 미드 확인 후가 안전");
       }
+      // 메타 선픽 가치: 대회에서 밴픽이 많고 일찍 뽑히는 챔프는 먼저 확보
+      const mi = o.best ? metaInfo(o.best.id, r) : null;
+      if (mi && (mi.prio >= 40 || (mi.rp && mi.rp <= 1.7 && mi.games >= 200))) {
+        u += 1.5; why.push(`${bestName} 대회 밴픽 우선도 ${Math.round(mi.prio)}%${mi.rp ? `·평균 ${mi.rp}라운드 픽` : ""} → 먼저 확보`);
+      }
       if (o.enemyLaner) {
         const ctr = o.cands.find((c) => lanesCounter(c.id, o.enemyLaner.champ));
         u += 0.5;
-        why.push(ctr ? `상대 ${ko(o.enemyLaner.champ)} 공개 → ${ko(ctr.id)}로 바로 카운터 가능` : `상대 ${ko(o.enemyLaner.champ)} 공개됨`);
+        why.push(ctr ? `상대 ${ko(o.enemyLaner.champ)} 공개 → ${j(ko(ctr.id), "으로", "로")} 바로 카운터 가능` : `상대 ${ko(o.enemyLaner.champ)} 공개됨`);
       }
       if (r === "J" || r === "S") { u += 1; if (!why.length) why.push(r === "J" ? "정글은 초반 동선·조합 축이라 먼저" : "서폿은 조합 이니시 축이라 먼저"); }
       if (o.best && CH[o.best.id].pos.length >= 2 && open.some((x) => x !== r && CH[o.best.id].pos.includes(x))) {
@@ -738,6 +797,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr,
   };
 })();

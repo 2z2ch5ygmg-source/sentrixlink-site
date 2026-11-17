@@ -247,7 +247,8 @@
       }).join("");
       return `<div class="pp-slot ${s.now ? "now" : ""} ${s.items.every((x) => x.done) ? "past" : ""}"><div class="pp-h"><b>${s.label}</b>${s.now ? `<span class="pill gold">지금</span>` : ""}</div>${items}</div>`;
     }).join("");
-    return `<section class="plan-box"><div class="now-h"><span class="what">픽 순서 전략</span><span class="step">밴·진영·상대 공개 라인에 따라 계속 바뀜</span></div>
+    const src = window.META ? `메타: op.gg 솔랭 ${esc(window.META.patch)} · gol.gg 2026 대회 · 라인 상대 전적 (${esc(window.META.at)})` : "밴·진영·상대 공개 라인에 따라 계속 바뀜";
+    return `<section class="plan-box"><div class="now-h"><span class="what">픽 순서 전략</span><span class="step">${src}</span></div>
       <ul class="plain pp-sum">${p.summary.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><div class="pp-grid">${cards}</div></section>`;
   }
 
