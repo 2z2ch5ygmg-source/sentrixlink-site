@@ -659,13 +659,72 @@
     s.role = r; save(); render();
   }
 
+  // ---------- 시야 공부: 정석 와드 자리 + 이번 판 시야 계획 ----------
+  const TYPE_KO = { ward: "와드", ctrl: "제어 와드", sweep: "렌즈(지우기)" };
+  // 우리 팀 맞춤: 상대 정글 성향(갱킹형이면 방어 와드), 우리 서폿 성향(이니시면 끊기 와드)
+  function visionFocus() {
+    const ourT = E.teamOf(S, "our"), enT = E.teamOf(S, "enemy");
+    const enJ = E.picks(S, "enemy").find((p) => p.role === "J");
+    const topOf = (t, r) => Object.entries(E.poolMap(t, r)).sort((a, b) => (b[1].score || 0) - (a[1].score || 0))[0];
+    const jId = enJ ? enJ.champ : (topOf(enT, "J") || [])[0];
+    const ourS = E.picks(S, "our").find((p) => p.role === "S");
+    const sId = ourS ? ourS.champ : (topOf(ourT, "S") || [])[0];
+    const gank = !!(jId && window.KB.GANK.includes(jId));
+    const engage = !!(sId && CH[sId] && (CH[sId].st.includes("eng") || CH[sId].st.includes("pick")));   // 이니시·그랩(끌어오기) 서폿
+    return { jId, jPicked: !!enJ, gank, sId, sPicked: !!ourS, engage };
+  }
+  function renderVision() {
+    const V = window.VISION;
+    if (!V) return `<div class="card">시야 자료를 불러오지 못했습니다.</div>`;
+    const u = S.ui;
+    const phase = V.phases.find((p) => p.id === u.vPhase) || V.phases[1];
+    // 진영은 실시간 벤픽의 우리 진영을 따르고, 직접 바꾸면 그 진영이 바뀔 때까지 유지
+    const side = (u.vSide && u.vSideBase === S.draft.ourSide ? u.vSide : S.draft.ourSide) || "B";
+    const role = u.vRole || "";
+    const f = visionFocus();
+    const pri = (sp) => (f.gank && sp.tag === "def") || (f.engage && sp.tag === "agg") || sp.tag === "obj";
+    const pos = (sp) => (side === "B" ? { x: sp.x, y: sp.y } : { x: sp.y, y: sp.x });   // 레드는 강을 기준으로 뒤집기
+    const list = V.spots.filter((sp) => sp.phases.includes(phase.id)).sort((a, b) => pri(b) - pri(a) || a.id - b.id);
+    const on = (sp) => !role || sp.roles.includes(role);
+    const marks = list.map((sp) => { const p = pos(sp); return `<button class="vm ${sp.type} ${pri(sp) ? "pri" : ""} ${on(sp) ? "" : "dim"} ${u.vSpot === sp.id ? "sel" : ""}" style="left:${p.x}%;top:${p.y}%" data-act="vspot" data-id="${sp.id}" aria-label="${sp.id}번 ${esc(sp.name)} · ${TYPE_KO[sp.type]}">${sp.id}</button>`; }).join("");
+    const base = side === "B" ? `<span class="vbase ours" style="left:9%;top:91%">우리</span><span class="vbase theirs" style="left:91%;top:9%">상대</span>` : `<span class="vbase ours" style="left:91%;top:9%">우리</span><span class="vbase theirs" style="left:9%;top:91%">상대</span>`;
+    const rows = list.map((sp) => `<li class="vrow ${on(sp) ? "" : "dim"} ${u.vSpot === sp.id ? "sel" : ""}" data-act="vspot" data-id="${sp.id}" tabindex="0">
+      <span class="vm ${sp.type} ${pri(sp) ? "pri" : ""}" aria-hidden="true">${sp.id}</span>
+      <span class="vr-main"><b>${esc(sp.name)}</b><span class="vr-sub">${TYPE_KO[sp.type]} · ${sp.roles.map((r) => ROLE_KO[r]).join("·")}${pri(sp) ? ` · <span class="vr-pri">${sp.tag === "def" ? "갱 대비 우선" : sp.tag === "agg" ? "끊기 우선" : "오브젝트"}</span>` : ""}</span><span class="vr-why">${esc(sp.why)}</span></span></li>`).join("");
+    const seg = (act, cur, items) => `<div class="seg" role="group">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
+    // 이번 판 시야 계획: 단계마다 누가 몇 번
+    const plan = V.phases.map((ph) => {
+      const sp = V.spots.filter((x) => x.phases.includes(ph.id)).sort((a, b) => pri(b) - pri(a) || a.id - b.id);
+      const by = {};
+      sp.forEach((x) => { const r = x.roles[0]; (by[r] = by[r] || []).push(x); });
+      const who = ROLES.filter((r) => by[r]).map((r) => `<span class="vp-who"><b>${ROLE_KO[r]}</b>${by[r].slice(0, 3).map((x) => `<span class="vm mini ${x.type} ${pri(x) ? "pri" : ""}">${x.id}</span>`).join("")}</span>`).join("");
+      return `<button class="vp ${ph.id === phase.id ? "on" : ""}" data-act="vphase" data-v="${ph.id}"><span class="vp-h"><b>${ph.name}</b><span class="dim">${ph.time}</span></span><span class="vp-r">${who}</span></button>`;
+    }).join("");
+    const fx = [];
+    if (f.jId) fx.push(`<span class="tg ${f.gank ? "bad" : ""}" title="${f.jPicked ? "상대 픽" : "상대 정글 주력(예상)"}">${icon(f.jId, "sm")}상대 정글 ${esc(CH[f.jId].ko)}${f.jPicked ? "" : "(예상)"} · ${f.gank ? "갱킹형 → 방어 와드 우선" : "성장형 → 상대 정글 시야"}</span>`);
+    if (f.sId) fx.push(`<span class="tg ${f.engage ? "good" : ""}" title="${f.sPicked ? "우리 픽" : "우리 서폿 주력"}">${icon(f.sId, "sm")}우리 서폿 ${esc(CH[f.sId].ko)} · ${f.engage ? "이니시·그랩 → 끊기 와드" : "보호형 → 방어 시야"}</span>`);
+    return `<section class="card vbox">
+      <div class="now-h"><span class="what">이번 판 시야 계획</span><span class="step">${side === "B" ? "블루" : "레드"} 진영 · ${esc(E.teamOf(S, "our").name)} vs ${esc(E.teamOf(S, "enemy").name)}</span></div>
+      ${fx.length ? `<div class="tgs vfx">${fx.join("")}</div>` : ""}
+      <div class="vplan">${plan}</div></section>
+    <section class="card vbox">
+      <div class="vctl">${seg("vphase", phase.id, V.phases.map((p) => [p.id, p.name]))}${seg("vside", side, [["B", "블루"], ["R", "레드"]])}${seg("vrole", role, [["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])))}</div>
+      <p class="vtip"><b>${phase.name}</b> <span class="dim">${phase.time}</span> — ${esc(phase.tip)}</p>
+      <div class="vgrid">
+        <div class="vmap"><img src="https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png" alt="소환사의 협곡 미니맵" loading="lazy">${base}${marks}</div>
+        <ol class="vlist">${rows}</ol>
+      </div>
+      <p class="vkey"><span><i class="vm ward"></i>와드</span><span><i class="vm ctrl"></i>제어 와드</span><span><i class="vm sweep"></i>렌즈</span><span><i class="vm ward pri"></i>우리 팀 우선</span><span class="dim">자리는 정석 위치를 미니맵에 대략 표시한 것</span></p>
+    </section>`;
+  }
+
   function render() {
     if (typeof hideHover === "function") hideHover();
     renderTop();
     const v = document.getElementById("view");
     const keepFocus = document.activeElement && document.activeElement.id === "q";
     const pos = keepFocus ? document.activeElement.selectionStart : 0;
-    v.innerHTML = S.tab === "live" ? renderLive() : S.tab === "our" ? renderOur() : renderEnemy();
+    v.innerHTML = S.tab === "live" ? renderLive() : S.tab === "our" ? renderOur() : S.tab === "vision" ? renderVision() : renderEnemy();
     if (keepFocus) { const q = document.getElementById("q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
   }
 
@@ -696,6 +755,10 @@
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
       case "pred": S.ui.predRole = el.dataset.r; render(); break;
       case "scen": S.ui.scen = el.dataset.k; save(); render(); break;
+      case "vphase": S.ui.vPhase = el.dataset.v; S.ui.vSpot = null; save(); render(); break;
+      case "vside": S.ui.vSide = el.dataset.v; S.ui.vSideBase = S.draft.ourSide; save(); render(); break;
+      case "vrole": S.ui.vRole = el.dataset.v; save(); render(); break;
+      case "vspot": S.ui.vSpot = S.ui.vSpot === Number(el.dataset.id) ? null : Number(el.dataset.id); render(); break;
       case "sheet": S.ui.sheet = !S.ui.sheet; render(); if (S.ui.sheet) { const q = document.getElementById("q"); if (q && matchMedia("(min-width: 761px)").matches) q.focus(); } break;
       case "edit": editing = el.dataset.team; renderEditor(); break;
       case "close": editing = null; renderEditor(); break;
