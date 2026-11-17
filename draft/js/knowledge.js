@@ -196,15 +196,17 @@ window.KB = (function () {
     "Kaisa|Rell": 2, "Ezreal|Yuumi": 2, "Kaisa|Alistar": 2, "Jhin|Nautilus": 2, "Ashe|Brand": 2,
   };
   // 밴픽 순서: 대회(토너먼트 드래프트) / 솔랭·자랭(랭크 드래프트: 밴 10개 뒤 픽 1-2-2-2-2-1).
+  // 솔랭·자랭 밴은 번갈아가 아니라 우리 쪽 5개를 먼저 다 넣고 상대 쪽 5개(사용자 요청 11-17).
   // 모든 화면이 같은 ORDER 배열을 쓰므로 바꿀 때는 배열 내용만 바꾼다(useOrder).
   const ORDER_TOURNAMENT = ORDER.map((x) => x.slice());
-  const ORDER_RANKED = [
-    ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"],
-    ["B", "pick"], ["R", "pick"], ["R", "pick"], ["B", "pick"], ["B", "pick"], ["R", "pick"], ["R", "pick"], ["B", "pick"], ["B", "pick"], ["R", "pick"],
-  ];
+  const rankedOrder = (ourSide) => {
+    const us = ourSide === "R" ? "R" : "B", them = us === "B" ? "R" : "B";
+    return [...Array(5).fill(us), ...Array(5).fill(them)].map((sd) => [sd, "ban"])
+      .concat(["B", "R", "R", "B", "B", "R", "R", "B", "B", "R"].map((sd) => [sd, "pick"]));
+  };
   ORDER.kind = "tournament";
-  function useOrder(kind) {
-    const src = kind === "ranked" ? ORDER_RANKED : ORDER_TOURNAMENT;
+  function useOrder(kind, ourSide) {
+    const src = kind === "ranked" ? rankedOrder(ourSide) : ORDER_TOURNAMENT;
     ORDER.splice(0, ORDER.length, ...src.map((x) => x.slice()));
     ORDER.kind = kind === "ranked" ? "ranked" : "tournament";
   }

@@ -21,7 +21,7 @@
   function syncQueue(resetDraft) {
     const kind = isSolo(S.enemyTeam) ? "ranked" : "tournament";
     if (ORDER.kind !== kind) {
-      window.KB.useOrder(kind);
+      window.KB.useOrder(kind, S.draft.ourSide);
       if (resetDraft) { S.draft.steps = emptySteps(); S.draft.idx = 0; }
       // 솔랭·자랭은 피어리스 끔, 대회로 돌아오면 전에 쓰던 피어리스 설정으로
       if (kind === "ranked") { S.series.prevMode = S.series.mode; S.series.mode = "off"; }
@@ -61,7 +61,7 @@
     return fresh();
   }
   let S = ensureSolo(load());
-  if (isSolo(S.enemyTeam)) window.KB.useOrder("ranked");
+  if (isSolo(S.enemyTeam)) window.KB.useOrder("ranked", S.draft.ourSide);
   S.ui.sheet = false;
   S.ui.predRole = "";
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
@@ -926,7 +926,8 @@
       case "resetSeries": if (confirm("피어리스 잠금과 세트 번호를 모두 초기화할까요?")) { S.series = { game: 1, mode: S.series.mode, locked: [] }; S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
       case "side": if (S.draft.ourSide !== el.dataset.v) {
         if (S.draft.idx > 0 && !confirm("진영을 바꾸면 이번 세트 밴픽이 지워집니다. 바꿀까요?")) break;
-        S.draft.ourSide = el.dataset.v; S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
+        S.draft.ourSide = el.dataset.v; if (ORDER.kind === "ranked") window.KB.useOrder("ranked", S.draft.ourSide);   // 솔랭·자랭: 우리 밴이 먼저
+        S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
       case "mode": S.series.mode = el.dataset.v; save(); render(); break;
       case "frole": S.ui.role = el.dataset.r; save(); render(); break;
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
