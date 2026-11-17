@@ -732,7 +732,8 @@
     const out = [];
     V.drills.forEach((d) => {
       out.push(d);
-      if (d.mirror) out.push({ ...d, id: d.id + "-r", side: "R", title: d.title + " (레드)", opts: d.opts.map((o) => ({ ...o, ...(o.rx != null ? { x: o.rx, y: o.ry } : redXY(o.x, o.y)) })) });
+      const flip = (arr) => (arr || []).map(([id, x, y]) => [id, y, x]);
+      if (d.mirror) out.push({ ...d, id: d.id + "-r", side: "R", title: d.title + " (레드)", pos: d.pos ? { us: flip(d.pos.us), them: flip(d.pos.them) } : undefined, opts: d.opts.map((o) => ({ ...o, ...(o.rx != null ? { x: o.rx, y: o.ry } : redXY(o.x, o.y)) })) });
     });
     V._all = out;
     return out;
@@ -772,7 +773,7 @@
       if (!items.length) return "";
       const rows = items.map((l) => { const sp = spotOf(l.spot); return `<li class="vrow ${u.vSpot === l.spot ? "sel" : ""}" data-act="vspot" data-id="${l.spot}" tabindex="0">
         <span class="vm p-${l.tag} ${l.type === "ctrl" ? "t-ctrl" : ""} ${pri(l) ? "pri" : ""}" aria-hidden="true">${l.spot}</span>
-        <span class="vr-main"><b>${esc(l.title)}</b><span class="vr-sub">${esc(sp.name)} · ${l.type === "ctrl" ? "제어 와드" : "와드"} · ${l.roles.map((r) => ROLE_KO[r]).join("·")}${pri(l) ? ` · <span class="vr-pri">우리 팀 우선</span>` : ""}</span><span class="vr-why">${esc(l.text)}</span>${vlink(V, l.t)}</span></li>`; }).join("");
+        <span class="vr-main"><b>${esc(l.title)}</b><span class="vr-sub">${esc(sp.name)} · ${l.type === "ctrl" ? "제어 와드" : "와드"} · ${l.roles.map((r) => ROLE_KO[r]).join("·")}${pri(l) ? ` · <span class="vr-pri">우리 팀 우선</span>` : ""}</span>${l.when ? `<span class="vr-when"><b>언제</b> ${esc(l.when)}</span>` : ""}<span class="vr-why">${esc(l.text)}</span>${vlink(V, l.t)}</span></li>`; }).join("");
       return `<li class="vgrp"><div class="vgrp-h p-${pu.id}"><b>${pu.name}</b><span>${esc(pu.when)}</span></div><ol class="vlist">${rows}</ol></li>`;
     }).join("");
     // 이번 판 시야 계획: 단계마다 누가 몇 번 구역
@@ -828,16 +829,29 @@
       const px = (v, o) => ((v - o) / vs) * 100;
       const mapImg = `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`;
       const zoomBg = d.kind === "map" ? `<img class="dzoom" src="${mapImg}" alt="소환사의 협곡 미니맵 확대" style="width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%">
-        ${vs < 100 ? `<span class="dmini" aria-hidden="true"><img src="${mapImg}" alt=""><i style="left:${vx}%;top:${vy}%;width:${vs}%;height:${vs}%"></i></span>` : ""}` : bg;
+        ${vs < 100 ? `<span class="dmini" aria-hidden="true"><img src="${mapImg}" alt=""><i style="left:${vx}%;top:${vy}%;width:${vs}%;height:${vs}%"></i><b class="mb b" style="left:2%;bottom:2%">${d.side === "R" ? "상대" : "우리"}</b><b class="mb r" style="right:2%;top:2%">${d.side === "R" ? "우리" : "상대"}</b></span>` : ""}` : bg;
+      // 양 팀 챔프 위치(테두리 = 그 팀 진영 색) — 확대 밖이면 가장자리에 붙여 흐리게
+      const red = d.side === "R";
+      const usCol = red ? "r" : "b", themCol = red ? "b" : "r";
+      const champs = d.kind === "map" && d.pos ? [...d.pos.us.map((c) => [c, "us " + usCol]), ...d.pos.them.map((c) => [c, "them " + themCol])].map(([[id, x, y], cls]) => {
+        let l = px(x, vx), t = px(y, vy); const out = l < 0 || l > 100 || t < 0 || t > 100;
+        l = Math.max(4, Math.min(96, l)); t = Math.max(4, Math.min(96, t));
+        return `<span class="dch-map ${cls} ${out ? "out" : ""}" style="left:${l}%;top:${t}%" title="${cls.startsWith("us") ? "우리" : "상대"} ${esc(CH[id].ko)}">${icon(id, "sm")}</span>`; }).join("") : "";
+      // 진영 방향: 우리 기지·상대 기지가 어느 쪽인지(확대 화면 모서리)
+      const baseTag = d.kind === "map" ? (red
+        ? `<span class="dbase us r" style="right:8px;top:8px">우리(레드) 기지 ↗</span><span class="dbase them b" style="left:8px;bottom:8px">↙ 상대(블루) 기지</span>`
+        : `<span class="dbase us b" style="left:8px;bottom:8px">↙ 우리(블루) 기지</span><span class="dbase them r" style="right:8px;top:8px">상대(레드) 기지 ↗</span>`) : "";
       const pins = d.opts.map((o, i) => { const l = px(o.x, vx), t = px(o.y, vy); return `<button class="dpin ${optCls(o, i)}" style="left:${l}%;top:${t}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>${d.kind === "map" ? `<span class="dpin-l" style="left:${l}%;top:${t}%" aria-hidden="true">${esc(o.t)}</span>` : ""}`; }).join("");
-      body = `<div class="dgrid"><div class="vmap dmap ${d.kind}">${zoomBg}${pins}</div><ol class="dopts">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol></div>`;
+      body = `<div class="dgrid"><div class="vmap dmap ${d.kind}">${zoomBg}${baseTag}${champs}${pins}</div><ol class="dopts">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol></div>`;
     } else {
       body = `<ol class="dopts wide">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol>`;
     }
     const verdict = done ? (d.opts[ans].ok ? `<p class="dres ok">맞음 — ${esc(d.opts[ans].why)}</p>` : `<p class="dres no">아쉬움 — 정답은 ${"ABCD"[d.opts.findIndex((o) => o.ok)]}. ${esc(d.opts.find((o) => o.ok).why)}</p>`) : "";
-    const sideTxt = d.side === "R" ? "레드 진영(우리 = 오른쪽 위)" : "블루 진영(우리 = 왼쪽 아래)";
-    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)} · ${esc(d.obj)}</span><span class="dim">${sideTxt}</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
-      <div class="dteams"><div><span class="dt-l us">우리</span>${team(d.us, "us")}</div><div><span class="dt-l them">상대</span>${team(d.them, "them")}</div></div>
+    const red = d.side === "R";
+    const sides = `<span class="dside ${red ? "r" : "b"}">우리 = ${red ? "레드(오른쪽 위)" : "블루(왼쪽 아래)"}</span><span class="dside ${red ? "b" : "r"}">상대 = ${red ? "블루(왼쪽 아래)" : "레드(오른쪽 위)"}</span>`;
+    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)} · ${esc(d.obj)}</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
+      <div class="dsides">${sides}${d.when ? `<span class="dwhen"><b>언제</b> ${esc(d.when)}</span>` : ""}</div>
+      <div class="dteams"><div><span class="dt-l ${red ? "r" : "b"}">우리 · ${red ? "레드" : "블루"}</span>${team(d.us, "us")}</div><div><span class="dt-l ${red ? "b" : "r"}">상대 · ${red ? "블루" : "레드"}</span>${team(d.them, "them")}</div></div>
       ${d.note ? `<p class="dnote">${esc(d.note)}</p>` : ""}
       <p class="dq">${esc(d.q)}</p>${body}${verdict}`;
   }
@@ -875,7 +889,7 @@
     let body = "";
     if (T.step === "learn") {
       const ls = un.lessons.map(lessonByT).filter(Boolean);
-      body = ls.length ? `<ol class="lcore">${ls.map((l) => `<li><b>${esc(l.title)}</b><p>${esc(l.text)}</p>${vlink(V, l.t)}</li>`).join("")}</ol>`
+      body = ls.length ? `<ol class="lcore">${ls.map((l) => `<li><b>${esc(l.title)}</b>${l.when ? `<span class="vr-when"><b>언제</b> ${esc(l.when)}</span>` : ""}<p>${esc(l.text)}</p>${vlink(V, l.t)}</li>`).join("")}</ol>`
         : `<p class="dnote">영상 밖 기본 원칙: 한타는 숫자(몇 대 몇)·체력·이니시 궁·상대 딜러 위치를 보고 판단합니다. 문제에서 바로 연습해 보세요.</p>`;
       body += `<div class="dnav"><button class="btn sm primary" data-act="tstart">문제 풀기 (${un.drills.length}문제)</button></div>`;
     } else if (T.step === "quiz") {
