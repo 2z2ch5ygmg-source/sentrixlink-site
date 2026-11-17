@@ -183,8 +183,11 @@ window.Engine = (function () {
     const oppOpen = openRoles(state, opp);
     const oppDir = picks(state, opp).length ? direction(state, opp) : null;
     const myPicks = picks(state, who);
+    // 우리 주력: 아직 우리가 고를 수 있는(밴·픽·피어리스 잠금 아님) 상 숙련도 챔프, 비어 있는 라인만
+    const myAvail = new Set(available(state, who).map((c) => c.id));
+    const myOpen = openRoles(state, who);
     const myComfort = [];
-    ROLES.forEach((r) => Object.entries(poolMap(myTeam, r)).forEach(([id, e]) => e.lv >= 3 && myComfort.push(id)));
+    myOpen.forEach((r) => Object.entries(poolMap(myTeam, r)).forEach(([id, e]) => (e.lv >= 3 || e.one) && myAvail.has(id) && !myComfort.includes(id) && myComfort.push(id)));
     const res = [];
     for (const c of available(state, opp)) {
       const reasons = [];
@@ -212,7 +215,7 @@ window.Engine = (function () {
           s += v; reasons.push({ t: "카운터 차단", d: `우리 ${ko(p.champ)} 상대로 강함`, v });
         }
       }
-      if (!myPicks.length) {
+      {
         let k = 0;
         for (const id of myComfort) if (lanesCounter(c.id, id) && k < 2) { k++; s += 4; reasons.push({ t: "카운터 차단", d: `우리 ${ko(id)} 상대로 강함`, v: 4 }); }
       }
