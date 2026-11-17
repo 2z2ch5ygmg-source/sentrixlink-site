@@ -132,7 +132,7 @@
     const why = r.good ? [...r.good.map((g) => `<span class="pc-good">+ ${esc(g)}</span>`), ...r.bad.map((b) => `<span class="pc-bad">− ${esc(b)}</span>`)].join("<br>")
       : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 ? "first" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
-      ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg")}<span class="cn">${esc(CH[r.id].ko)}</span>
+      ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg").replace(/ title="[^"]*"/, "")}<span class="cn">${esc(CH[r.id].ko)}</span>
       ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span></button>`;
   }
 
@@ -190,7 +190,7 @@
     const list = window.CHAMPIONS.filter((c) => matches(c, u.q) && (!u.role || c.pos.includes(u.role)) && (!u.onlyPool || ourPool.has(c.id)));
     const btns = list.map((c) => {
       const dis = !st || taken.has(c.id) || locked.has(c.id);
-      return `<button class="cbtn ${ourPool.has(c.id) ? "mine" : ""} ${locked.has(c.id) ? "locked" : ""}" data-act="pick" data-id="${c.id}" ${dis ? "disabled" : ""} title="${esc(c.ko)}">${icon(c.id)}<span>${esc(c.ko)}</span></button>`;
+      return `<button class="cbtn ${ourPool.has(c.id) ? "mine" : ""} ${locked.has(c.id) ? "locked" : ""}" data-act="pick" data-id="${c.id}" ${dis ? "disabled" : ""} aria-label="${esc(c.ko)}">${icon(c.id).replace(/ title="[^"]*"/, "")}<span>${esc(c.ko)}</span></button>`;
     }).join("");
     const roleBtns = [["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])).map(([r, n]) => `<button aria-pressed="${u.role === r}" data-act="frole" data-r="${r}">${n}</button>`).join("");
     return `<div class="pool"><div class="sheet-h m-only"><b>챔피언 고르기</b><button class="btn sm" data-act="sheet">닫기</button></div><div class="pool-bar"><input id="q" class="input" placeholder="챔피언 검색 (예: 말파, 오리)" value="${esc(u.q)}" autocomplete="off">
@@ -670,17 +670,25 @@
   document.body.appendChild(hc);
   let hcFor = null;
   const pcPointer = matchMedia("(hover: hover) and (pointer: fine) and (min-width: 761px)");
-  function hcAllowed() { const st = curStep(); return pcPointer.matches && S.tab === "live" && st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our"; }
+  function hcAllowed() { return pcPointer.matches && S.tab === "live" && !!curStep(); }
   function showHover(el) {
     if (!hcAllowed() || !CH[el.dataset.id]) return;
     const id = el.dataset.id;
-    const role = el.dataset.role || E.guessRole(S, "our", id);
+    // 누구의 챔프로 볼지: 우리 픽 차례이거나 우리 챔프폭에 있으면 우리 관점, 아니면 상대 관점
+    const st = curStep();
+    const ourTurnPick = st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
+    const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
+    const who = ourTurnPick || inOurPool ? "our" : "enemy";
+    const role = (who === "our" && el.dataset.role) || E.guessRole(S, who, id);
     if (!role) return;
-    const h = E.hoverInfo(S, "our", id, role);
+    const h = E.hoverInfo(S, who, id, role);
+    const labels = who === "our"
+      ? { bad: h.laner ? "상대 같은 라인" : "카운터 위험 · 상대 " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리" }
+      : { bad: h.laner ? "우리 같은 라인" : "우리 카운터 후보 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대" };
     const row = (x) => `<li>${icon(x.id, "sm")}<span><b>${esc(CH[x.id].ko)}</b><small>${esc(x.d)}</small></span></li>`;
-    hc.innerHTML = `<div class="hc-h">${icon(id, "sm")}<b>${esc(CH[id].ko)}</b><span class="pill">${ROLE_KO[role]}</span></div>
-      <div class="hc-sec"><div class="hc-t bad">${h.laner ? "상대 같은 라인" : "카운터 위험 · 상대 " + ROLE_KO[role]}</div>${h.threats.length ? `<ul>${h.threats.map(row).join("")}</ul>` : `<p class="help">상대 챔프폭에 뚜렷한 카운터 없음</p>`}</div>
-      <div class="hc-sec"><div class="hc-t good">우리 팀 시너지</div>${h.synergy.length ? `<ul>${h.synergy.map(row).join("")}</ul>` : `<p class="help">남은 라인 챔프폭에서 뚜렷한 시너지 없음</p>`}</div>`;
+    hc.innerHTML = `<div class="hc-h">${icon(id, "sm")}<b>${esc(CH[id].ko)}</b><span class="pill">${labels.tag} ${ROLE_KO[role]}</span></div>
+      <div class="hc-sec"><div class="hc-t ${who === "our" ? "bad" : "good"}">${labels.bad}</div>${h.threats.length ? `<ul>${h.threats.map(row).join("")}</ul>` : `<p class="help">뚜렷한 카운터 없음</p>`}</div>
+      <div class="hc-sec"><div class="hc-t ${who === "our" ? "good" : "bad"}">${labels.good}</div>${h.synergy.length ? `<ul>${h.synergy.map(row).join("")}</ul>` : `<p class="help">남은 라인 챔프폭에서 뚜렷한 시너지 없음</p>`}</div>`;
     hc.hidden = false;
     hcFor = el;
     el.setAttribute("aria-describedby", "hovercard");

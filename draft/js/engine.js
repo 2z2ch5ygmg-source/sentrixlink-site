@@ -830,14 +830,14 @@ window.Engine = (function () {
     let threats = [];
     if (theirLaner) {
       const m = pct(muWr(theirLaner.champ, id));
-      threats = [{ id: theirLaner.champ, d: lanesCounter(theirLaner.champ, id) ? `이미 픽 · ${ko(id)} 상대 강함${m ? ` (상대 승률 ${m}%)` : ""}` : `이미 픽 · 상성 ${m ? `상대 승률 ${m}%` : "비슷"}` }];
+      threats = [{ id: theirLaner.champ, d: lanesCounter(theirLaner.champ, id) ? `이미 픽 · ${ko(id)} 상대 강함${m ? ` (라인 승률 ${m}%)` : ""}` : `이미 픽 · 상성 ${m ? `라인 승률 ${m}%` : "비슷"}` }];
     } else {
       threats = Object.entries(poolMap(oppTeam, role)).filter(([c]) => oppAvail.has(c) && lanesCounter(c, id))
         .sort((a, b) => lvScore(b[1]) - lvScore(a[1]))
-        .map(([c, e]) => { const m = pct(muWr(c, id)); return { id: c, d: `상대 챔프폭 · ${statText(e)}${m ? ` · 상대 승률 ${m}%` : ""}` }; }).slice(0, 5);
+        .map(([c, e]) => { const m = pct(muWr(c, id)); return { id: c, d: `${who === "our" ? "상대" : "우리"} 챔프폭 · ${statText(e)}${m ? ` · 라인 승률 ${m}%` : ""}` }; }).slice(0, 5);
       if (threats.length < 5) {
         const gen = window.CHAMPIONS.filter((c) => c.pos.includes(role) && oppAvail.has(c.id) && c.id !== id && !threats.find((t) => t.id === c.id) && lanesCounter(c.id, id))
-          .map((c) => { const m = pct(muWr(c.id, id)); return { id: c.id, wr: m || 0, d: `일반 카운터${m ? ` · 상대 승률 ${m}%` : ""}` }; })
+          .map((c) => { const m = pct(muWr(c.id, id)); return { id: c.id, wr: m || 0, d: `일반 카운터${m ? ` · 라인 승률 ${m}%` : ""}` }; })
           .sort((a, b) => b.wr - a.wr);
         threats = threats.concat(gen.slice(0, 5 - threats.length));
       }
