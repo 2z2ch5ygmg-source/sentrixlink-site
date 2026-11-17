@@ -41,9 +41,21 @@
   const nick = (riot) => String(riot || "").split("#")[0].trim();
   const lvTag = (e) => (e.one ? `<span class="lv lvone">원챔</span>` : `<span class="lv lv${e.lv}">${LEVEL_KO[e.lv]}</span>`);
   function poolChips(t, r, opts) {
+    if (!(opts && opts.edit)) {
+      // 보기용: 직접 입력 + op.gg 전적을 합친 챔프폭 (숙련 점수 순)
+      const pm = E.poolMap(t, r);
+      const list = Object.entries(pm).sort((a, b) => E.lvScore(b[1]) - E.lvScore(a[1])).slice(0, (opts && opts.max) || 8);
+      if (!list.length) return `<span class="dim">챔프폭·전적 없음</span>`;
+      return list.map(([id, e]) => `<span class="chip" title="${esc(CH[id] ? CH[id].ko : id)}${e.kda ? " · KDA " + e.kda : ""}${e.mp ? " · 숙련도 " + e.mp.toLocaleString() : ""}">${icon(id, "sm")}${esc(CH[id] ? CH[id].ko : id)} ${lvTag({ lv: e.lv, one: e.one })}${e.g ? `<span class="st">${e.g}판 ${Math.round(e.wr)}%</span>` : ""}</span>`).join("");
+    }
     const pool = (t.players[r].pool || []).slice().sort((a, b) => (b[2] ? 4 : b[1]) - (a[2] ? 4 : a[1]));
-    if (!pool.length) return `<span class="dim">챔프폭 미입력</span>`;
+    if (!pool.length) return `<span class="dim">직접 입력한 챔프 없음 (op.gg 전적은 자동 반영)</span>`;
     return pool.map(([id, lv, one]) => `<span class="chip ${opts && opts.edit ? "ed-chip" : ""}" ${opts && opts.edit ? `data-act="cycle" data-team="${t.id}" data-role="${r}" data-id="${id}"` : ""}>${icon(id, "sm")}${esc(CH[id] ? CH[id].ko : id)} ${lvTag({ lv, one })}${opts && opts.edit ? `<span class="del" data-act="del" data-team="${t.id}" data-role="${r}" data-id="${id}" title="삭제">×</span>` : ""}</span>`).join("");
+  }
+  function totalTxt(t, r) {
+    const sc = E.scoutOf(t, r);
+    if (!sc || !sc.total || !sc.total.g) return window.SCOUT && window.SCOUT.teams && window.SCOUT.teams[t.id] && window.SCOUT.teams[t.id][r] && window.SCOUT.teams[t.id][r].error ? " · 전적 못 읽음" : "";
+    return ` · 시즌 ${sc.total.g}판 ${Math.round((sc.total.w / sc.total.g) * 100)}%`;
   }
   function opgg(riot) {
     const [n, tag] = String(riot).split("#");
@@ -213,7 +225,7 @@
 
   function renderOur() {
     const t = team(S.ourTeam);
-    const roster = ROLES.map((r) => { const p = t.players[r]; return `<div class="pl"><div class="role">${ROLE_KO[r]}</div><div class="id" title="${esc(p.riot)}">${esc(nick(p.riot))}</div><div class="tier">${esc(p.tier)} · ${p.pts}점</div><div class="chips">${poolChips(t, r)}</div></div>`; }).join("");
+    const roster = ROLES.map((r) => { const p = t.players[r]; return `<div class="pl"><div class="role">${ROLE_KO[r]}</div><div class="id" title="${esc(p.riot)}">${esc(nick(p.riot))}</div><div class="tier">${esc(p.tier)} · ${p.pts}점${totalTxt(t, r)}</div><div class="chips">${poolChips(t, r)}</div></div>`; }).join("");
     const has = E.teamHasPools(t);
     const comps = has ? E.teamComps(t).slice(0, 4) : [];
     const plan = has ? E.fearlessPlan(t, 3) : [];
@@ -253,8 +265,8 @@
       const learn = [...new Set(study.flatMap((x) => x.learn))].slice(0, 4);
       const risky = [...new Set(study.flatMap((x) => x.risky))];
       return `<tr><td><b>${ROLE_KO[r]}</b></td>
-        <td><a href="${opgg(p.riot)}" target="_blank" rel="noopener">${esc(nick(p.riot))}</a><div class="help">${esc(p.tier)} · ${p.pts}점</div></td>
-        <td>${esc(nick(o.riot))}<div class="help">${esc(o.tier)} · ${o.pts}점</div></td>
+        <td><a href="${opgg(p.riot)}" target="_blank" rel="noopener">${esc(nick(p.riot))}</a><div class="help">${esc(p.tier)} · ${p.pts}점${totalTxt(en, r)}</div></td>
+        <td>${esc(nick(o.riot))}<div class="help">${esc(o.tier)} · ${o.pts}점${totalTxt(ours, r)}</div></td>
         <td><span class="pill ${gap >= 15 ? "good" : gap <= -15 ? "bad" : ""}">${gap > 0 ? "+" : ""}${gap}</span></td>
         <td><div class="row-chips">${poolChips(en, r)}</div></td>
         <td><div class="row-chips">${have.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td>
@@ -277,13 +289,13 @@
     const gaps = ROLES.map((r) => ({ r, g: (ours.players[r].pts || 0) - (en.players[r].pts || 0) }));
     const weak = gaps.filter((x) => x.g <= -15).map((x) => ROLE_KO[x.r]);
     const strong = gaps.filter((x) => x.g >= 15).map((x) => ROLE_KO[x.r]);
-    return `<div class="section-title"><h2>상대팀 사전 분석</h2><select id="enemyPick" aria-label="상대팀">${opts}</select><button class="btn sm" data-act="edit" data-team="${en.id}">상대 챔프폭 편집</button></div>
+    return `<div class="section-title"><h2>상대팀 사전 분석</h2><select id="enemyPick" aria-label="상대팀">${opts}</select><button class="btn sm" data-act="edit" data-team="${en.id}">상대 챔프폭 편집</button>${window.SCOUT ? `<p>op.gg 전적 기준 ${esc(window.SCOUT.at)}</p>` : ""}</div>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
         <div class="card"><div class="muted">티어 점수 합</div><div style="font-size:22px;font-weight:800">${sum(ours)} <span class="muted" style="font-size:14px">우리</span> : ${sum(en)} <span class="muted" style="font-size:14px">상대</span></div></div>
         <div class="card"><div class="muted">우세 라인</div><div style="font-weight:700">${strong.join(", ") || "없음"}</div><div class="muted" style="margin-top:6px">열세 라인</div><div style="font-weight:700">${weak.join(", ") || "없음"}</div></div>
         <div class="card"><div class="muted">운영 방향</div><div>${weak.length ? `${esc(weak.join("·"))}은 버티는 픽, 정글이 커버` : "라인전 무난"}${strong.length ? ` · ${esc(strong.join("·"))} 주도권으로 동선 시작` : ""}</div></div>
       </div>
-      ${has ? "" : `<div class="note" style="margin-top:12px">상대 챔프폭이 비어 있습니다. 선수 이름(op.gg 링크)에서 최근 챔피언을 확인해 「상대 챔프폭 편집」에 넣으면 카운터·연습 추천·예상 조합이 채워집니다.</div>`}
+      ${has ? "" : `<div class="note" style="margin-top:12px">이 팀은 op.gg 전적을 읽지 못했고 직접 입력한 챔프폭도 없습니다. 「상대 챔프폭 편집」에 넣으면 카운터·연습 추천·예상 조합이 채워집니다.</div>`}
       <div class="section-title"><h2>라인별 상대와 연습 포인트</h2><p>점수 차 = 우리 − 상대</p></div>
       <div class="card tbl-wrap"><table class="study"><thead><tr><th>라인</th><th>상대 선수</th><th>우리 선수</th><th>점수 차</th><th>상대 챔프폭</th><th>우리 대응 가능</th><th>새로 연습 추천</th><th>우리 챔프 중 주의</th></tr></thead><tbody>${rows}</tbody></table></div>
       ${compsHtml}

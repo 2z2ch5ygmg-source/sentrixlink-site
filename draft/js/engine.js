@@ -17,16 +17,59 @@ window.Engine = (function () {
   const ko = (id) => (CH[id] ? CH[id].ko : id);
 
   // ---- 챔프폭 ----
+  // op.gg 전적(tools/scout.py → js/scout.js)
+  function scoutOf(team, role) {
+    const S = window.SCOUT;
+    const t = S && S.teams && team && S.teams[team.id];
+    return t && t[role] && !t[role].error ? t[role] : null;
+  }
+  // 판수·승률(표본 보정)·숙련도 점수·라인 일치로 0~1 숙련 점수를 만든다
+  function statEntry(x, total, role) {
+    const c = CH[x.id];
+    if (!c) return null;
+    const g = x.g || 0;
+    const wr = g ? (x.w / g) * 100 : 0;
+    const wrS = (x.w + 5) / (g + 10);
+    const vol = Math.min(1, g / 40);
+    const wrPart = Math.max(0, Math.min(1, (wrS - 0.45) / 0.15)) * Math.min(1, g / 10);
+    const mast = Math.min(1, (x.mp || 0) / 300000);
+    const share = total && total.g ? g / total.g : 0;
+    // 판수 비중이 큰 챔프는 라인과 상관없이 대회에서도 꺼낼 수 있는 주력으로 본다(예: 미드 브라이어 원챔)
+    const one = g >= 25 && share >= 0.35;
+    const onRole = c.pos.includes(role) || one || share >= 0.2;
+    const score = (0.55 * vol + 0.3 * wrPart + 0.15 * mast) * (onRole ? 1 : 0.45);
+    return { lv: score >= 0.6 ? 3 : score >= 0.35 ? 2 : 1, one, score: one ? Math.max(score, 0.9) : score, g, w: x.w || 0, wr, kda: x.kda, mp: x.mp || 0, share, scout: true };
+  }
+  const MANUAL_SCORE = { 3: 0.75, 2: 0.45, 1: 0.2 };
   function poolMap(team, role) {
     const m = {};
     const p = team && team.players[role];
     if (!p) return m;
-    (p.pool || []).forEach(([id, lv, one]) => (m[id] = { lv: lv || 1, one: !!one }));
+    const sc = scoutOf(team, role);
+    const stats = {};
+    if (sc) sc.champs.forEach((x) => { const e = statEntry(x, sc.total, role); if (e) stats[x.id] = e; });
+    const manual = p.pool || [];
+    manual.forEach(([id, lv, one]) => {
+      const st = stats[id];
+      m[id] = { lv: lv || 1, one: !!one, score: one ? 1 : MANUAL_SCORE[lv || 1], manual: true };
+      if (st) Object.assign(m[id], { g: st.g, w: st.w, wr: st.wr, kda: st.kda, mp: st.mp, score: Math.max(m[id].score, st.score), one: !!one || st.one });
+    });
+    // 직접 입력이 없는 라인은 전적 전체를, 있는 라인은 전적상 강한 챔프만 더한다
+    Object.entries(stats).forEach(([id, e]) => {
+      if (m[id] || e.score < 0.15) return;
+      if (!manual.length || e.score >= 0.6 || e.one) m[id] = e;
+    });
     return m;
   }
-  const lvScore = (e) => (!e ? 0 : e.one ? 3.6 : e.lv);
+  const lvScore = (e) => (!e ? 0 : e.one ? 3.6 : 1 + (e.score != null ? e.score : MANUAL_SCORE[e.lv] || 0.2) * 2.6);
+  function statText(e) {
+    if (!e) return "";
+    if (e.g) return `${e.g}판 ${Math.round(e.wr)}%${e.one ? " · 원챔" : ""}`;
+    if (e.mp && !e.manual) return `숙련도 ${Math.round(e.mp / 1000)}k`;
+    return e.one ? "원챔" : LEVEL_KO[e.lv];
+  }
   function teamHasPools(team) {
-    return !!team && ROLES.some((r) => (team.players[r].pool || []).length);
+    return !!team && ROLES.some((r) => (team.players[r].pool || []).length || (scoutOf(team, r) && scoutOf(team, r).champs.length));
   }
 
   // ---- 조합 적합도 ----
@@ -191,16 +234,18 @@ window.Engine = (function () {
     const res = [];
     for (const c of available(state, opp)) {
       const reasons = [];
-      let s = 0;
+      let s = 0, tgt = null;
       for (const r of oppOpen) {
         const e = poolMap(oppTeam, r)[c.id];
         if (!e) continue;
         const p = oppTeam.players[r];
         const f = strengthFactor(p);
-        const v = (e.one ? 40 : e.lv === 3 ? 24 : e.lv === 2 ? 14 : 6) * f;
+        const v = Math.max(e.one ? 40 : 0, 8 + 34 * e.score) * f;
         if (v > s) {
           s = v;
-          reasons[0] = { t: e.one ? "원챔 차단" : e.lv === 3 ? "숙련도 높음" : "상대 챔프폭", d: `${ROLE_KO[r]} ${p.riot.split("#")[0]} · ${e.one ? "원챔" : LEVEL_KO[e.lv]}`, v };
+          const t = e.one ? "원챔 차단" : e.g >= 15 && e.wr >= 60 ? "고승률 차단" : e.score >= 0.6 ? "숙련도 높음" : "상대 챔프폭";
+          reasons[0] = { t, d: `${ROLE_KO[r]} ${p.riot.split("#")[0]} · ${statText(e)}`, v };
+          tgt = r;
         }
       }
       const onRole = c.pos.some((r) => oppOpen.includes(r));
@@ -222,9 +267,20 @@ window.Engine = (function () {
       if (c.pos.length >= 2 && onRole) s += 1;
       if (s < 3) continue;
       reasons.sort((a, b) => b.v - a.v);
-      res.push({ id: c.id, score: s, label: reasons[0] ? reasons[0].t : "견제", reasons });
+      res.push({ id: c.id, score: s, label: reasons[0] ? reasons[0].t : "견제", reasons, tgt });
     }
-    return res.sort((a, b) => b.score - a.score).slice(0, 6);
+    // 한 선수만 계속 밴하지 않도록: 같은 선수를 다시 노릴수록 점수를 낮춰 고른다
+    res.sort((a, b) => b.score - a.score);
+    const out = [], hits = {};
+    const pool = res.slice(0, 30);
+    while (out.length < 6 && pool.length) {
+      let bi = 0, bv = -1;
+      pool.forEach((r, i) => { const v = r.tgt ? r.score * Math.pow(0.7, hits[r.tgt] || 0) : r.score; if (v > bv) { bv = v; bi = i; } });
+      const r = pool.splice(bi, 1)[0];
+      if (r.tgt) hits[r.tgt] = (hits[r.tgt] || 0) + 1;
+      out.push(r);
+    }
+    return out;
   }
 
   function recommendPick(state, who) {
@@ -250,7 +306,7 @@ window.Engine = (function () {
         const reasons = [];
         let s = 0;
         const lv = lvScore(e);
-        if (lv) { s += lv * 9; reasons.push({ t: lv >= 3 ? "숙련도 높음" : `숙련도 ${LEVEL_KO[e.lv]}`, d: `${ROLE_KO[r]} ${team.players[r].riot.split("#")[0]}`, v: lv * 9 }); }
+        if (lv) { s += lv * 9; reasons.push({ t: lv >= 2.9 ? "숙련도 높음" : `숙련도 ${LEVEL_KO[e.lv]}`, d: `${ROLE_KO[r]} ${team.players[r].riot.split("#")[0]} · ${statText(e)}`, v: lv * 9 }); }
         else s -= teamHasPools(team) ? 8 : 0;
         if (!c.pos.includes(r)) s -= 4;
         if (dir) {
@@ -270,7 +326,7 @@ window.Engine = (function () {
         }
         for (const rr of oppOpen) {
           const e2 = poolMap(oppTeam, rr)[c.id];
-          if (e2 && (e2.lv >= 2 || e2.one)) { const v = e2.one ? 8 : 4; s += v; reasons.push({ t: "상대 주력 뺏기", d: `${ROLE_KO[rr]} ${oppTeam.players[rr].riot.split("#")[0]} 주력`, v }); break; }
+          if (e2 && (e2.lv >= 2 || e2.one)) { const v = e2.one ? 8 : 3 + e2.score * 4; s += v; reasons.push({ t: "상대 주력 뺏기", d: `${ROLE_KO[rr]} ${oppTeam.players[rr].riot.split("#")[0]} · ${statText(e2)}`, v }); break; }
         }
         if (!best || s > best.s) best = { r, s, reasons };
       }
@@ -455,7 +511,7 @@ window.Engine = (function () {
   }
 
   return {
-    champ, ko, j, poolMap, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
+    champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
     recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor,
   };
