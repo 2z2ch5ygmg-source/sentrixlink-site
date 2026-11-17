@@ -8,6 +8,26 @@
   // ---------- state ----------
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const emptySteps = () => ORDER.map(() => ({ champ: null, role: null, skip: false }));
+  // 솔랭·자랭: 팀 자료 없이 쓰는 빈 팀(챔프폭·전적 없음 → 메타·상성·조합으로만 추천)
+  const SOLO = { our: "solo-our", enemy: "solo-enemy" };
+  const soloTeam = (id, name) => ({ id, name, solo: true, players: Object.fromEntries(ROLES.map((r) => [r, { riot: "", tier: "", pts: 50, pool: [] }])) });
+  function ensureSolo(st) {
+    if (!st.teams.find((t) => t.id === SOLO.our)) st.teams.push(soloTeam(SOLO.our, "솔랭·자랭 우리팀"));
+    if (!st.teams.find((t) => t.id === SOLO.enemy)) st.teams.push(soloTeam(SOLO.enemy, "솔랭·자랭 상대팀"));
+    return st;
+  }
+  const isSolo = (id) => id === SOLO.our || id === SOLO.enemy;
+  // 상대가 솔랭·자랭이면 랭크 드래프트 순서(밴 10 → 픽 1-2-2-2-2-1), 아니면 대회 순서
+  function syncQueue(resetDraft) {
+    const kind = isSolo(S.enemyTeam) ? "ranked" : "tournament";
+    if (ORDER.kind !== kind) {
+      window.KB.useOrder(kind);
+      if (resetDraft) { S.draft.steps = emptySteps(); S.draft.idx = 0; }
+      // 솔랭·자랭은 피어리스 끔, 대회로 돌아오면 전에 쓰던 피어리스 설정으로
+      if (kind === "ranked") { S.series.prevMode = S.series.mode; S.series.mode = "off"; }
+      else if (S.series.prevMode) { S.series.mode = S.series.prevMode; delete S.series.prevMode; }
+    }
+  }
   function fresh() {
     const teams = clone(window.SEED_TEAMS);
     const our = window.SEED_OUR_TEAM;
@@ -40,7 +60,8 @@
     } catch (e) { /* 저장소를 못 쓰는 환경: 기본값 */ }
     return fresh();
   }
-  let S = load();
+  let S = ensureSolo(load());
+  if (isSolo(S.enemyTeam)) window.KB.useOrder("ranked");
   S.ui.sheet = false;
   S.ui.predRole = "";
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
@@ -149,12 +170,22 @@
   // ---------- header ----------
   function renderTop() {
     document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === S.tab)));
-    const opts = (sel, excl) => S.teams.filter((t) => t.id !== excl).map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("");
-    document.getElementById("ourSel").innerHTML = opts(S.ourTeam, null);
-    document.getElementById("enemySel").innerHTML = opts(S.enemyTeam, S.ourTeam);
+    // 대회 팀 목록 아래에 「솔랭·자랭」(팀 자료 없음)
+    const opts = (sel, excl, soloId) => S.teams.filter((t) => t.id !== excl && !t.solo).map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("")
+      + `<optgroup label="팀 자료 없이"><option value="${soloId}" ${sel === soloId ? "selected" : ""}>솔랭·자랭</option></optgroup>`;
+    document.getElementById("ourSel").innerHTML = opts(S.ourTeam, null, SOLO.our);
+    document.getElementById("enemySel").innerHTML = opts(S.enemyTeam, S.ourTeam, SOLO.enemy);
   }
 
   // ---------- live draft ----------
+  // 단계 이름: 대회 = 1차 밴·1차 픽·2차 밴·2차 픽, 솔랭·자랭 = 밴·픽
+  function phaseName(i) {
+    const t = ORDER[i][1];
+    if (ORDER.kind === "ranked") return (t === "ban" ? "밴" : "픽") + " 단계";
+    let n = 0;
+    for (let k = 0; k <= i; k++) if (ORDER[k][1] === t && (k === 0 || ORDER[k - 1][1] !== t)) n++;
+    return `${n}차 ${t === "ban" ? "밴" : "픽"}`;
+  }
   const curStep = () => (S.draft.idx < ORDER.length ? ORDER[S.draft.idx] : null);
   function sideIdx(side, type) { return ORDER.map((o, i) => (o[0] === side && o[1] === type ? i : -1)).filter((i) => i >= 0); }
 
@@ -233,7 +264,7 @@
     const who = st ? E.whoOfSide(S, side) : null;
     const t = st ? E.teamOf(S, who) : null;
     const what = done ? "밴픽 완료" : `${who === "our" ? "우리팀" : esc(t.name)} ${st[1] === "ban" ? "밴" : "픽"}`;
-    const phase = done ? "아래 전략 확인" : S.draft.idx < 6 ? "1차 밴" : S.draft.idx < 12 ? "1차 픽" : S.draft.idx < 16 ? "2차 밴" : "2차 픽";
+    const phase = done ? "아래 전략 확인" : phaseName(S.draft.idx);
     return `<div class="dstat ${side || ""} ${extra || ""}"><div class="dstat-top"><span class="dstat-n">${done ? 20 : S.draft.idx + 1}<small>/20</small></span><span class="dstat-ph">${phase}</span></div>
       <div class="dstat-what">${what}</div>
       <div class="dstat-act">${st && st[1] === "ban" ? `<button class="btn sm ghost" data-act="skip">밴 넘기기</button>` : ""}<button class="btn sm" data-act="undo" ${S.draft.idx ? "" : "disabled"}>되돌리기</button>${done ? "" : `<button class="btn sm primary m-only" data-act="sheet">고르기</button>`}</div></div>`;
@@ -303,6 +334,7 @@
   }
 
   function renderThreat(compact) {
+    if (!E.teamHasPools(E.teamOf(S, "enemy")) && !E.picks(S, "enemy").length) return "";   // 솔랭·자랭: 상대 정보가 없으면 픽이 나온 뒤부터
     const k = E.keyThreats(S, "our");
     if (!k || !k.top) return "";
     const th = k.top, a = k.advice;
@@ -367,7 +399,7 @@
       const s = S.draft.steps[i];
       const who = E.whoOfSide(S, side);
       const pr = !s.champ && planned[i];
-      const cls = ["tl-c", side === "B" ? "b" : "r", type, i === S.draft.idx ? "now" : "", s.champ ? "filled" : s.skip ? "skip" : "open", [6, 12, 16].includes(i) ? "gap" : ""].join(" ");
+      const cls = ["tl-c", side === "B" ? "b" : "r", type, i === S.draft.idx ? "now" : "", s.champ ? "filled" : s.skip ? "skip" : "open", i > 0 && ORDER[i - 1][1] !== type ? "gap" : ""].join(" ");
       const label = `${i + 1}. ${side === "B" ? "블루" : "레드"}(${who === "our" ? "우리" : "상대"}) ${type === "ban" ? "밴" : "픽"}${s.champ ? ` · ${CH[s.champ].ko}` : pr ? ` · ${ROLE_KO[pr]} 예정` : ""}`;
       const inner = s.champ ? `<img src="${IMG(s.champ)}" alt="" loading="lazy" onerror="this.remove()">` : pr ? `<span>${ROLE_1[pr]}</span>` : "";
       return `<li class="${cls}" title="${esc(label)}"><span class="sr-only">${esc(label)}</span>${inner}</li>`;
@@ -681,6 +713,8 @@
     const head = `<div class="vmode">${vseg("vmode", mode, [["spots", "자리 보기"], ["drill", "상황 훈련"]], "시야 공부 보기")}</div>`;
     return head + (mode === "drill" ? renderDrill(V) : renderSpots(V));
   }
+  const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  const vlink = (V, t) => `<a class="vlink" href="${V.source.url}&t=${t}s" target="_blank" rel="noopener" title="${esc(V.source.title)} ${mmss(t)} 장면 열기">${ico("eye")}영상 ${mmss(t)}</a>`;
   function renderSpots(V) {
     const u = S.ui;
     const phase = V.phases.find((p) => p.id === u.vPhase) || V.phases[1];
@@ -688,47 +722,53 @@
     const side = (u.vSide && u.vSideBase === S.draft.ourSide ? u.vSide : S.draft.ourSide) || "B";
     const role = u.vRole || "", purp = u.vPurp || "";
     const f = visionFocus();
-    const pri = (sp) => (f.gank && sp.tag === "def") || (f.engage && sp.tag === "agg") || sp.tag === "obj";
+    const pri = (l) => (f.gank && l.tag === "def") || (f.engage && l.tag === "agg");
     const pos = (sp) => (side === "B" ? { x: sp.x, y: sp.y } : { x: sp.y, y: sp.x });   // 레드는 강을 기준으로 뒤집기
+    const spotOf = (id) => V.spots.find((x) => x.id === id);
     // 역할·목적을 고르면 나머지는 아예 숨긴다
-    const list = V.spots.filter((sp) => sp.phases.includes(phase.id) && (!role || sp.roles.includes(role)) && (!purp || sp.tag === purp))
-      .sort((a, b) => pri(b) - pri(a) || a.id - b.id);
-    const marks = list.map((sp) => { const p = pos(sp); return `<button class="vm p-${sp.tag} t-${sp.type} ${pri(sp) ? "pri" : ""} ${u.vSpot === sp.id ? "sel" : ""}" style="left:${p.x}%;top:${p.y}%" data-act="vspot" data-id="${sp.id}" aria-label="${sp.id}번 ${esc(sp.name)} · ${TYPE_KO[sp.type]}">${sp.id}</button>`; }).join("");
+    const lessons = V.lessons.filter((l) => l.phase === phase.id && (!role || l.roles.includes(role)) && (!purp || l.tag === purp));
+    const areas = [...new Set(lessons.map((l) => l.spot))].map(spotOf);
+    const marks = areas.map((sp) => {
+      const ls = lessons.filter((l) => l.spot === sp.id), p = pos(sp);
+      const ctrl = ls.some((l) => l.type === "ctrl");
+      return `<span class="varea p-${ls[0].tag}" style="left:${p.x}%;top:${p.y}%" aria-hidden="true"></span><button class="vm p-${ls[0].tag} ${ctrl ? "t-ctrl" : ""} ${ls.some(pri) ? "pri" : ""} ${u.vSpot === sp.id ? "sel" : ""}" style="left:${p.x}%;top:${p.y}%" data-act="vspot" data-id="${sp.id}" aria-label="${sp.id}번 ${esc(sp.name)}">${sp.id}</button>`;
+    }).join("");
     const base = side === "B" ? `<span class="vbase ours" style="left:9%;top:91%">우리</span><span class="vbase theirs" style="left:91%;top:9%">상대</span>` : `<span class="vbase ours" style="left:91%;top:9%">우리</span><span class="vbase theirs" style="left:9%;top:91%">상대</span>`;
-    // 목록: 목적별 묶음(갱 대비 / 끊기·동선 / 오브젝트) — 왜 박는지부터 보이게
+    // 목록: 목적별 묶음 — 강의 한 줄 요약 + 그 장면 영상 링크
     const groups = V.purposes.map((pu) => {
-      const items = list.filter((sp) => sp.tag === pu.id);
+      const items = lessons.filter((l) => l.tag === pu.id);
       if (!items.length) return "";
-      const rows = items.map((sp) => `<li class="vrow ${u.vSpot === sp.id ? "sel" : ""}" data-act="vspot" data-id="${sp.id}" tabindex="0">
-        <span class="vm p-${sp.tag} t-${sp.type} ${pri(sp) ? "pri" : ""}" aria-hidden="true">${sp.id}</span>
-        <span class="vr-main"><b>${esc(sp.name)}</b><span class="vr-sub">${TYPE_KO[sp.type]} · ${sp.roles.map((r) => ROLE_KO[r]).join("·")}${pri(sp) ? ` · <span class="vr-pri">우리 팀 우선</span>` : ""}</span><span class="vr-why">${esc(sp.why)}</span></span></li>`).join("");
+      const rows = items.map((l) => { const sp = spotOf(l.spot); return `<li class="vrow ${u.vSpot === l.spot ? "sel" : ""}" data-act="vspot" data-id="${l.spot}" tabindex="0">
+        <span class="vm p-${l.tag} ${l.type === "ctrl" ? "t-ctrl" : ""} ${pri(l) ? "pri" : ""}" aria-hidden="true">${l.spot}</span>
+        <span class="vr-main"><b>${esc(l.title)}</b><span class="vr-sub">${esc(sp.name)} · ${l.type === "ctrl" ? "제어 와드" : "와드"} · ${l.roles.map((r) => ROLE_KO[r]).join("·")}${pri(l) ? ` · <span class="vr-pri">우리 팀 우선</span>` : ""}</span><span class="vr-why">${esc(l.text)}</span>${vlink(V, l.t)}</span></li>`; }).join("");
       return `<li class="vgrp"><div class="vgrp-h p-${pu.id}"><b>${pu.name}</b><span>${esc(pu.when)}</span></div><ol class="vlist">${rows}</ol></li>`;
     }).join("");
-    // 이번 판 시야 계획: 단계마다 누가 몇 번
+    // 이번 판 시야 계획: 단계마다 누가 몇 번 구역
     const plan = V.phases.map((ph) => {
-      const sp = V.spots.filter((x) => x.phases.includes(ph.id) && (!role || x.roles.includes(role))).sort((a, b) => pri(b) - pri(a) || a.id - b.id);
+      const ls = V.lessons.filter((l) => l.phase === ph.id && (!role || l.roles.includes(role)));
       const by = {};
-      sp.forEach((x) => { const r = role || x.roles[0]; (by[r] = by[r] || []).push(x); });
-      const who = ROLES.filter((r) => by[r]).map((r) => `<span class="vp-who"><b>${ROLE_KO[r]}</b>${by[r].slice(0, 3).map((x) => `<span class="vm mini p-${x.tag} t-${x.type} ${pri(x) ? "pri" : ""}">${x.id}</span>`).join("")}</span>`).join("") || `<span class="dim">없음</span>`;
+      ls.forEach((l) => { const r = role || l.roles[0]; (by[r] = by[r] || []); if (!by[r].some((x) => x.spot === l.spot)) by[r].push(l); });
+      const who = ROLES.filter((r) => by[r]).map((r) => `<span class="vp-who"><b>${ROLE_KO[r]}</b>${by[r].map((l) => `<span class="vm mini p-${l.tag} ${l.type === "ctrl" ? "t-ctrl" : ""} ${pri(l) ? "pri" : ""}">${l.spot}</span>`).join("")}</span>`).join("") || `<span class="dim">없음</span>`;
       return `<button class="vp ${ph.id === phase.id ? "on" : ""}" data-act="vphase" data-v="${ph.id}"><span class="vp-h"><b>${ph.name}</b><span class="dim">${ph.time}</span></span><span class="vp-r">${who}</span></button>`;
     }).join("");
     const fx = [];
-    if (f.jId) fx.push(`<span class="tg ${f.gank ? "bad" : ""}">${icon(f.jId, "sm")}상대 정글 ${esc(CH[f.jId].ko)}${f.jPicked ? "" : "(예상)"} · ${f.gank ? "갱킹형 → 갱 대비 와드 우선" : "성장형 → 상대 정글 시야"}</span>`);
-    if (f.sId) fx.push(`<span class="tg ${f.engage ? "good" : ""}">${icon(f.sId, "sm")}우리 서폿 ${esc(CH[f.sId].ko)} · ${f.engage ? "이니시·그랩 → 끊기 와드" : "보호형 → 방어 시야"}</span>`);
+    if (f.jId) fx.push(`<span class="tg ${f.gank ? "bad" : ""}">${icon(f.jId, "sm")}상대 정글 ${esc(CH[f.jId].ko)}${f.jPicked ? "" : "(예상)"} · ${f.gank ? "갱킹형 → 갱·카정 대비 우선" : "성장형 → 상대 정글 시야"}</span>`);
+    if (f.sId) fx.push(`<span class="tg ${f.engage ? "good" : ""}">${icon(f.sId, "sm")}우리 서폿 ${esc(CH[f.sId].ko)} · ${f.engage ? "이니시·그랩 → 낚시 와드" : "보호형 → 방어 시야"}</span>`);
     const purpKey = V.purposes.map((pu) => `<button class="vpk p-${pu.id}" data-act="vpurp" data-v="${pu.id}" aria-pressed="${purp === pu.id}"><b>${pu.name}</b><span>${esc(pu.what)}</span></button>`).join("");
     return `<section class="card vbox">
       <div class="now-h"><span class="what">이번 판 시야 계획</span><span class="step">${side === "B" ? "블루" : "레드"} 진영 · ${esc(E.teamOf(S, "our").name)} vs ${esc(E.teamOf(S, "enemy").name)}</span></div>
       ${fx.length ? `<div class="tgs vfx">${fx.join("")}</div>` : ""}
       <div class="vplan">${plan}</div></section>
     <section class="card vbox">
+      <p class="vsrc">출처 <a href="${V.source.url}" target="_blank" rel="noopener">${esc(V.source.author)} · ${esc(V.source.title)}</a> — 자리는 영상 장면의 미니맵 위치를 구역으로 표시, 정확한 지점은 각 「영상」 링크에서</p>
       <div class="vpks" role="group" aria-label="와드 목적">${purpKey}</div>
       <div class="vctl">${vseg("vphase", phase.id, V.phases.map((p) => [p.id, p.name]), "단계")}${vseg("vrole", role, [["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])), "역할")}${vseg("vside", side, [["B", "블루"], ["R", "레드"]], "진영")}</div>
       <p class="vtip"><b>${phase.name}</b> <span class="dim">${phase.time}</span> — ${esc(phase.tip)}${purp ? ` · <b>${V.purposes.find((x) => x.id === purp).name}</b>만` : ""}${role ? ` · <b>${ROLE_KO[role]}</b>만` : ""}</p>
       <div class="vgrid">
         <div class="vmap"><img src="https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png" alt="소환사의 협곡 미니맵" loading="lazy">${base}${marks}</div>
-        <ol class="vlist vgroups">${groups || `<li class="dim">이 단계에 ${role ? ROLE_KO[role] + " " : ""}와드 자리가 없습니다.</li>`}</ol>
+        <ol class="vlist vgroups">${groups || `<li class="dim">이 단계에 ${role ? ROLE_KO[role] + " " : ""}강의 내용이 없습니다.</li>`}</ol>
       </div>
-      <p class="vkey"><span><i class="vm p-def"></i>갱 대비</span><span><i class="vm p-agg"></i>끊기·동선</span><span><i class="vm p-obj"></i>오브젝트</span><span><i class="vm p-def t-ctrl"></i>분홍 테두리 = 제어 와드</span><span><i class="vm p-obj t-sweep"></i>점선 = 렌즈</span><span class="dim">벽이 아닌 길·강 위 정석 근처</span></p>
+      <p class="vkey"><span><i class="vm p-def"></i>갱·카정 대비</span><span><i class="vm p-agg"></i>낚시·정보</span><span><i class="vm p-obj"></i>오브젝트</span><span><i class="vm p-def t-ctrl"></i>분홍 테두리 = 제어 와드</span><span class="dim">번호 둘레 = 강의 장면의 구역</span></p>
     </section>`;
   }
   // 상황 훈련: 상황(시간·오브젝트·양 팀 레벨·아이템)을 보고 와드 자리·한타 판단·포지셔닝을 고른다
@@ -762,7 +802,7 @@
     const verdict = done ? (d.opts[ans].ok ? `<p class="dres ok">맞음 — ${esc(d.opts[ans].why)}</p>` : `<p class="dres no">아쉬움 — 정답은 ${"ABCD"[d.opts.findIndex((o) => o.ok)]}. ${esc(d.opts.find((o) => o.ok).why)}</p>`) : "";
     return `<section class="card vbox drill">
       <div class="dtop">${vseg("dcat", cat, cats.map((c) => [c, c]), "훈련 종류")}<span class="dsc">맞힘 ${right} / 푼 문제 ${tried} · 전체 ${D.length}</span></div>
-      <div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${k + 1}. ${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)} · ${esc(d.obj)}</span><span class="dim">블루 진영(우리 = 왼쪽 아래)</span></div>
+      <div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${k + 1}. ${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)} · ${esc(d.obj)}</span><span class="dim">블루 진영(우리 = 왼쪽 아래)</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
       <div class="dteams"><div><span class="dt-l us">우리</span>${team(d.us, "us")}</div><div><span class="dt-l them">상대</span>${team(d.them, "them")}</div></div>
       ${d.note ? `<p class="dnote">${esc(d.note)}</p>` : ""}
       <p class="dq">${esc(d.q)}</p>
@@ -844,8 +884,8 @@
   });
   document.addEventListener("change", (ev) => {
     const t = ev.target;
-    if (t.id === "ourSel") { S.ourTeam = t.value; if (S.enemyTeam === S.ourTeam) S.enemyTeam = S.teams.find((x) => x.id !== S.ourTeam).id; save(); render(); }
-    else if (t.id === "enemySel" || t.id === "enemyPick") { S.enemyTeam = t.value; save(); render(); }
+    if (t.id === "ourSel") { S.ourTeam = t.value; if (S.enemyTeam === S.ourTeam) S.enemyTeam = S.teams.find((x) => x.id !== S.ourTeam && !x.solo).id; syncQueue(true); save(); render(); }
+    else if (t.id === "enemySel" || t.id === "enemyPick") { S.enemyTeam = t.value; syncQueue(true); save(); render(); }
     else if (t.dataset && t.dataset.act === "role") setRole(Number(t.dataset.i), t.value);
     else if (t.id === "file" && t.files[0]) { importData(t.files[0]); t.value = ""; }
     else if (t.dataset && t.dataset.f && editing) render();

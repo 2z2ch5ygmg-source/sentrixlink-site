@@ -564,3 +564,13 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .dnav { display: flex; gap: 6px; flex-wrap: wrap; }
 @media (max-width: 900px) { .dgrid { grid-template-columns: minmax(0, 1fr); } .vpks { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) { .dteams { grid-template-columns: minmax(0, 1fr); } .dnav .btn { flex: 1; min-height: 44px; } }
+
+.varea { position: absolute; transform: translate(-50%, -50%); width: 11%; height: 11%; border-radius: 50%; pointer-events: none; }
+.varea.p-def { background: rgba(110, 164, 255, 0.22); border: 1px dashed rgba(110, 164, 255, 0.7); }
+.varea.p-agg { background: rgba(255, 122, 128, 0.2); border: 1px dashed rgba(255, 122, 128, 0.7); }
+.varea.p-obj { background: rgba(232, 182, 76, 0.2); border: 1px dashed rgba(232, 182, 76, 0.7); }
+.vlink { display: inline-flex; align-items: center; gap: 4px; width: max-content; font-size: 12px; font-weight: 700; color: #9cc0ff; text-decoration: none; padding: 2px 6px; border-radius: 6px; background: var(--blue-bg); }
+.vlink:hover { text-decoration: underline; }
+.vsrc { margin: 0; font-size: 12px; color: var(--muted); }
+.vsrc a { color: #9cc0ff; }
+@media (max-width: 760px) { .vlink { min-height: 32px; padding: 4px 8px; } }

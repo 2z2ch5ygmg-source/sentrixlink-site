@@ -195,5 +195,18 @@ window.KB = (function () {
     "MissFortune|Leona": 2, "Ashe|Zyra": 2, "Varus|Xerath": 2, "Caitlyn|Morgana": 2, "Caitlyn|Neeko": 2,
     "Kaisa|Rell": 2, "Ezreal|Yuumi": 2, "Kaisa|Alistar": 2, "Jhin|Nautilus": 2, "Ashe|Brand": 2,
   };
-  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS };
+  // 밴픽 순서: 대회(토너먼트 드래프트) / 솔랭·자랭(랭크 드래프트: 밴 10개 뒤 픽 1-2-2-2-2-1).
+  // 모든 화면이 같은 ORDER 배열을 쓰므로 바꿀 때는 배열 내용만 바꾼다(useOrder).
+  const ORDER_TOURNAMENT = ORDER.map((x) => x.slice());
+  const ORDER_RANKED = [
+    ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"],
+    ["B", "pick"], ["R", "pick"], ["R", "pick"], ["B", "pick"], ["B", "pick"], ["R", "pick"], ["R", "pick"], ["B", "pick"], ["B", "pick"], ["R", "pick"],
+  ];
+  ORDER.kind = "tournament";
+  function useOrder(kind) {
+    const src = kind === "ranked" ? ORDER_RANKED : ORDER_TOURNAMENT;
+    ORDER.splice(0, ORDER.length, ...src.map((x) => x.slice()));
+    ORDER.kind = kind === "ranked" ? "ranked" : "tournament";
+  }
+  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS, useOrder };
 })();

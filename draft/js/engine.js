@@ -4,6 +4,7 @@ window.Engine = (function () {
   const CH = {};
   window.CHAMPIONS.forEach((c) => (CH[c.id] = c));
   const COMP_KEYS = Object.keys(COMPS);
+  const firstPick = () => ORDER.findIndex((o) => o[1] === "pick");   // 대회 6, 솔랭·자랭 10
 
   const champ = (id) => CH[id];
   // 받침에 따라 조사 고르기: j("케이틀린", "이", "가") → "케이틀린이"
@@ -809,7 +810,7 @@ window.Engine = (function () {
         const why = sc.why.slice(), tags = sc.tags.slice();
         const U = (k, t, d, ids, cap) => { why.unshift(d); tags.unshift({ k, t, d, ids: (ids || []).filter((x) => x && CH[x]), cap }); };
         if (i === lastIdx && remainingIdx.length > 1) U("wait", "마지막 픽", "마지막 픽 — 상대 픽을 다 보고 결정");
-        if (side === "B" && i === 6) {
+        if (side === "B" && i === firstPick()) {
           U("grab", "블루 1픽", "블루 1픽 — 밴에서 살아남은 가장 강한 챔프 선점");
           const best = outlook[r].best;
           const pf = best && proFirst(best.id);
@@ -841,7 +842,7 @@ window.Engine = (function () {
   // 밴·상대 픽·피어리스 잠금을 뺀 챔프폭으로 조합별 5칸을 채우고(주 픽 + 대체 2), 양쪽 픽이 들어올 때마다 다시 계산한다.
   function scenarios(state, who) {
     who = who || "our";
-    if (state.draft.idx < 6) return null;
+    if (state.draft.idx < firstPick()) return null;   // 첫 밴 단계가 끝난 뒤부터
     const opp = who === "our" ? "enemy" : "our";
     const team = teamOf(state, who);
     if (!teamHasPools(team)) return null;
