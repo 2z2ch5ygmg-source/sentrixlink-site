@@ -59,6 +59,10 @@ window.Engine = (function () {
       if (m[id] || e.score < 0.15) return;
       if (!manual.length || e.score >= 0.6 || e.one) m[id] = e;
     });
+    // 판수가 적은 선수라도 라인이 비지 않게: 판수·숙련도 상위 3개는 남긴다
+    if (!Object.keys(m).length) {
+      Object.entries(stats).sort((a, b) => b[1].score - a[1].score || b[1].mp - a[1].mp).slice(0, 3).forEach(([id, e]) => (m[id] = e));
+    }
     return m;
   }
   const lvScore = (e) => (!e ? 0 : e.one ? 3.6 : 1 + (e.score != null ? e.score : MANUAL_SCORE[e.lv] || 0.2) * 2.6);
