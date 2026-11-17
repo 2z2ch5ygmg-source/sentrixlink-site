@@ -627,6 +627,34 @@ window.Engine = (function () {
     return { comp, opts: opts.filter((o) => o.picks.length), lanes, name, champ };
   }
 
+  // ---- 라인별 상대 예상 픽: 그 라인 선수가 꺼낼 수 있는 챔프 + 우리 대응 ----
+  function predictRole(state, who, role) {
+    const me = who === "our" ? "enemy" : "our";
+    const team = teamOf(state, who), myTeam = teamOf(state, me);
+    const avail = new Set(available(state, who).map((c) => c.id));
+    const myAvail = new Set(available(state, me).map((c) => c.id));
+    const pm = poolMap(team, role);
+    const list = [];
+    Object.entries(pm).forEach(([id, e]) => {
+      if (!avail.has(id)) return;
+      const mi = metaInfo(id, role);
+      list.push({ id, e, mi, s: lvScore(e) * 10 + (mi ? mi.score * 4 : 0), src: "pool" });
+    });
+    if (list.length < 6) {
+      window.CHAMPIONS.filter((c) => c.pos[0] === role && avail.has(c.id) && !pm[c.id])
+        .map((c) => ({ id: c.id, e: null, mi: metaInfo(c.id, role), src: "meta" }))
+        .filter((x) => x.mi).sort((a, b) => b.mi.score - a.mi.score).slice(0, 6 - list.length)
+        .forEach((x) => list.push({ ...x, s: x.mi.score * 6 }));
+    }
+    const myPool = Object.entries(poolMap(myTeam, role)).filter(([id]) => myAvail.has(id));
+    return list.sort((a, b) => b.s - a.s).slice(0, 8).map((x) => {
+      const answers = myPool.filter(([id]) => lanesCounter(id, x.id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([id]) => id);
+      const label = x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
+      const d = x.e ? statText(x.e) : metaText(x.mi);
+      return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers };
+    });
+  }
+
   // ---- 밴픽 완료 후 전략 ----
   function buildStrategy(state) {
     const our = picks(state, "our");
@@ -797,6 +825,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole,
   };
 })();

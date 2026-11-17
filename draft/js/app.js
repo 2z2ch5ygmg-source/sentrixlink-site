@@ -28,6 +28,7 @@
   }
   let S = load();
   S.ui.sheet = false;
+  S.ui.predRole = "";
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
 
   // ---------- helpers ----------
@@ -110,10 +111,10 @@
     return `<section class="side ${side}"><div class="side-h"><span class="nm">${esc(t.name)}</span><span class="tag">${side === "B" ? "블루" : "레드"} · ${who === "our" ? "우리" : "상대"}</span></div><div class="bans">${bans}</div><div class="picks">${picks}</div></section>`;
   }
 
-  function recCard(r, type, muted) {
+  function recCard(r, type, muted, rank) {
     const why = r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""}" data-act="pick" data-id="${r.id}">
-      <span class="lab">${esc(r.label)}</span>${icon(r.id, "lg")}<span class="cn">${esc(CH[r.id].ko)}</span>
+      ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg")}<span class="cn">${esc(CH[r.id].ko)}</span>
       ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span></button>`;
   }
 
@@ -128,9 +129,21 @@
     const dirTxt = dir ? `${who === "our" ? "우리" : "상대"} 조합 방향 <b>${COMPS[dir].name}</b>` : "";
     const title = `${who === "our" ? "우리팀" : esc(t.name)} ${type === "ban" ? "밴" : "픽"} 차례${who === "enemy" ? " · 예상" : ""}`;
     let body;
-    if (list.length) body = `<div class="recs">${list.map((r) => recCard(r, type, who === "enemy")).join("")}</div>`;
+    const pr = who === "enemy" ? S.ui.predRole || "" : "";
+    const theirPicks = who === "enemy" ? E.picks(S, "enemy") : [];
+    const roleTabs = who === "enemy" ? `<div class="seg pred-seg" role="group" aria-label="라인별 예상">${[["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])).map(([r, n]) => {
+      const done = r && theirPicks.find((p) => p.role === r);
+      return `<button data-act="pred" data-r="${r}" aria-pressed="${pr === r}" ${done ? `disabled title="${esc(CH[done.champ].ko)} 픽 완료"` : ""}>${n}</button>`; }).join("")}</div>` : "";
+    if (pr) {
+      const pl = E.predictRole(S, "enemy", pr);
+      const p = t.players[pr];
+      body = pl.length ? `<p class="help pred-h">${ROLE_KO[pr]} ${esc(nick(p.riot))} 선수가 꺼낼 수 있는 챔프 · 눌러서 상대 ${type === "ban" ? "밴" : "픽"}으로 기록</p><div class="recs">${pl.map((x) => `<button class="rec muted pred" data-act="pick" data-id="${x.id}">
+        <span class="lab">${esc(x.label)}</span>${icon(x.id, "lg")}<span class="cn">${esc(CH[x.id].ko)}</span><span class="why">${esc(x.d)}${x.meta ? `<br>${esc(x.meta)}` : ""}</span>
+        ${x.answers.length ? `<span class="ans">우리 대응 ${x.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`).join("")}</div>`
+        : `<div class="empty-recs">${ROLE_KO[pr]} 예상 챔프가 없습니다.</div>`;
+    } else if (list.length) body = `<div class="recs">${list.map((r, i) => recCard(r, type, who === "enemy", who === "our" ? i + 1 : 0)).join("")}</div>`;
     else body = `<div class="empty-recs">${who === "enemy" && !E.teamHasPools(t) ? "상대 챔프폭이 비어 있어 예상이 어렵습니다. 「상대팀 분석」에서 챔프폭을 넣으면 예상이 나옵니다." : "추천할 챔프가 없습니다. 아래에서 직접 고르세요."}</div>`;
-    return `<div class="now-box"><div class="now-h"><span class="what ${side}">${who === "our" ? "추천" : "상대 예상"}</span><span class="step">${title}</span><span class="dir">${dirTxt}</span></div>${body}</div>`;
+    return `<div class="now-box"><div class="now-h"><span class="what ${side}">${who === "our" ? "추천 순서" : "상대 예상"}</span><span class="step">${title}</span>${roleTabs}<span class="dir">${dirTxt}</span></div>${body}</div>`;
   }
 
   function renderStatus(extra) {
@@ -433,8 +446,9 @@
     if (E.taken(S).has(id) || E.lockedFor(S, who).has(id)) return;
     const step = S.draft.steps[S.draft.idx];
     step.champ = id; step.skip = false;
-    step.role = st[1] === "pick" ? E.guessRole(S, who, id) : null;
+    step.role = st[1] === "pick" ? (who === "enemy" && S.ui.predRole && E.openRoles(S, "enemy").includes(S.ui.predRole) ? S.ui.predRole : E.guessRole(S, who, id)) : null;
     S.draft.idx++;
+    if (S.ui.predRole && !E.openRoles(S, "enemy").includes(S.ui.predRole)) S.ui.predRole = "";
     S.ui.sheet = false; S.ui.q = "";
     save(); render();
   }
@@ -480,6 +494,7 @@
       case "mode": S.series.mode = el.dataset.v; save(); render(); break;
       case "frole": S.ui.role = el.dataset.r; save(); render(); break;
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
+      case "pred": S.ui.predRole = el.dataset.r; render(); break;
       case "sheet": S.ui.sheet = !S.ui.sheet; render(); if (S.ui.sheet) { const q = document.getElementById("q"); if (q && matchMedia("(min-width: 761px)").matches) q.focus(); } break;
       case "edit": editing = el.dataset.team; renderEditor(); break;
       case "close": editing = null; renderEditor(); break;

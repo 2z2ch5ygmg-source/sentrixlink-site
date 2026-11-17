@@ -167,6 +167,13 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .rec .lab { font-size: 12px; font-weight: 800; color: var(--gold); background: var(--gold-bg); border-radius: 6px; padding: 2px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rec.ban .lab { color: var(--red); background: var(--red-bg); }
 .rec .cn { font-weight: 800; font-size: 14px; }
+.rec { position: relative; }
+.rec .rk { position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold); color: #1b1404; font-size: 12px; font-weight: 900; display: grid; place-items: center; font-variant-numeric: tabular-nums; }
+.rec .ans { font-size: 11px; color: var(--good); line-height: 1.35; }
+.rec .ans b { font-weight: 700; }
+.pred-seg { margin-left: 4px; }
+.pred-seg button[disabled] { opacity: 0.35; cursor: not-allowed; text-decoration: line-through; }
+.pred-h { margin: -4px 0 10px; }
 .rec .why { font-size: 11px; color: var(--muted); line-height: 1.35; }
 .rec .role { font-size: 11px; }
 .rec.muted { opacity: 0.75; }
@@ -312,6 +319,9 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
   .rec { padding: 8px 4px; }
   .rec .ic.lg { width: 48px; height: 48px; }
   .rec .lab { font-size: 11px; padding: 2px 5px; }
+  .rec .rk { width: 18px; height: 18px; font-size: 10px; top: 4px; left: 4px; }
+  .pred-seg { order: 5; width: 100%; margin-left: 0; overflow-x: auto; }
+  .pred-seg button { flex: 1; padding: 6px 4px; }
   .pp-grid { grid-template-columns: minmax(0, 1fr); }
   /* 챔피언 고르기: 아래에서 올라오는 시트 */
   .col-grid { position: fixed; top: auto; left: 0; right: 0; bottom: 0; z-index: 40; transform: translateY(105%); transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
