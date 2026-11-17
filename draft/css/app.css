@@ -80,12 +80,29 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .seg { display: inline-flex; background: var(--bg2); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
 .seg button { border: 0; background: transparent; padding: 4px 10px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .seg button[aria-pressed="true"] { background: var(--panel2); color: var(--text); }
-.board { display: grid; grid-template-columns: 280px minmax(0, 1fr) 280px; grid-template-areas: "b now r" "b plan r" "b grid r"; gap: 12px; align-items: start; }
-.board > .side.B { grid-area: b; }
-.board > .side.R { grid-area: r; }
-.board > .now-box { grid-area: now; min-width: 0; }
-.board > .pool { grid-area: grid; min-width: 0; }
-.board > .plan-box { grid-area: plan; min-width: 0; }
+/* PC: 위 = 중계형 밴픽판, 아래 = 추천·순서(왼쪽) + 챔피언(오른쪽 고정) */
+.board { display: grid; grid-template-columns: minmax(0, 1fr) 420px; grid-template-areas: "dh dh" "main grid"; gap: 12px; align-items: start; }
+.dh { grid-area: dh; display: grid; grid-template-columns: minmax(0, 1fr) 190px minmax(0, 1fr); grid-template-areas: "b st r"; gap: 12px; align-items: stretch; }
+.dh > .side.B { grid-area: b; }
+.dh > .side.R { grid-area: r; }
+.dh > .dstat { grid-area: st; }
+.col-main { grid-area: main; display: grid; gap: 12px; min-width: 0; }
+.col-grid { grid-area: grid; min-width: 0; position: sticky; top: 70px; }
+.col-grid .champs { max-height: calc(100vh - 210px); }
+.m-only { display: none !important; }
+.dstat-m { display: none !important; }
+.dstat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; text-align: center; }
+.dstat.B { box-shadow: inset 0 0 0 1px rgba(76, 141, 255, 0.45); }
+.dstat.R { box-shadow: inset 0 0 0 1px rgba(255, 90, 99, 0.45); }
+.dstat-top { display: flex; align-items: baseline; gap: 8px; }
+.dstat-n { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.dstat-n small { font-size: 13px; color: var(--muted); font-weight: 600; }
+.dstat-ph { font-size: 12px; color: var(--muted); font-weight: 700; }
+.dstat-what { font-size: 17px; font-weight: 800; }
+.dstat.B .dstat-what { color: var(--blue); }
+.dstat.R .dstat-what { color: var(--red); }
+.dstat-act { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 .plan-box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
 .pp-sum { margin: 0 0 12px; font-size: 13px; color: #cfd6e4; }
 .pp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
@@ -108,18 +125,20 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .side-h .tag { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 5px; }
 .side.B .tag { background: var(--blue-bg); color: var(--blue); }
 .side.R .tag { background: var(--red-bg); color: var(--red); }
-.bans { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 12px; }
+.bans { display: grid; grid-template-columns: repeat(5, 34px); gap: 5px; margin-bottom: 10px; }
 .slot-ban { aspect-ratio: 1; border-radius: 8px; border: 1px dashed var(--line); background: var(--bg2); display: grid; place-items: center; overflow: hidden; position: relative; }
 .slot-ban img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) brightness(0.6); }
 .slot-ban.now, .slot-pick.now { border: 1px solid var(--gold); box-shadow: 0 0 0 3px var(--gold-bg); }
 .slot-ban .x { position: absolute; inset: 0; display: grid; place-items: center; font-size: 18px; color: rgba(255, 255, 255, 0.75); }
-.picks { display: grid; gap: 6px; }
-.slot-pick { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); min-height: 54px; }
-.slot-pick .who { min-width: 0; flex: 1; }
-.slot-pick .cn { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slot-pick .pn { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.slot-pick select { min-height: 28px; padding: 2px 6px; font-size: 12px; }
-.slot-pick.empty .cn { color: var(--dim); font-weight: 500; }
+.picks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.slot-pick { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg2); text-align: center; min-width: 0; }
+.slot-pick .ic { width: 52px; height: 52px; border-radius: 10px; }
+.slot-pick .who { min-width: 0; width: 100%; }
+.slot-pick .cn { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-pick .pn { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 16px; }
+.slot-pick select { min-height: 26px; padding: 1px 4px; font-size: 11px; width: 100%; max-width: 72px; }
+.slot-pick.empty .ic { border: 1px dashed var(--line); background: transparent; }
+.slot-pick.empty .cn { color: var(--dim); font-weight: 600; }
 
 .center { display: grid; gap: 12px; min-width: 0; }
 .now-box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
@@ -142,8 +161,10 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .empty-recs { color: var(--muted); font-size: 13px; padding: 8px 2px; }
 
 .pool { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.sheet-h { align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); z-index: 39; }
 .pool-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
-.pool-bar .input { flex: 1; min-width: 160px; }
+.pool-bar .input { flex: 1 1 100%; min-width: 0; }
 .champs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px; max-height: 420px; overflow: auto; padding: 2px; }
 .cbtn { border: 1px solid transparent; background: transparent; padding: 4px 2px; border-radius: 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
 .cbtn:hover { background: var(--panel2); border-color: var(--line); }
@@ -223,32 +244,81 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 
 /* ---------- responsive ---------- */
 @media (max-width: 1180px) {
-  .board { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "now now" "plan plan" "b r" "grid grid"; }
+  .board { grid-template-columns: minmax(0, 1fr); grid-template-areas: "dh" "main" "grid"; }
+  .dh { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "st st" "b r"; }
+  .dstat { flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+  .col-grid { position: static; }
+  .col-grid .champs { max-height: 420px; }
   .roster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
-  main { padding: 12px; }
-  .top-in { padding: 8px 12px; gap: 8px; }
-  .tabs { order: 3; width: 100%; }
-  .tab { flex: 1; padding: 7px 4px; font-size: 13px; }
+  main { padding: 12px 12px 96px; }
+  .m-only { display: flex !important; }
+  /* 머리: 고정 해제, 섹션 탭은 아래 고정 막대로 */
+  .top { position: static; backdrop-filter: none; background: var(--bg); } /* blur가 있으면 안쪽 fixed 탭 막대가 화면이 아닌 머리에 붙음 */
+  .top-in { padding: 10px 12px; gap: 8px; }
   .top-side { margin-left: 0; width: 100%; }
   .top-side .sel { flex: 1; min-width: 0; }
   .top-side .sel select { flex: 1; min-width: 0; }
-  .board { gap: 8px; }
-  .side { padding: 8px; }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-radius: 0; border: 0; border-top: 1px solid var(--line);
+    background: rgba(18, 23, 34, 0.96); backdrop-filter: blur(10px); padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); gap: 6px; }
+  .tab { flex: 1; padding: 10px 4px; font-size: 13px; border-radius: 10px; }
+  .tab[aria-selected="true"] { background: var(--gold-bg); color: var(--gold); }
+  /* 조작 막대 */
+  .draft-bar { gap: 6px; }
+  .draft-bar .sel-l { display: none; }
+  .draft-bar .spacer { display: none; }
+  .draft-bar .btn { flex: 1; }
+  /* 상태 칸: 위에 붙어 다님 */
+  .board { gap: 10px; }
+  .dh { grid-template-columns: minmax(0, 1fr); grid-template-areas: "b" "r"; gap: 8px; }
+  .dh > .dstat { display: none; }
+  .dstat-m { display: flex !important; }
+  .dstat { position: sticky; top: 0; z-index: 20; margin-bottom: 10px !important; flex-direction: row; flex-wrap: nowrap; justify-content: flex-start; gap: 10px; padding: 8px 10px;
+    border-radius: 0 0 12px 12px; margin: 0 -12px; border-width: 0 0 1px; background: rgba(22, 28, 41, 0.97); backdrop-filter: blur(10px); }
+  .dstat-top { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .dstat-n { font-size: 18px; }
+  .dstat-ph { font-size: 10px; }
+  .dstat-what { font-size: 15px; flex: 1; text-align: left; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dstat-act { flex-wrap: nowrap; }
+  .dstat-act .btn { padding: 4px 8px; }
+  /* 팀 칸: 밴은 이름 줄 옆 작은 아이콘, 픽은 가로 5칸 */
+  .side { padding: 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "h bans" "p p"; column-gap: 8px; }
+  .side-h { grid-area: h; margin-bottom: 8px; min-width: 0; }
   .side-h .nm { font-size: 13px; }
-  .bans { gap: 4px; }
-  .slot-pick { gap: 6px; padding: 4px; min-height: 46px; }
-  .slot-pick .ic { width: 32px; height: 32px; }
-  .slot-pick select { max-width: 64px; }
+  .side-h .tag { display: none; }
+  .bans { grid-area: bans; grid-template-columns: repeat(5, 22px); gap: 3px; margin-bottom: 8px; }
+  .slot-ban { border-radius: 5px; }
+  .slot-ban .x { font-size: 11px; }
+  .picks { grid-area: p; gap: 4px; }
+  .slot-pick { padding: 5px 2px; gap: 3px; }
+  .slot-pick .ic { width: 40px; height: 40px; border-radius: 8px; }
+  .slot-pick .cn { font-size: 11px; }
+  .slot-pick .pn { font-size: 10px; min-height: 13px; }
+  .slot-pick select { font-size: 10px; min-height: 22px; max-width: 58px; }
   .recs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .rec { padding: 8px 4px; }
   .rec .ic.lg { width: 48px; height: 48px; }
   .rec .lab { font-size: 11px; padding: 2px 5px; }
+  .pp-grid { grid-template-columns: minmax(0, 1fr); }
+  /* 챔피언 고르기: 아래에서 올라오는 시트 */
+  .col-grid { position: fixed; top: auto; left: 0; right: 0; bottom: 0; z-index: 40; transform: translateY(105%); transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .col-grid.open { transform: none; }
+  .col-grid .pool { border-radius: 16px 16px 0 0; padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); border-width: 1px 0 0; }
+  .col-grid .champs { max-height: 58vh; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); }
+  .pool-bar .seg { overflow-x: auto; max-width: 100%; }
+  .cbtn .ic { width: 44px; height: 44px; }
+  /* 상대 분석 표 → 라인별 카드 */
+  table.cards-m thead { display: none; }
+  table.cards-m, table.cards-m tbody, table.cards-m tr, table.cards-m td { display: block; width: 100%; }
+  table.cards-m tr { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; background: var(--bg2); }
+  table.cards-m td { border: 0; padding: 5px 0; display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; align-items: start; }
+  table.cards-m td::before { content: attr(data-label); font-size: 11px; color: var(--muted); padding-top: 3px; }
+  table.cards-m td:first-child { font-size: 15px; }
+  .tbl-wrap:has(table.cards-m) { background: transparent; border: 0; padding: 0; }
   .strat { grid-template-columns: 1fr; }
   .roster { grid-template-columns: 1fr; }
   .series { grid-template-columns: 1fr; }
   .comps { grid-template-columns: 1fr; }
-  .champs { grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); max-height: 360px; }
-  .cbtn .ic { width: 42px; height: 42px; }
 }
+@media (prefers-reduced-motion: reduce) { .col-grid { transition: none; } }

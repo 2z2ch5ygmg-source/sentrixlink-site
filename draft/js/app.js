@@ -27,6 +27,7 @@
     return fresh();
   }
   let S = load();
+  S.ui.sheet = false;
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
 
   // ---------- helpers ----------
@@ -87,7 +88,7 @@
   const curStep = () => (S.draft.idx < ORDER.length ? ORDER[S.draft.idx] : null);
   function sideIdx(side, type) { return ORDER.map((o, i) => (o[0] === side && o[1] === type ? i : -1)).filter((i) => i >= 0); }
 
-  function renderSide(side) {
+  function renderSide(side, planned) {
     const who = E.whoOfSide(S, side);
     const t = E.teamOf(S, who);
     const bans = sideIdx(side, "ban").map((i) => {
@@ -98,7 +99,10 @@
     const picks = sideIdx(side, "pick").map((i) => {
       const s = S.draft.steps[i];
       const now = i === S.draft.idx ? "now" : "";
-      if (!s.champ) return `<div class="slot-pick empty ${now}"><span class="ic"></span><div class="who"><div class="cn">${now ? "선택 중…" : "대기"}</div></div></div>`;
+      if (!s.champ) {
+        const pr = who === "our" && planned ? planned[i] : null;
+        return `<div class="slot-pick empty ${now}"><span class="ic"></span><div class="who"><div class="cn">${now ? "선택 중" : pr ? ROLE_KO[pr] : "대기"}</div><div class="pn">${pr ? (now ? ROLE_KO[pr] + " 차례" : "예정") : ""}</div></div></div>`;
+      }
       const p = s.role ? t.players[s.role] : null;
       const sel = `<select data-act="role" data-i="${i}" aria-label="라인">${ROLES.map((r) => `<option value="${r}" ${r === s.role ? "selected" : ""}>${ROLE_KO[r]}</option>`).join("")}</select>`;
       return `<div class="slot-pick ${now}">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${p ? esc(nick(p.riot)) : ""}</div></div>${sel}</div>`;
@@ -126,7 +130,20 @@
     let body;
     if (list.length) body = `<div class="recs">${list.map((r) => recCard(r, type, who === "enemy")).join("")}</div>`;
     else body = `<div class="empty-recs">${who === "enemy" && !E.teamHasPools(t) ? "상대 챔프폭이 비어 있어 예상이 어렵습니다. 「상대팀 분석」에서 챔프폭을 넣으면 예상이 나옵니다." : "추천할 챔프가 없습니다. 아래에서 직접 고르세요."}</div>`;
-    return `<div class="now-box"><div class="now-h"><span class="step">${S.draft.idx + 1}/20</span><span class="what ${side}">${title}</span>${type === "ban" ? `<button class="btn sm ghost" data-act="skip">밴 없이 넘기기</button>` : ""}<span class="dir">${dirTxt}</span></div>${body}</div>`;
+    return `<div class="now-box"><div class="now-h"><span class="what ${side}">${who === "our" ? "추천" : "상대 예상"}</span><span class="step">${title}</span><span class="dir">${dirTxt}</span></div>${body}</div>`;
+  }
+
+  function renderStatus(extra) {
+    const st = curStep();
+    const done = !st;
+    const side = st ? st[0] : null;
+    const who = st ? E.whoOfSide(S, side) : null;
+    const t = st ? E.teamOf(S, who) : null;
+    const what = done ? "밴픽 완료" : `${who === "our" ? "우리팀" : esc(t.name)} ${st[1] === "ban" ? "밴" : "픽"}`;
+    const phase = done ? "아래 전략 확인" : S.draft.idx < 6 ? "1차 밴" : S.draft.idx < 12 ? "1차 픽" : S.draft.idx < 16 ? "2차 밴" : "2차 픽";
+    return `<div class="dstat ${side || ""} ${extra || ""}"><div class="dstat-top"><span class="dstat-n">${done ? 20 : S.draft.idx + 1}<small>/20</small></span><span class="dstat-ph">${phase}</span></div>
+      <div class="dstat-what">${what}</div>
+      <div class="dstat-act">${st && st[1] === "ban" ? `<button class="btn sm ghost" data-act="skip">밴 넘기기</button>` : ""}<button class="btn sm" data-act="undo" ${S.draft.idx ? "" : "disabled"}>되돌리기</button>${done ? "" : `<button class="btn sm primary m-only" data-act="sheet">고르기</button>`}</div></div>`;
   }
 
   function renderGrid() {
@@ -144,7 +161,7 @@
       return `<button class="cbtn ${ourPool.has(c.id) ? "mine" : ""} ${locked.has(c.id) ? "locked" : ""}" data-act="pick" data-id="${c.id}" ${dis ? "disabled" : ""} title="${esc(c.ko)}">${icon(c.id)}<span>${esc(c.ko)}</span></button>`;
     }).join("");
     const roleBtns = [["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])).map(([r, n]) => `<button aria-pressed="${u.role === r}" data-act="frole" data-r="${r}">${n}</button>`).join("");
-    return `<div class="pool"><div class="pool-bar"><input id="q" class="input" placeholder="챔피언 검색 (예: 말파, 오리)" value="${esc(u.q)}" autocomplete="off">
+    return `<div class="pool"><div class="sheet-h m-only"><b>챔피언 고르기</b><button class="btn sm" data-act="sheet">닫기</button></div><div class="pool-bar"><input id="q" class="input" placeholder="챔피언 검색 (예: 말파, 오리)" value="${esc(u.q)}" autocomplete="off">
       <div class="seg">${roleBtns}</div>
       <button class="btn sm ${u.onlyPool ? "primary" : ""}" data-act="onlypool">우리 챔프폭만</button></div>
       <div class="champs" id="champs">${btns || `<span class="muted">검색 결과 없음</span>`}</div></div>`;
@@ -211,17 +228,25 @@
 
   function renderLive() {
     const seg = (act, cur, items) => `<div class="seg">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
+    const plan = E.pickPlan(S, "our");
+    const planned = {};
+    plan.plan.forEach((p) => p.items.forEach((x) => !x.done && x.role && (planned[x.i] = x.role)));
     return `<div class="draft-bar">
       <span class="pill gold">${S.series.game}세트</span>
-      <span class="sel">우리 진영 ${seg("side", S.draft.ourSide, [["B", "블루"], ["R", "레드"]])}</span>
-      <span class="sel">피어리스 ${seg("mode", S.series.mode, [["hard", "하드"], ["soft", "소프트"], ["off", "끔"]])}</span>
+      <span class="sel"><span class="sel-l">우리 진영</span> ${seg("side", S.draft.ourSide, [["B", "블루"], ["R", "레드"]])}</span>
+      <span class="sel"><span class="sel-l">피어리스</span> ${seg("mode", S.series.mode, [["hard", "하드"], ["soft", "소프트"], ["off", "끔"]])}</span>
       <span class="spacer"></span>
-      <button class="btn sm" data-act="undo">되돌리기</button>
       <button class="btn sm" data-act="resetGame">이번 세트 다시</button>
       <button class="btn sm primary" data-act="nextGame">세트 종료 → 다음 세트</button>
       ${S.series.locked.length ? `<button class="btn sm ghost" data-act="resetSeries">시리즈 초기화</button>` : ""}
     </div>
-    <div class="board">${renderSide("B")}${renderNow()}${renderPlan()}${renderSide("R")}${renderGrid()}</div>
+    ${renderStatus("dstat-m")}
+    <div class="board">
+      <div class="dh">${renderSide("B", planned)}${renderStatus()}${renderSide("R", planned)}</div>
+      <div class="col-main">${renderNow()}${renderPlan()}</div>
+      <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
+    </div>
+    ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
     ${renderFearless()}${renderStrategy()}`;
   }
 
@@ -281,14 +306,14 @@
       const have = [...new Set(study.flatMap((x) => x.have))];
       const learn = [...new Set(study.flatMap((x) => x.learn))].slice(0, 4);
       const risky = [...new Set(study.flatMap((x) => x.risky))];
-      return `<tr><td><b>${ROLE_KO[r]}</b></td>
-        <td><a href="${opgg(p.riot)}" target="_blank" rel="noopener">${esc(nick(p.riot))}</a><div class="help">${esc(p.tier)} · ${p.pts}점${totalTxt(en, r)}</div></td>
-        <td>${esc(nick(o.riot))}<div class="help">${esc(o.tier)} · ${o.pts}점${totalTxt(ours, r)}</div></td>
-        <td><span class="pill ${gap >= 15 ? "good" : gap <= -15 ? "bad" : ""}">${gap > 0 ? "+" : ""}${gap}</span></td>
-        <td><div class="row-chips">${poolChips(en, r)}</div></td>
-        <td><div class="row-chips">${have.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td>
-        <td><div class="row-chips">${learn.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td>
-        <td><div class="row-chips">${risky.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td></tr>`;
+      return `<tr><td data-label="라인"><b>${ROLE_KO[r]}</b></td>
+        <td data-label="상대 선수"><a href="${opgg(p.riot)}" target="_blank" rel="noopener">${esc(nick(p.riot))}</a><div class="help">${esc(p.tier)} · ${p.pts}점${totalTxt(en, r)}</div></td>
+        <td data-label="우리 선수">${esc(nick(o.riot))}<div class="help">${esc(o.tier)} · ${o.pts}점${totalTxt(ours, r)}</div></td>
+        <td data-label="점수 차"><span class="pill ${gap >= 15 ? "good" : gap <= -15 ? "bad" : ""}">${gap > 0 ? "+" : ""}${gap}</span></td>
+        <td data-label="상대 챔프폭"><div class="row-chips">${poolChips(en, r)}</div></td>
+        <td data-label="우리 대응 가능"><div class="row-chips">${have.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td>
+        <td data-label="새로 연습 추천"><div class="row-chips">${learn.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td>
+        <td data-label="우리 챔프 중 주의"><div class="row-chips">${risky.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("") || `<span class="dim">-</span>`}</div></td></tr>`;
     }).join("");
     let compsHtml = "";
     if (has) {
@@ -314,7 +339,7 @@
       </div>
       ${has ? "" : `<div class="note" style="margin-top:12px">이 팀은 op.gg 전적을 읽지 못했고 직접 입력한 챔프폭도 없습니다. 「상대 챔프폭 편집」에 넣으면 카운터·연습 추천·예상 조합이 채워집니다.</div>`}
       <div class="section-title"><h2>라인별 상대와 연습 포인트</h2><p>점수 차 = 우리 − 상대</p></div>
-      <div class="card tbl-wrap"><table class="study"><thead><tr><th>라인</th><th>상대 선수</th><th>우리 선수</th><th>점수 차</th><th>상대 챔프폭</th><th>우리 대응 가능</th><th>새로 연습 추천</th><th>우리 챔프 중 주의</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="card tbl-wrap"><table class="study cards-m"><thead><tr><th>라인</th><th>상대 선수</th><th>우리 선수</th><th>점수 차</th><th>상대 챔프폭</th><th>우리 대응 가능</th><th>새로 연습 추천</th><th>우리 챔프 중 주의</th></tr></thead><tbody>${rows}</tbody></table></div>
       ${compsHtml}
       <div class="section-title"><h2>사전 밴 후보</h2><p>첫 밴 페이즈 기준</p></div>
       <div class="card">${preBans.length ? `<div class="recs">${preBans.map((r) => recCard(r, "ban")).join("")}</div>` : `<span class="muted">상대 챔프폭을 넣으면 나옵니다.</span>`}</div>`;
@@ -383,6 +408,7 @@
     step.champ = id; step.skip = false;
     step.role = st[1] === "pick" ? E.guessRole(S, who, id) : null;
     S.draft.idx++;
+    S.ui.sheet = false; S.ui.q = "";
     save(); render();
   }
   function setRole(i, r) {
@@ -427,6 +453,7 @@
       case "mode": S.series.mode = el.dataset.v; save(); render(); break;
       case "frole": S.ui.role = el.dataset.r; save(); render(); break;
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
+      case "sheet": S.ui.sheet = !S.ui.sheet; render(); if (S.ui.sheet) { const q = document.getElementById("q"); if (q && matchMedia("(min-width: 761px)").matches) q.focus(); } break;
       case "edit": editing = el.dataset.team; renderEditor(); break;
       case "close": editing = null; renderEditor(); break;
       case "add": addChamp(el.dataset.role); break;
@@ -460,6 +487,12 @@
     if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.add) { ev.preventDefault(); addChamp(ev.target.dataset.add); }
     else if (ev.key === "Enter" && ev.target.id === "q") { const first = document.querySelector("#champs .cbtn:not([disabled])"); if (first) choose(first.dataset.id); }
     else if (ev.key === "Escape" && editing) { editing = null; renderEditor(); }
+    else if (ev.key === "Escape" && S.ui.sheet) { S.ui.sheet = false; render(); }
+    else if (ev.key === "Escape" && ev.target.id === "q") { S.ui.q = ""; render(); }
+    else if (S.tab === "live" && !editing && ev.key.length === 1 && !ev.metaKey && !ev.ctrlKey && !ev.altKey
+      && !/^(INPUT|SELECT|TEXTAREA)$/.test(ev.target.tagName) && matchMedia("(min-width: 761px)").matches) {
+      const q = document.getElementById("q"); if (q) q.focus(); // PC: 아무 글자나 치면 바로 챔피언 검색
+    }
   });
 
   document.getElementById("champList").innerHTML = window.CHAMPIONS.map((c) => `<option value="${esc(c.ko)}">`).join("");
