@@ -40,6 +40,35 @@ window.Engine = (function () {
     const score = (0.55 * vol + 0.3 * wrPart + 0.15 * mast) * (onRole ? 1 : 0.45);
     return { lv: score >= 0.6 ? 3 : score >= 0.35 ? 2 : 1, one, score: one ? Math.max(score, 0.9) : score, g, w: x.w || 0, wr, kda: x.kda, mp: x.mp || 0, share, scout: true };
   }
+  // Riot 최근 경기(tools/recent.py → js/recent.js): 11/10 이후 랭크
+  function recentOf(team, role) {
+    const R = window.RECENT;
+    if (!R || R.status !== "ok" || !team) return null;
+    const t = R.players && R.players[team.id];
+    return t && t[role] && !t[role].error ? t[role] : null;
+  }
+  // 실제로 가장 많이 간 라인 (8판 이상, 60% 이상일 때만)
+  function actualRole(team, role) {
+    const rc = recentOf(team, role);
+    if (!rc || !rc.n) return null;
+    const tot = Object.values(rc.roles || {}).reduce((a, b) => a + b, 0);
+    const top = Object.entries(rc.roles || {}).sort((a, b) => b[1] - a[1])[0];
+    if (!top || tot < 8 || top[1] / tot < 0.6) return null;
+    return { role: top[0], n: top[1], tot, differs: top[0] !== role };
+  }
+  // 5인 경기 기록: null = 미확보(계정 못 찾음·키 없음), [] = 0판
+  function stacksOf(team) {
+    const R = window.RECENT;
+    if (!R || R.status !== "ok" || !team || !R.stacks) return null;
+    const g = R.stacks[team.id];
+    return g === undefined ? null : g;
+  }
+  function stackChampRecord(team, role, id) {
+    const st = stacksOf(team);
+    if (!st) return null;
+    const games = st.filter((g) => g.picks && g.picks[role] === id);
+    return games.length ? { g: games.length, w: games.filter((g) => g.win).length, of: st.length } : null;
+  }
   const MANUAL_SCORE = { 3: 0.75, 2: 0.45, 1: 0.2 };
   function poolMap(team, role) {
     const m = {};
@@ -48,16 +77,30 @@ window.Engine = (function () {
     const sc = scoutOf(team, role);
     const stats = {};
     if (sc) sc.champs.forEach((x) => { const e = statEntry(x, sc.total, role); if (e) stats[x.id] = e; });
+    // 최근 경기: 판수·승률로 점수를 올리고, 시즌 기록에 없던 챔프(2판 이상)도 더한다
+    const rc = recentOf(team, role);
+    if (rc) rc.champs.forEach((x) => {
+      if (!CH[x.id]) return;
+      const wrS = (x.w + 3) / (x.g + 6);
+      const rs = Math.min(1, x.g / 12) * 0.7 + Math.max(0, Math.min(1, (wrS - 0.45) / 0.15)) * 0.3;
+      const base = stats[x.id] || (x.g >= 2 ? { lv: 1, one: false, score: 0, g: 0, w: 0, wr: 0, mp: 0, scout: true } : null);
+      if (!base) return;
+      base.rg = x.g; base.rw = x.w;
+      base.score = Math.min(1, Math.max(base.score, rs * 0.9) + 0.08);
+      base.lv = base.score >= 0.6 ? 3 : base.score >= 0.35 ? 2 : 1;
+      stats[x.id] = base;
+    });
     const manual = p.pool || [];
     manual.forEach(([id, lv, one]) => {
       const st = stats[id];
+      // 자기평가 우선: 점수는 본인이 정한 자신감으로, 전적은 참고 표시만
       m[id] = { lv: lv || 1, one: !!one, score: one ? 1 : MANUAL_SCORE[lv || 1], manual: true };
-      if (st) Object.assign(m[id], { g: st.g, w: st.w, wr: st.wr, kda: st.kda, mp: st.mp, score: Math.max(m[id].score, st.score), one: !!one || st.one });
+      if (st) Object.assign(m[id], { g: st.g, w: st.w, wr: st.wr, kda: st.kda, mp: st.mp, rg: st.rg, rw: st.rw });
     });
-    // 직접 입력이 없는 라인은 전적 전체를, 있는 라인은 전적상 강한 챔프만 더한다
-    Object.entries(stats).forEach(([id, e]) => {
+    // 자기평가가 있는 선수는 그 목록만 쓴다. 없는 선수는 전적 전체.
+    if (!manual.length) Object.entries(stats).forEach(([id, e]) => {
       if (m[id] || e.score < 0.15) return;
-      if (!manual.length || e.score >= 0.6 || e.one) m[id] = e;
+      m[id] = e;
     });
     // 판수가 적은 선수라도 라인이 비지 않게: 판수·숙련도 상위 3개는 남긴다
     if (!Object.keys(m).length) {
@@ -68,12 +111,36 @@ window.Engine = (function () {
   const lvScore = (e) => (!e ? 0 : e.one ? 3.6 : 1 + (e.score != null ? e.score : MANUAL_SCORE[e.lv] || 0.2) * 2.6);
   function statText(e) {
     if (!e) return "";
-    if (e.g) return `${e.g}판 ${Math.round(e.wr)}%${e.one ? " · 원챔" : ""}`;
+    const rec = e.rg ? ` · 최근 ${e.rg}판 ${e.rw}승` : "";
+    if (e.manual) return `${e.one ? "원챔" : "자신감 " + LEVEL_KO[e.lv]} (본인 평가)${e.g ? ` · 시즌 ${e.g}판` : ""}${rec}`;
+    if (e.g) return `${e.g}판 ${Math.round(e.wr)}%${e.one ? " · 원챔" : ""}${rec}`;
+    if (e.rg) return `최근 ${e.rg}판 ${e.rw}승`;
     if (e.mp && !e.manual) return `숙련도 ${Math.round(e.mp / 1000)}k`;
     return e.one ? "원챔" : LEVEL_KO[e.lv];
   }
   function teamHasPools(team) {
-    return !!team && ROLES.some((r) => (team.players[r].pool || []).length || (scoutOf(team, r) && scoutOf(team, r).champs.length));
+    return !!team && ROLES.some((r) => (team.players[r].pool || []).length || (scoutOf(team, r) && scoutOf(team, r).champs.length) || (recentOf(team, r) && recentOf(team, r).champs.length));
+  }
+  // 프로 경기(tools/pro.js): 바텀 조합·블루 1픽
+  function proDuo(a, s) { const P = window.PRO; const d = P && P.duo && P.duo[a + "|" + s]; return d ? { g: d[0], w: d[1] } : null; }
+  function proFirst(id) { const P = window.PRO; return P && P.firstPick && P.firstPick[id] ? { n: P.firstPick[id], of: P.games } : null; }
+  // 우리 챔프폭으로 만들 수 있는 원딜+서폿 세트: 대회 조합 기록 우선
+  function duoSuggest(state, who) {
+    const team = teamOf(state, who);
+    const avail = new Set(available(state, who).map((c) => c.id));
+    const A = Object.entries(poolMap(team, "A")).filter(([id]) => avail.has(id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 5);
+    const Sx = Object.entries(poolMap(team, "S")).filter(([id]) => avail.has(id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 5);
+    const out = [];
+    A.forEach(([a, ea]) => Sx.forEach(([sp, es]) => {
+      const d = proDuo(a, sp);
+      const team5 = stacksOf(team);
+      const tg = team5 ? team5.filter((g) => g.picks && g.picks.A === a && g.picks.S === sp) : [];
+      let v = lvScore(ea) + lvScore(es);
+      if (d) v += Math.min(3, d.g * 0.5) + (d.g >= 3 ? (d.w / d.g - 0.5) * 4 : 0);
+      if (tg.length) v += Math.min(3, tg.length) + tg.filter((g) => g.win).length;
+      out.push({ a, s: sp, v, pro: d, team: tg.length ? { g: tg.length, w: tg.filter((g) => g.win).length } : null });
+    }));
+    return out.sort((x, y) => y.v - x.v).slice(0, 3);
   }
 
   // ---- 조합 적합도 ----
@@ -286,6 +353,10 @@ window.Engine = (function () {
           tgt = r;
         }
       }
+      for (const r of oppOpen) {
+        const tr = stackChampRecord(oppTeam, r, c.id);
+        if (tr) { const v = Math.min(16, 6 * tr.g); s += v; reasons.push({ t: "자랭 5인 픽", d: `${ROLE_KO[r]} · 5인 자랭 ${tr.of}판 중 ${tr.g}판 (${tr.w}승)`, v }); tgt = tgt || r; break; }
+      }
       const onRole = c.pos.some((r) => oppOpen.includes(r));
       if (!onRole && !s) continue;
       if (oppDir && onRole) {
@@ -354,6 +425,8 @@ window.Engine = (function () {
         if (!c.pos.includes(r)) s -= 4;
         const mi = metaInfo(c.id, r);
         if (mi && mi.score >= 0.45) { const v = mi.score * 4; s += v; reasons.push({ t: "메타 강세", d: metaText(mi), v }); }
+        const tr = stackChampRecord(team, r, c.id);
+        if (tr) { const v = Math.max(-6, Math.min(6, tr.w * 2 - (tr.g - tr.w))); s += v; if (v > 0) reasons.push({ t: "팀 경기 기록", d: `5인 경기 ${tr.g}판 ${tr.w}승`, v }); }
         if (dir) {
           const f = fit(c, dir);
           if (f >= 2) { s += f * 2.5; reasons.push({ t: `${COMPS[dir].short} 조합`, d: `${COMPS[dir].name}에 맞음`, v: f * 2.5, comp: true }); }
@@ -524,9 +597,18 @@ window.Engine = (function () {
         const sc = scored.find((x) => x.r === r);
         const why = sc.why.slice();
         if (i === lastIdx && remainingIdx.length > 1) why.unshift("마지막 픽 — 상대 픽을 다 보고 결정");
-        if (side === "B" && i === 6) why.unshift("블루 1픽 — 밴에서 살아남은 가장 강한 챔프 선점");
+        if (side === "B" && i === 6) {
+          why.unshift("블루 1픽 — 밴에서 살아남은 가장 강한 챔프 선점");
+          const best = outlook[r].best;
+          const pf = best && proFirst(best.id);
+          if (pf) why.push(`${ko(best.id)} 대회 블루 1픽 ${pf.n}회 / ${pf.of}경기`);
+        }
         const isDuo = duo && (r === "A" || r === "S");
-        if (isDuo) why.unshift("바텀 세트 — 원딜·서폿을 같은 차례에 함께");
+        if (isDuo) {
+          why.unshift("바텀 세트 — 원딜·서폿을 같은 차례에 함께");
+          const ds = duoSuggest(state, who)[0];
+          if (ds && r === "A") why.push(`추천 세트 ${ko(ds.a)}+${ko(ds.s)}${ds.pro ? ` (대회 ${ds.pro.g}판 ${ds.pro.w}승)` : " (대회 기록 없음)"}${ds.team ? ` · 우리 5인 ${ds.team.g}판 ${ds.team.w}승` : ""}`);
+        }
         return { i, done: false, role: r, cands: outlook[r].cands, why, duo: isDuo };
       });
       return { label: s.label, idxs: s.idxs, items, now: s.idxs.includes(state.draft.idx) };
@@ -638,7 +720,8 @@ window.Engine = (function () {
     Object.entries(pm).forEach(([id, e]) => {
       if (!avail.has(id)) return;
       const mi = metaInfo(id, role);
-      list.push({ id, e, mi, s: lvScore(e) * 10 + (mi ? mi.score * 4 : 0), src: "pool" });
+      const tr = stackChampRecord(team, role, id);
+      list.push({ id, e, mi, tr, s: lvScore(e) * 10 + (mi ? mi.score * 4 : 0) + (tr ? Math.min(15, tr.g * 6) : 0), src: "pool" });
     });
     if (list.length < 6) {
       window.CHAMPIONS.filter((c) => c.pos[0] === role && avail.has(c.id) && !pm[c.id])
@@ -669,7 +752,8 @@ window.Engine = (function () {
     return list.sort((a, b) => b.s - a.s).slice(0, 8).map((x) => {
       const answers = myPool.filter(([id]) => lanesCounter(id, x.id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([id]) => id);
       const counterTag = x.adj.find((a) => a.t === "카운터 픽");
-      const label = counterTag ? "카운터 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
+      if (x.tr) x.adj.unshift({ t: "", d: `5인 자랭 ${x.tr.of}판 중 ${x.tr.g}판 (${x.tr.w}승)` });
+      const label = counterTag ? "카운터 픽" : x.tr ? "자랭 5인 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
       const d = x.e ? statText(x.e) : metaText(x.mi);
       return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers: ourLaner ? [] : answers, vsOurs: x.adj.map((a) => a.d) };
     });
@@ -845,6 +929,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, recentOf, actualRole, stacksOf, duoSuggest, proDuo,
   };
 })();

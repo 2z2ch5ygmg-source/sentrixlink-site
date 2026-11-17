@@ -260,6 +260,7 @@ table.study th:first-child, table.study td:first-child, table.study td:nth-child
 .ed-chip { cursor: pointer; }
 .ed-chip .del { color: var(--dim); margin-left: 2px; }
 .help { font-size: 12px; color: var(--muted); }
+.warn { font-size: 12px; color: var(--bad); font-weight: 700; }
 footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(--dim); font-size: 11px; }
 
 /* ---------- responsive ---------- */
@@ -337,6 +338,7 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
   table.cards-m tr { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 10px; background: var(--bg2); }
   table.cards-m td { border: 0; padding: 5px 0; display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; align-items: start; }
   table.cards-m td::before { content: attr(data-label); font-size: 11px; color: var(--muted); padding-top: 3px; }
+  table.cards-m td { white-space: normal !important; overflow-wrap: anywhere; min-width: 0; }
   table.cards-m td:first-child { font-size: 15px; }
   .tbl-wrap:has(table.cards-m) { background: transparent; border: 0; padding: 0; }
   .strat { grid-template-columns: 1fr; }
