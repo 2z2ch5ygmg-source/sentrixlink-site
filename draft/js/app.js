@@ -120,9 +120,15 @@
         const pr = who === "our" && planned ? planned[i] : null;
         return `<div class="slot-pick empty ${now}"><span class="ic"></span><div class="who"><div class="cn">${now ? "선택 중" : pr ? ROLE_KO[pr] : "대기"}</div><div class="pn">${pr ? (now ? ROLE_KO[pr] + " 차례" : "예정") : ""}</div></div></div>`;
       }
-      const p = s.role ? t.players[s.role] : null;
-      const sel = `<select data-act="role" data-i="${i}" aria-label="라인">${ROLES.map((r) => `<option value="${r}" ${r === s.role ? "selected" : ""}>${ROLE_KO[r]}</option>`).join("")}</select>`;
-      return `<div class="slot-pick ${now}">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${p ? esc(nick(p.riot)) : ""}</div></div>${sel}</div>`;
+      // 라인 '모름': 다른 픽으로 좁혀진 라인(자동) 또는 남은 후보를 보여 준다
+      const ep = s.role === "?" ? E.picks(S, who).find((x) => x.i === i) : null;
+      const eff = ep ? ep.role : s.role;
+      const p = eff ? t.players[eff] : null;
+      const unk = who === "enemy" || s.role === "?"
+        ? `<option value="?" ${s.role === "?" ? "selected" : ""}>${ep && ep.role ? `모름→${ROLE_KO[ep.role]}` : "모름"}</option>` : "";
+      const sel = `<select data-act="role" data-i="${i}" aria-label="라인">${unk}${ROLES.map((r) => `<option value="${r}" ${r === s.role ? "selected" : ""}>${ROLE_KO[r]}</option>`).join("")}</select>`;
+      const pn = ep && !ep.role ? `<span class="unk">${ep.cands.map((r) => ROLE_KO[r]).join("·")} 중</span>` : p ? esc(nick(p.riot)) + (ep && ep.guessed ? " (추정)" : "") : "";
+      return `<div class="slot-pick ${now}">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${pn}</div></div>${sel}</div>`;
     }).join("");
     return `<section class="side ${side}"><div class="side-h"><span class="nm">${esc(t.name)}</span><span class="tag">${side === "B" ? "블루" : "레드"} · ${who === "our" ? "우리" : "상대"}</span></div><div class="bans">${bans}</div><div class="picks">${picks}</div></section>`;
   }
@@ -525,7 +531,10 @@
     if (E.taken(S).has(id) || E.lockedFor(S, who).has(id)) return;
     const step = S.draft.steps[S.draft.idx];
     step.champ = id; step.skip = false;
-    step.role = st[1] === "pick" ? (who === "enemy" && S.ui.predRole && E.openRoles(S, "enemy").includes(S.ui.predRole) ? S.ui.predRole : E.guessRole(S, who, id)) : null;
+    step.cands = undefined;
+    if (st[1] !== "pick") step.role = null;
+    else if (who === "enemy" && S.ui.predRole && E.openRoles(S, "enemy").includes(S.ui.predRole)) step.role = S.ui.predRole;
+    else { const pr = E.pickRole(S, who, id); step.role = pr.role; step.cands = pr.cands; }
     S.draft.idx++;
     if (S.ui.predRole && !E.openRoles(S, "enemy").includes(S.ui.predRole)) S.ui.predRole = "";
     S.ui.sheet = false; S.ui.q = "";
@@ -534,8 +543,10 @@
   function setRole(i, r) {
     const side = ORDER[i][0];
     const s = S.draft.steps[i];
+    if (r === "?") { s.role = "?"; if (!s.cands || !s.cands.length) s.cands = E.flexRoles(s.champ); save(); render(); return; }
     const other = S.draft.steps.find((x, j) => j !== i && ORDER[j][0] === side && ORDER[j][1] === "pick" && x.role === r);
-    if (other) other.role = s.role;
+    if (other) other.role = s.role === "?" ? "?" : s.role;
+    if (other && other.role === "?" && (!other.cands || !other.cands.length)) other.cands = E.flexRoles(other.champ);
     s.role = r; save(); render();
   }
 

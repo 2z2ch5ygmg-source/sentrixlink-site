@@ -164,6 +164,36 @@ window.Engine = (function () {
   // 프로 경기(tools/pro.js): 바텀 조합·블루 1픽
   function proDuo(a, s) { const P = window.PRO; const d = P && P.duo && P.duo[a + "|" + s]; return d ? { g: d[0], w: d[1] } : null; }
   function proFirst(id) { const P = window.PRO; return P && P.firstPick && P.firstPick[id] ? { n: P.firstPick[id], of: P.games } : null; }
+  const ULT = window.KB.ULT_STEAL || {};
+  const PAIRS = window.KB.DUO_PAIRS || {};
+  // 원딜·서폿 세트 가산: 정석 세트(knowledge.js) 또는 대회 바텀 조합 기록
+  function pairBonus(a, s) {
+    const k = PAIRS[a + "|" + s] || 0;
+    let v = k === 3 ? 12 : k === 2 ? 7 : 0, d = k === 3 ? "정석 바텀 세트" : k ? "자주 쓰는 바텀 세트" : "";
+    const pro = proDuo(a, s);
+    if (pro && pro.g >= 3 && pro.w / pro.g >= 0.45) {
+      const pv = Math.min(12, 3 + pro.g * 0.3);
+      v = Math.max(v, pv); d = `대회 바텀 조합 ${pro.g}판 ${pro.w}승`;
+    }
+    return v ? { v, d } : null;
+  }
+  // 같은 팀이 이미 뽑은 바텀 짝(원딜이면 서폿, 서폿이면 원딜)과의 세트
+  function botPartner(state, who, role, id) {
+    if (role !== "A" && role !== "S") return null;
+    const p = picks(state, who).find((x) => x.role === (role === "A" ? "S" : "A"));
+    if (!p) return null;
+    const b = role === "A" ? pairBonus(id, p.champ) : pairBonus(p.champ, id);
+    return b ? { ...b, partner: p.champ } : null;
+  }
+  // 이 챔프가 실제로 서는 라인: 챔프 기본 라인 + 솔로랭크에서 픽률 1% 이상인 라인
+  function flexRoles(id) {
+    const c = CH[id];
+    if (!c) return [];
+    const set = new Set(c.pos);
+    const sq = window.META && window.META.soloq && window.META.soloq[id];
+    if (sq) Object.entries(sq).forEach(([r, x]) => x.pr >= 1.0 && set.add(r));
+    return ROLES.filter((r) => set.has(r));
+  }
   // 우리 챔프폭으로 만들 수 있는 원딜+서폿 세트: 대회 조합 기록 우선
   function duoSuggest(state, who) {
     const team = teamOf(state, who);
@@ -296,9 +326,38 @@ window.Engine = (function () {
     return who === "our" ? state.draft.ourSide : state.draft.ourSide === "B" ? "R" : "B";
   }
   function whoOfSide(state, side) { return side === state.draft.ourSide ? "our" : "enemy"; }
+  // 픽 목록. 라인 '모름'(role "?")은 다른 픽으로 라인이 채워질수록 후보(cands)를 좁히고, 하나만 남으면 그 라인으로 본다.
+  // 다섯 픽이 다 찼는데도 둘 이상이 모름이면 챔프폭 기준으로 가장 그럴듯하게 나눈다(guessed).
   function picks(state, who) {
     const side = sideOf(state, who);
-    return state.draft.steps.map((s, i) => ({ ...s, i })).filter((s, i) => ORDER[i][0] === side && ORDER[i][1] === "pick" && s.champ);
+    const raw = state.draft.steps.map((s, i) => ({ ...s, i })).filter((s, i) => ORDER[i][0] === side && ORDER[i][1] === "pick" && s.champ);
+    if (!raw.some((p) => p.role === "?")) return raw;
+    const known = new Set(raw.filter((p) => p.role && p.role !== "?").map((p) => p.role));
+    const unk = raw.filter((p) => p.role === "?");
+    unk.forEach((p) => { p.role = null; p.unknown = true; p.cands = (p.cands && p.cands.length ? p.cands : flexRoles(p.champ)).slice(); });
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const p of unk) {
+        if (p.role) continue;
+        p.cands = p.cands.filter((r) => !known.has(r));
+        if (!p.cands.length) p.cands = ROLES.filter((r) => !known.has(r));
+        if (p.cands.length === 1) { p.role = p.cands[0]; known.add(p.role); changed = true; }
+      }
+    }
+    const rest = unk.filter((p) => !p.role);
+    const free = ROLES.filter((r) => !known.has(r));
+    if (rest.length && raw.length === 5 && rest.length === free.length) {
+      const team = teamOf(state, who);
+      const fit1 = (p, r) => lvScore(poolMap(team, r)[p.champ]) + (p.cands.includes(r) ? 2 : -5) + (CH[p.champ].pos[0] === r ? 1 : 0);
+      let best = null;
+      const perm = (arr, used) => {
+        if (arr.length === rest.length) { const v = arr.reduce((a, r, k) => a + fit1(rest[k], r), 0); if (!best || v > best.v) best = { v, arr: arr.slice() }; return; }
+        free.forEach((r) => !used.has(r) && (used.add(r), arr.push(r), perm(arr, used), arr.pop(), used.delete(r)));
+      };
+      perm([], new Set());
+      rest.forEach((p, k) => { p.role = best.arr[k]; p.guessed = true; });
+    }
+    return raw;
   }
   function bans(state) { return state.draft.steps.filter((s, i) => ORDER[i][1] === "ban" && s.champ).map((s) => s.champ); }
   function taken(state) { return new Set(state.draft.steps.filter((s) => s.champ).map((s) => s.champ)); }
@@ -337,6 +396,30 @@ window.Engine = (function () {
       if (!best || s > best.s) best = { r, s };
     }
     return best.r;
+  }
+
+  // 새 픽의 라인: 우리 픽은 추정 라인. 상대 픽은 한 선수만 그 챔프를 잘 다루면 그 라인, 여러 라인이 가능하면 '모름'(후보 함께)
+  function pickRole(state, who, id) {
+    if (who === "our") return { role: guessRole(state, who, id) };
+    const open = openRoles(state, who);
+    const team = teamOf(state, who);
+    const strong = open.filter((r) => { const e = poolMap(team, r)[id]; return e && (e.one || e.manual || Math.max(e.score || 0, e.sscore || 0) >= 0.35); });
+    if (strong.length === 1) return { role: strong[0] };
+    const flex = flexRoles(id).filter((r) => open.includes(r));
+    const cands = ROLES.filter((r) => strong.includes(r) || flex.includes(r));
+    if (cands.length >= 2) return { role: "?", cands };
+    return { role: cands[0] || guessRole(state, who, id) };
+  }
+  // 상대가 아직 사일러스를 뽑을 수 있는지(0~1): 사일러스가 남아 있고 그 라인이 비어 있으면 기본 0.25, 상대 선수 기록이 있으면 더 높게
+  function sylasRisk(state, who) {
+    const opp = who === "our" ? "enemy" : "our";
+    if (!available(state, opp).some((c) => c.id === "Sylas")) return 0;
+    const oo = openRoles(state, opp).filter((r) => flexRoles("Sylas").includes(r));
+    if (!oo.length) return 0;
+    const team = teamOf(state, opp);
+    let p = 0.25;
+    oo.forEach((r) => { const e = poolMap(team, r).Sylas; if (e) p = Math.max(p, 0.25 + (e.one ? 1 : Math.max(e.score || 0, e.sscore || 0)) * 0.75); });
+    return Math.min(1, p);
   }
 
   function direction(state, who) {
@@ -420,6 +503,19 @@ window.Engine = (function () {
         let k = 0;
         for (const { id, r } of myComfort) if (c.pos.includes(r) && lanesCounter(c.id, id) && k < 2) { k++; s += 4; reasons.push({ t: "카운터 차단", d: `우리 ${ko(id)} 상대로 강함`, v: 4 }); }
       }
+      // 사일러스: 우리 팀(이미 뽑은 챔프 + 아직 쓸 수 있는 주력)에 뺏기면 위험한 궁이 많으면 보호 밴
+      if (c.id === "Sylas" && flexRoles("Sylas").some((r) => oppOpen.includes(r))) {
+        const mineU = myPicks.filter((p) => ULT[p.champ]).map((p) => p.champ);
+        const comfortU = myComfort.filter((x) => ULT[x.id] === 3).map((x) => x.id);
+        const sum = mineU.reduce((a, id) => a + ULT[id], 0) + comfortU.length * 0.75;
+        if (sum >= 3) { const v = (4 + sum * 3) * (0.6 + sylasRisk(state, who)); s += v; reasons.push({ t: "궁 보호 밴", d: `우리 ${[...mineU, ...comfortU].slice(0, 3).map(ko).join("·")} 궁을 사일러스가 뺏을 수 있음`, v }); }
+      }
+      // 상대가 이미 뽑은 바텀 짝과 세트인 챔프
+      for (const r of ["A", "S"]) {
+        if (!oppOpen.includes(r) || !flexRoles(c.id).includes(r)) continue;
+        const bp = botPartner(state, opp, r, c.id);
+        if (bp) { const v = bp.v; s += v; reasons.push({ t: "세트 차단", d: `상대 ${j(ko(bp.partner), "과", "와")} 세트 · ${bp.d}`, v }); break; }
+      }
       if (c.pos.length >= 2 && onRole) s += 1;
       const mi = onRole ? metaInfo(c.id, c.pos.find((r) => oppOpen.includes(r))) : null;
       if (mi && mi.score >= 0.5) { const v = mi.score * (s >= 10 ? 4 : 7); s += v; reasons.push({ t: "메타 강세", d: metaText(mi), v }); }
@@ -458,18 +554,33 @@ window.Engine = (function () {
     const ad = mine.filter((p) => CH[p.champ].dmg === "AD").length;
     const ap = mine.filter((p) => CH[p.champ].dmg === "AP").length;
     const oppOpen = openRoles(state, opp);
+    const sy = sylasRisk(state, who);
+    // 우리 밴이 남아 있으면(2차 밴) 사일러스를 밴해서 막을 수 있으니 감점을 줄이고 밴을 권한다
+    const myBanLeft = ORDER.some(([sd, t], i) => i >= state.draft.idx && t === "ban" && sd === sideOf(state, who));
+    const theirUlt = theirs.filter((t) => ULT[t.champ]);
     const res = [];
     for (const c of available(state, who)) {
       let best = null;
       for (const r of open) {
         const pm = poolMap(team, r);
         const e = pm[c.id];
-        if (!e && !c.pos.includes(r)) continue;
+        const bp = botPartner(state, who, r, c.id);
+        if (!e && !c.pos.includes(r) && !bp) continue;
         const reasons = [];
         let s = 0;
         const lv = lvScore(e);
         if (lv) { s += lv * 9; reasons.push({ t: lv >= 2.9 ? "숙련도 높음" : `숙련도 ${LEVEL_KO[e.lv]}`, d: `${ROLE_KO[r]} ${team.players[r].riot.split("#")[0]} · ${statText(e)}`, v: lv * 9 }); }
-        else s -= teamHasPools(team) ? 8 : 0;
+        else s -= teamHasPools(team) && !bp ? 8 : 0;
+        if (bp) { s += bp.v; reasons.push({ t: "바텀 세트", d: `${j(ko(bp.partner), "과", "와")} 세트 · ${bp.d}`, v: bp.v }); }
+        const ut = ULT[c.id];
+        if (ut && sy > 0) {
+          const v = (ut === 3 ? 30 : 10) * sy * (myBanLeft ? 0.4 : 1);
+          s -= v; reasons.push({ t: "사일러스 주의", d: `사일러스가 남아 있어 ${ko(c.id)} 궁을 뺏길 수 있음${myBanLeft ? " — 2차 밴에서 사일러스를 빼면 해결" : ""}`, v: -v, banFix: myBanLeft });
+        }
+        if (c.id === "Sylas" && theirUlt.length) {
+          const v = Math.min(12, theirUlt.reduce((a, t) => a + ULT[t.champ], 0) * 2);
+          s += v; reasons.push({ t: "궁 뺏기", d: `상대 ${theirUlt.slice(0, 2).map((t) => ko(t.champ)).join("·")} 궁을 뺏어 씀`, v });
+        }
         if (!c.pos.includes(r)) s -= 4;
         const mi = metaInfo(c.id, r);
         if (mi && mi.score >= 0.45) { const v = mi.score * 4; s += v; reasons.push({ t: "메타 강세", d: metaText(mi), v }); }
@@ -483,12 +594,15 @@ window.Engine = (function () {
         if (mine.length >= 2 && ad >= 2 && ap === 0 && (c.dmg === "AP" || c.dmg === "MX")) { s += 4; reasons.push({ t: "AP 딜 보강", d: "물리 딜만 있음", v: 4 }); }
         if (mine.length >= 2 && ap >= 2 && ad === 0 && (c.dmg === "AD" || c.dmg === "MX")) { s += 4; reasons.push({ t: "AD 딜 보강", d: "마법 딜만 있음", v: 4 }); }
         for (const t of theirs) {
+          // 라인 모름: 이 라인이 후보면 절반만 반영하고 '이 라인으로 오면'이라고 표시
+          const maybe = !t.role && t.cands && t.cands.includes(r);
+          const when = maybe ? `(${j(ROLE_KO[r], "이면", "면")})` : "";
           if (lanesCounter(c.id, t.champ)) {
             const same = t.role === r;
-            const v = same ? 12 : 2;
-            s += v; if (same) reasons.push({ t: "카운터 픽", d: `vs ${ko(t.champ)} 라인전 우위`, v });
+            const v = same ? 12 : maybe ? 6 : 2;
+            s += v; if (same || maybe) reasons.push({ t: "카운터 픽", d: `vs ${ko(t.champ)} 라인전 우위${when}`, v });
           }
-          if (lanesCounter(t.champ, c.id) && t.role === r) { s -= 10; reasons.push({ t: "주의", d: `${ko(t.champ)} 상대로 불리`, v: -10 }); }
+          if (lanesCounter(t.champ, c.id) && (t.role === r || maybe)) { const v = maybe ? 5 : 10; s -= v; reasons.push({ t: "주의", d: `${ko(t.champ)} 상대로 불리${when}`, v: -v }); }
         }
         for (const rr of oppOpen) {
           const e2 = poolMap(oppTeam, rr)[c.id];
@@ -526,7 +640,9 @@ window.Engine = (function () {
     best.reasons.forEach((x) => {
       if (x.v <= 0) return;
       if (x.comp) good.push(x.t.replace(" 조합", " 조합에 맞음"));
-      else if (x.t === "카운터 픽") good.push(x.d.replace(/^vs (.+) 라인전 우위$/, "$1 상대 강함"));
+      else if (x.t === "카운터 픽") good.push(x.d.replace(/^vs (.+?) 라인전 우위(.*)$/, "$1 상대 강함$2"));
+      else if (x.t === "바텀 세트") good.push(x.d.split(" · ")[0]);
+      else if (x.t === "궁 뺏기") good.push("상대 궁 뺏어 쓰기");
       else if (x.t === "앞라인 보강") good.push("앞라인 보강");
       else if (x.t === "AP 딜 보강" || x.t === "AD 딜 보강") good.push(x.t);
       else if (x.t === "갱 대비") good.push("갱 버팀");
@@ -536,6 +652,9 @@ window.Engine = (function () {
       else if (x.t === "메타 강세") good.push("대회 메타 픽");
     });
     best.reasons.forEach((x) => { if (x.t === "주의") bad.push(x.d.replace(" 상대로 불리", " 상대 불리")); });
+    const sy = best.reasons.find((x) => x.t === "사일러스 주의" && x.v <= -3);
+    const sylas = !!sy;
+    if (sy) bad.unshift(sy.banFix ? "사일러스 밴 필요(궁 뺏김)" : "사일러스에 궁 뺏길 위험");
     // 성향상 약한 조합 (이 챔프의 주 성향을 잡는 조합)
     const sc = compScores([c.id])[0];
     if (sc && sc.score > 0) {
@@ -543,8 +662,8 @@ window.Engine = (function () {
       if (weak.length) bad.push(`${weak.slice(0, 2).join("·")} 조합에 약함`);
     }
     if (window.KB.SLIPPERY.includes(c.id) === false && c.st.includes("carry") && !c.st.includes("dive")) bad.push("돌진에 취약");
-    const rank = (g) => (/상대 강함/.test(g) ? 0 : /조합에 맞음/.test(g) ? 1 : g === "갱 버팀" ? 2 : g === "앞라인 보강" ? 3 : /딜 보강/.test(g) ? 4 : /팀 경기/.test(g) ? 5 : g === "상대 주력 뺏기" ? 6 : 7);
-    return { good: [...new Set(good)].sort((a, b) => rank(a) - rank(b)).slice(0, 2), bad: [...new Set(bad)].slice(0, 1) };
+    const rank = (g) => (/상대 강함/.test(g) ? 0 : /조합에 맞음|세트$/.test(g) ? 1 : g === "갱 버팀" ? 2 : g === "앞라인 보강" ? 3 : /딜 보강/.test(g) ? 4 : /팀 경기/.test(g) ? 5 : g === "상대 주력 뺏기" ? 6 : 7);
+    return { good: [...new Set(good)].sort((a, b) => rank(a) - rank(b)).slice(0, 2), bad: [...new Set(bad)].slice(0, sylas ? 2 : 1) };
   }
 
   // ---- 픽 순서 전략: 남은 우리 픽 차례에 어느 라인을 넣을지 ----
@@ -598,6 +717,8 @@ window.Engine = (function () {
     const oppWho = who === "our" ? "enemy" : "our";
     const oppTeamP = teamOf(state, oppWho);
     const oppAvailP = new Set(available(state, oppWho).map((c) => c.id));
+    const mineAll = picks(state, who);
+    const syP = sylasRisk(state, who);
     const scored = open.map((r) => {
       const o = outlook[r];
       const why = [];
@@ -643,6 +764,7 @@ window.Engine = (function () {
       if (o.best && CH[o.best.id].pos.length >= 2 && open.some((x) => x !== r && CH[o.best.id].pos.includes(x))) {
         u += 1.5; why.push(`${j(bestName, "은", "는")} 여러 라인 가능 → 라인을 숨긴 채 먼저`);
       }
+      if (o.best && ULT[o.best.id] === 3 && syP >= 0.35) { u -= 1; why.push(`${bestName} 궁은 사일러스가 빠진 뒤 꺼내기`); }
       if (!o.best) { u -= 1; why.push("챔프폭이 비어 있음 — 상대 픽을 보고 결정"); }
       return { r, u, why };
     }).sort((a, b) => b.u - a.u);
@@ -668,7 +790,7 @@ window.Engine = (function () {
     const plan = slots.map((s) => {
       const items = s.idxs.map((i) => {
         const st = state.draft.steps[i];
-        if (st.champ) return { i, done: true, champ: st.champ, role: st.role };
+        if (st.champ) { const ep = mineAll.find((p) => p.i === i); return { i, done: true, champ: st.champ, role: ep ? ep.role : st.role }; }
         const r = order[k++];
         if (!r) return { i, done: false };
         const sc = scored.find((x) => x.r === r);
@@ -713,7 +835,7 @@ window.Engine = (function () {
       const p = oppTeam.players[r];
       const pm = poolMap(oppTeam, r);
       const sc = scoutOf(oppTeam, r);
-      const picked = theirPicks.find((x) => x.role === r);
+      const picked = theirPicks.find((x) => x.role === r) || theirPicks.find((x) => !x.role && x.cands && x.cands.includes(r) && pm[x.champ]);
       let champId = picked ? picked.champ : null;
       if (!champId) {
         const best = Object.entries(pm).filter(([id]) => oppAvail.has(id)).sort((a, b) => b[1].score - a[1].score)[0];
@@ -800,6 +922,12 @@ window.Engine = (function () {
       const tr = stackChampRecord(team, role, id);
       list.push({ id, e, mi, tr, s: lvScore(e) * 10 + (mi ? mi.score * 4 : 0) + (tr ? Math.min(15, tr.g * 6) : 0), src: "pool" });
     });
+    // 바텀 짝이 이미 나왔으면 그 짝과 세트인 챔프를 후보에 더한다
+    if (role === "A" || role === "S") window.CHAMPIONS.forEach((c) => {
+      if (!avail.has(c.id) || pm[c.id] || !flexRoles(c.id).includes(role)) return;
+      const bp = botPartner(state, who, role, c.id);
+      if (bp) list.push({ id: c.id, e: null, mi: metaInfo(c.id, role), src: "pair", s: 0 });
+    });
     if (list.length < 6) {
       window.CHAMPIONS.filter((c) => c.pos[0] === role && avail.has(c.id) && !pm[c.id])
         .map((c) => ({ id: c.id, e: null, mi: metaInfo(c.id, role), src: "meta" }))
@@ -814,6 +942,8 @@ window.Engine = (function () {
     const ourIds = ourPicks.map((p) => p.champ);
     list.forEach((x) => {
       x.adj = [];
+      const bp = botPartner(state, who, role, x.id);
+      if (bp) { x.s += bp.v * 2; x.bp = bp; x.adj.push({ t: "세트", d: `${j(ko(bp.partner), "과", "와")} 세트 · ${bp.d}` }); }
       if (ourLaner) {
         const m = muWr(x.id, ourLaner.champ);
         if (lanesCounter(x.id, ourLaner.champ)) { x.s += 12; x.adj.push({ t: "카운터 픽", d: `우리 ${ko(ourLaner.champ)} 상대로 강함${m && m.g >= 150 ? ` (${m.wr}%)` : ""}` }); }
@@ -830,8 +960,8 @@ window.Engine = (function () {
       const answers = myPool.filter(([id]) => lanesCounter(id, x.id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([id]) => id);
       const counterTag = x.adj.find((a) => a.t === "카운터 픽");
       if (x.tr) x.adj.unshift({ t: "", d: `팀원과 함께 한 ${x.tr.of}판 중 ${x.tr.g}판 (${x.tr.w}승)` });
-      const label = counterTag ? "카운터 픽" : x.tr ? "함께 한 경기 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
-      const d = x.e ? statText(x.e) : metaText(x.mi);
+      const label = counterTag ? "카운터 픽" : x.bp ? "바텀 세트" : x.tr ? "함께 한 경기 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
+      const d = x.e ? statText(x.e) : x.mi ? metaText(x.mi) : "챔프폭 기록 없음";
       return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers: ourLaner ? [] : answers, vsOurs: x.adj.map((a) => a.d) };
     });
   }
@@ -844,20 +974,26 @@ window.Engine = (function () {
     const myAvail = new Set(available(state, who).map((c) => c.id));
     const pct = (m) => (m && m.g >= 150 ? m.wr : null);
     const theirLaner = picks(state, opp).find((p) => p.role === role);
+    const maybeLaner = !theirLaner && picks(state, opp).find((p) => !p.role && p.cands && p.cands.includes(role));
     let threats = [];
     if (theirLaner) {
       const m = pct(muWr(theirLaner.champ, id));
       threats = [{ id: theirLaner.champ, d: lanesCounter(theirLaner.champ, id) ? `이미 픽 · ${ko(id)} 상대 강함${m ? ` (라인 승률 ${m}%)` : ""}` : `이미 픽 · 상성 ${m ? `라인 승률 ${m}%` : "비슷"}` }];
     } else {
-      threats = Object.entries(poolMap(oppTeam, role)).filter(([c]) => oppAvail.has(c) && lanesCounter(c, id))
+      if (maybeLaner && lanesCounter(maybeLaner.champ, id)) threats.push({ id: maybeLaner.champ, d: `라인 모름(${maybeLaner.cands.map((r) => ROLE_KO[r]).join("·")}) · ${j(ROLE_KO[role], "으로", "로")} 오면 ${ko(id)} 상대 강함` });
+      threats = threats.concat(Object.entries(poolMap(oppTeam, role)).filter(([c]) => oppAvail.has(c) && lanesCounter(c, id))
         .sort((a, b) => lvScore(b[1]) - lvScore(a[1]))
-        .map(([c, e]) => { const m = pct(muWr(c, id)); return { id: c, d: `${who === "our" ? "상대" : "우리"} 챔프폭 · ${statText(e)}${m ? ` · 라인 승률 ${m}%` : ""}` }; }).slice(0, 5);
+        .map(([c, e]) => { const m = pct(muWr(c, id)); return { id: c, d: `${who === "our" ? "상대" : "우리"} 챔프폭 · ${statText(e)}${m ? ` · 라인 승률 ${m}%` : ""}` }; })).slice(0, 5);
       if (threats.length < 5) {
         const gen = window.CHAMPIONS.filter((c) => c.pos.includes(role) && oppAvail.has(c.id) && c.id !== id && !threats.find((t) => t.id === c.id) && lanesCounter(c.id, id))
           .map((c) => { const m = pct(muWr(c.id, id)); return { id: c.id, wr: m || 0, d: `일반 카운터${m ? ` · 라인 승률 ${m}%` : ""}` }; })
           .sort((a, b) => b.wr - a.wr);
         threats = threats.concat(gen.slice(0, 5 - threats.length));
       }
+    }
+    if (ULT[id] && sylasRisk(state, who) > 0 && !threats.find((t) => t.id === "Sylas")) {
+      threats.unshift({ id: "Sylas", d: `궁 뺏기 · 사일러스가 아직 남아 있어 ${ko(id)} 궁을 역이용당할 수 있음` });
+      threats = threats.slice(0, 5);
     }
     const dirKey = compScores([id])[0].key;
     const gr = groupsOf(myTeam) || [];
@@ -1056,7 +1192,7 @@ window.Engine = (function () {
 
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
-    picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
+    picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
     recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo,
   };
 })();

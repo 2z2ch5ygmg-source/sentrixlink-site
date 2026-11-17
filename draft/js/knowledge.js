@@ -178,5 +178,22 @@ window.KB = (function () {
   const GANK = ["LeeSin", "JarvanIV", "Elise", "XinZhao", "Vi", "RekSai", "Nocturne", "Pantheon", "Briar", "Olaf", "Hecarim",
     "Rammus", "Nunu", "Zac", "Sejuani", "Qiyana", "Evelynn", "Shaco", "Rengar", "Khazix", "Kayn", "Warwick", "Volibear",
     "MonkeyKing", "Nidalee", "Talon", "Ekko", "Diana", "Skarner", "Amumu", "Naafiri"];
-  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK };
+  // 사일러스가 뺏으면 위험한 궁극기: 3 = 한타를 뒤집는 광역 궁, 2 = 강한 궁
+  const ULT_STEAL = {
+    Malphite: 3, Kennen: 3, Amumu: 3, Orianna: 3, MonkeyKing: 3, Sejuani: 3, Rell: 3, Seraphine: 3, JarvanIV: 3,
+    Fiddlesticks: 3, MissFortune: 3, Karthus: 3, Rumble: 3, Cassiopeia: 3, Nunu: 3, Sona: 3, Galio: 3, Neeko: 3,
+    Diana: 3, Annie: 3,
+    Leona: 2, Ashe: 2, Nautilus: 2, Maokai: 2, Vi: 2, Morgana: 2, Taric: 2, Kayle: 2, Swain: 2, Gragas: 2, Brand: 2,
+    Veigar: 2, Syndra: 2, Darius: 2, Garen: 2, Zyra: 2, Ornn: 2, Skarner: 2, Viktor: 2, Azir: 2, Mordekaiser: 2,
+    Lissandra: 2, Zac: 2, Varus: 2, Jinx: 2,
+  };
+  // 자주 함께 쓰는 원딜|서폿 세트(솔로랭크·커뮤니티 정석): 3 = 정석 세트, 2 = 자주 쓰는 세트. 대회 기록은 pro.js
+  const DUO_PAIRS = {
+    "Ashe|Seraphine": 3, "Kaisa|Nautilus": 3, "Caitlyn|Lux": 3, "Ezreal|Karma": 3, "Xayah|Rakan": 3, "Lucian|Nami": 3,
+    "Lucian|Braum": 2, "Jinx|Lulu": 2, "Twitch|Lulu": 2, "KogMaw|Lulu": 2, "Zeri|Milio": 2, "Jinx|Milio": 2,
+    "Kalista|Renata": 2, "Kalista|Thresh": 2, "Samira|Leona": 2, "Samira|Nautilus": 2, "Draven|Pyke": 2,
+    "MissFortune|Leona": 2, "Ashe|Zyra": 2, "Varus|Xerath": 2, "Caitlyn|Morgana": 2, "Caitlyn|Neeko": 2,
+    "Kaisa|Rell": 2, "Ezreal|Yuumi": 2, "Kaisa|Alistar": 2, "Jhin|Nautilus": 2, "Ashe|Brand": 2,
+  };
+  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS };
 })();

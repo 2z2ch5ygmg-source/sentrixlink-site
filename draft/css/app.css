@@ -176,6 +176,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .slot-pick .who { min-width: 0; width: 100%; }
 .slot-pick .cn { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .slot-pick .pn { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 16px; }
+.slot-pick .pn .unk { color: var(--gold); }
 .slot-pick select { min-height: 26px; padding: 1px 4px; font-size: 12px; width: 100%; max-width: 72px; }
 .slot-pick.empty .ic { border: 1px dashed var(--line); background: transparent; }
 .slot-pick.empty .cn { color: var(--dim); font-weight: 600; }
