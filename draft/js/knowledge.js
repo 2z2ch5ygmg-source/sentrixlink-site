@@ -174,5 +174,9 @@ window.KB = (function () {
   const SLIPPERY = ["Ezreal", "Fizz", "Kassadin", "Ahri", "Zed", "Leblanc", "Akali", "Yasuo", "Yone", "Irelia", "Fiora",
     "Camille", "Riven", "Lucian", "Vayne", "Tristana", "Kalista", "Samira", "Zeri", "Katarina", "Talon", "Qiyana",
     "Aurora", "Naafiri", "Gnar", "Corki", "Sylas", "Ekko", "Kayle", "Nilah", "Shaco", "Smolder", "Locke"];
-  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY };
+  // 초반 갱킹 압박이 강한 정글
+  const GANK = ["LeeSin", "JarvanIV", "Elise", "XinZhao", "Vi", "RekSai", "Nocturne", "Pantheon", "Briar", "Olaf", "Hecarim",
+    "Rammus", "Nunu", "Zac", "Sejuani", "Qiyana", "Evelynn", "Shaco", "Rengar", "Khazix", "Kayn", "Warwick", "Volibear",
+    "MonkeyKing", "Nidalee", "Talon", "Ekko", "Diana", "Skarner", "Amumu", "Naafiri"];
+  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK };
 })();

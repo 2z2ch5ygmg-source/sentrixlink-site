@@ -209,6 +209,31 @@
       <div class="sub" style="margin-top:12px">이득을 퍼뜨리는 방법</div><ul class="plain">${j.spread.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div></div></div>`;
   }
 
+  function renderThreat(compact) {
+    const k = E.keyThreats(S, "our");
+    if (!k || !k.top) return "";
+    const th = k.top, a = k.advice;
+    const typeTxt = { gank: "갱킹형 정글", jungle: "정글", carry: "핵심 딜러", lane: "라이너" }[th.type];
+    const opts = a.opts.map((o) => `<div class="th-opt"><div class="th-ot"><b>${esc(o.t)}</b> <span class="help">${esc(o.d)}</span></div>
+      <div class="row-chips">${o.picks.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("")}</div></div>`).join("");
+    const lanes = ROLES.filter((r) => a.lanes[r]).map((r) => `<li><b>${ROLE_KO[r]}</b> ${esc(a.lanes[r])}</li>`).join("");
+    const second = k.second && k.second.champ ? `<span class="help">다음: ${ROLE_KO[k.second.r]} ${esc(k.second.p.riot.split("#")[0])} · ${esc(CH[k.second.champ].ko)}</span>` : "";
+    return `<section class="threat-box ${compact ? "compact" : ""}">
+      <div class="th-h">${th.champ ? icon(th.champ, "lg") : ""}<div class="th-who"><div class="th-k">요주의 인물 <span class="pill bad">${typeTxt}</span>${th.picked ? ` <span class="pill">픽 확정</span>` : ` <span class="pill">예상 픽</span>`}</div>
+        <div class="th-n">${ROLE_KO[th.r]} ${esc(th.p.riot.split("#")[0])} · ${esc(th.champ ? CH[th.champ].ko : "-")}</div>
+        <div class="help">${esc(th.why.join(" · "))}</div>${second}</div></div>
+      <p class="th-comp">${esc(a.comp)}</p>
+      ${opts ? `<div class="th-opts">${opts}</div>` : ""}
+      <details class="th-lanes" ${compact ? "" : "open"}><summary>라인별 움직임</summary><ul class="plain">${lanes}</ul></details></section>`;
+  }
+
+  // 상대 분석 탭: 밴픽 전 상태 기준으로 요주의 인물 보기
+  function renderThreatFor(enemyId) {
+    const keep = { enemyTeam: S.enemyTeam, draft: S.draft, series: S.series };
+    S.enemyTeam = enemyId; S.draft = { ourSide: keep.draft.ourSide, steps: emptySteps(), idx: 0 }; S.series = { game: 1, mode: "off", locked: [] };
+    try { return renderThreat(false); } finally { Object.assign(S, keep); }
+  }
+
   function renderPlan() {
     const p = E.pickPlan(S, "our");
     if (!p.plan.some((s) => s.items.some((x) => !x.done && x.role))) return "";
@@ -243,7 +268,7 @@
     ${renderStatus("dstat-m")}
     <div class="board">
       <div class="dh">${renderSide("B", planned)}${renderStatus()}${renderSide("R", planned)}</div>
-      <div class="col-main">${renderNow()}${renderPlan()}</div>
+      <div class="col-main">${renderNow()}${renderThreat(true)}${renderPlan()}</div>
       <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
     </div>
     ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
@@ -337,6 +362,7 @@
         <div class="card"><div class="muted">우세 라인</div><div style="font-weight:700">${strong.join(", ") || "없음"}</div><div class="muted" style="margin-top:6px">열세 라인</div><div style="font-weight:700">${weak.join(", ") || "없음"}</div></div>
         <div class="card"><div class="muted">운영 방향</div><div>${weak.length ? `${esc(weak.join("·"))}은 버티는 픽, 정글이 커버` : "라인전 무난"}${strong.length ? ` · ${esc(strong.join("·"))} 주도권으로 동선 시작` : ""}</div></div>
       </div>
+      <div style="margin-top:12px">${renderThreatFor(en.id)}</div>
       ${has ? "" : `<div class="note" style="margin-top:12px">이 팀은 op.gg 전적을 읽지 못했고 직접 입력한 챔프폭도 없습니다. 「상대 챔프폭 편집」에 넣으면 카운터·연습 추천·예상 조합이 채워집니다.</div>`}
       <div class="section-title"><h2>라인별 상대와 연습 포인트</h2><p>점수 차 = 우리 − 상대</p></div>
       <div class="card tbl-wrap"><table class="study cards-m"><thead><tr><th>라인</th><th>상대 선수</th><th>우리 선수</th><th>점수 차</th><th>상대 챔프폭</th><th>우리 대응 가능</th><th>새로 연습 추천</th><th>우리 챔프 중 주의</th></tr></thead><tbody>${rows}</tbody></table></div>

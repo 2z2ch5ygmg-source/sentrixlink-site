@@ -297,6 +297,7 @@ window.Engine = (function () {
     const theirs = picks(state, opp);
     const dir = direction(state, who);
     const pp = pickPlan(state, who);
+    const threat = keyThreats(state, who);
     const nowRoles = (pp.plan.find((p) => p.idxs.includes(state.draft.idx)) || { items: [] }).items.filter((x) => !x.done && x.role).map((x) => x.role);
     const hasFront = mine.some((p) => CH[p.champ].st.includes("front"));
     const ad = mine.filter((p) => CH[p.champ].dmg === "AD").length;
@@ -333,6 +334,11 @@ window.Engine = (function () {
         for (const rr of oppOpen) {
           const e2 = poolMap(oppTeam, rr)[c.id];
           if (e2 && (e2.lv >= 2 || e2.one)) { const v = e2.one ? 8 : 3 + e2.score * 4; s += v; reasons.push({ t: "상대 주력 뺏기", d: `${ROLE_KO[rr]} ${oppTeam.players[rr].riot.split("#")[0]} · ${statText(e2)}`, v }); break; }
+        }
+        if (threat) {
+          const th = threat.top;
+          if ((th.type === "gank") && "TMAS".includes(r) && holdable(c)) { s += 4; reasons.push({ t: "갱 대비", d: `상대 정글 ${ko(th.champ)} 갱 버팀`, v: 4 }); }
+          if (th.type !== "gank" && th.type !== "jungle" && th.r === r && th.champ && lanesCounter(c.id, th.champ)) { s += 6; reasons.push({ t: "요주의 대비", d: `상대 ${th.p.riot.split("#")[0]} ${ko(th.champ)} 상대로 유리`, v: 6 }); }
         }
         if (nowRoles.length) {
           if (nowRoles.includes(r)) { s += 8; reasons.push({ t: "픽 순서", d: `지금은 ${nowRoles.map((x) => ROLE_KO[x]).join("+")} 차례`, v: 8, order: true }); }
@@ -476,6 +482,90 @@ window.Engine = (function () {
     const cut = ROLES.filter((r) => outlook[r].mains.some((m) => m.st !== "가능"));
     if (cut.length) summary.push(`주력이 잘린 라인: ${cut.map((r) => `${ROLE_KO[r]}(${outlook[r].mains.filter((m) => m.st !== "가능").map((m) => ko(m.id)).join("·")})`).join(", ")}`);
     return { side, plan, summary, outlook, nextRole: nextRoles[0] ? nextRoles[0].role : null, order };
+  }
+
+  // ---- 요주의 인물: 상대에서 가장 위험한 선수와 그에 맞춘 라인별 움직임·조합 ----
+  function keyThreats(state, who) {
+    who = who || "our";
+    const opp = who === "our" ? "enemy" : "our";
+    const oppTeam = teamOf(state, opp), myTeam = teamOf(state, who);
+    const oppAvail = new Set(available(state, opp).map((c) => c.id));
+    const theirPicks = picks(state, opp);
+    const list = ROLES.map((r) => {
+      const p = oppTeam.players[r];
+      const pm = poolMap(oppTeam, r);
+      const sc = scoutOf(oppTeam, r);
+      const picked = theirPicks.find((x) => x.role === r);
+      let champId = picked ? picked.champ : null;
+      if (!champId) {
+        const best = Object.entries(pm).filter(([id]) => oppAvail.has(id)).sort((a, b) => b[1].score - a[1].score)[0];
+        champId = best ? best[0] : null;
+      }
+      const e = champId ? pm[champId] : null;
+      const why = [];
+      let t = (p.pts || 40) / 10;
+      if ((p.pts || 0) >= 60) why.push(`${p.tier} (${p.pts}점)`);
+      if (e) { t += e.score * 6; if (e.g) why.push(`${ko(champId)} ${statText(e)}`); }
+      else if (picked) t += 0.4 * 6; // 기록에 없는 챔프를 꺼냈어도 선수 기본 실력은 남는다
+      if (e && e.one) t += 3;
+      if (sc && sc.total && sc.total.g >= 50) {
+        const wr = sc.total.w / sc.total.g;
+        t += (wr - 0.5) * 20;
+        if (wr >= 0.55) why.push(`시즌 ${sc.total.g}판 승률 ${Math.round(wr * 100)}%`);
+      }
+      const gank = r === "J" && champId && window.KB.GANK.includes(champId);
+      if (gank) { t += picked ? 5 : 2; why.push("초반 갱킹이 강한 정글"); }
+      if (champId && CH[champId].st.includes("carry")) t += 1;
+      if (picked) t += 1;
+      return { r, p, champ: champId, e, picked: !!picked, t, why, type: gank ? "gank" : r === "J" ? "jungle" : (champId && CH[champId].st.includes("carry")) || r === "A" ? "carry" : "lane" };
+    }).sort((a, b) => b.t - a.t);
+    const top = list[0];
+    if (!top) return null;
+    return { top, second: list[1], advice: threatAdvice(state, who, top), list };
+  }
+
+  // 우리 챔프폭에서 조건에 맞는 아직 쓸 수 있는 챔프
+  function ourPoolWhere(state, who, role, test) {
+    const team = teamOf(state, who);
+    const avail = new Set(available(state, who).map((c) => c.id));
+    return Object.entries(poolMap(team, role)).filter(([id]) => avail.has(id) && test(CH[id], id))
+      .sort((a, b) => lvScore(b[1]) - lvScore(a[1])).map(([id]) => id).slice(0, 3);
+  }
+  const holdable = (c) => c.st.includes("prot") || window.KB.SLIPPERY.includes(c.id);
+  const punisher = (c) => c.st.includes("eng") && c.st.includes("cc");
+
+  function threatAdvice(state, who, th) {
+    const name = th.p.riot.split("#")[0];
+    const champ = th.champ ? ko(th.champ) : "주력";
+    const lanes = {};
+    let comp = null;
+    const opts = [];
+    if (th.type === "gank" || th.type === "jungle") {
+      const hold = { A: ourPoolWhere(state, who, "A", holdable), S: ourPoolWhere(state, who, "S", holdable) };
+      const fight = { S: ourPoolWhere(state, who, "S", punisher), J: ourPoolWhere(state, who, "J", (c) => c.st.includes("cc") || c.st.includes("eng")) };
+      comp = th.type === "gank" ? `상대 정글 ${champ}의 초반 갱이 핵심 — 바텀은 버티는 조합이나 받아치는 조합으로` : `상대 정글 ${j(name, "이", "가")} 운영의 중심 — 정글 싸움에서 밀리지 않게`;
+      opts.push({ t: "버티기", d: "보호형 서폿 + 이동기 있는 원딜. 갱이 와도 살아서 CS를 지킵니다.", picks: [...hold.A, ...hold.S] });
+      opts.push({ t: "받아치기", d: "CC 많은 서폿 + 우리 정글이 바텀 근처 대기. 상대 갱을 역으로 잡습니다.", picks: [...fight.S, ...fight.J] });
+      lanes.T = "강가 와드 1개 이상 유지, 상대 정글 위치가 안 보이면 라인을 당겨서 받기";
+      lanes.J = `상대 ${champ} 첫 갱 타이밍(3레벨·6레벨)에 갱 올 라인 근처에서 역갱 대기 — 반대편 카운터 정글은 시야가 있을 때만`;
+      lanes.M = "양쪽 강가 시야를 먼저 확보하고, 바텀·탑에 갱이 보이면 바로 합류";
+      lanes.A = "3레벨 전후 무리한 딜교 금지, 체력이 빠지면 바로 라인 당기기";
+      lanes.S = "바텀 강가·삼거리 와드를 3분 전에 깔고, 정글 위치 핑을 계속 공유";
+    } else {
+      const r = th.r;
+      const answers = ourPoolWhere(state, who, r, (c, id) => th.champ && lanesCounter(id, th.champ));
+      const safe = ourPoolWhere(state, who, r, (c, id) => !(th.champ && lanesCounter(th.champ, id)) && (c.st.includes("front") || holdable(c)));
+      comp = `상대 ${ROLE_KO[r]} ${name}의 ${j(champ, "이", "가")} 가장 위험 — ${j(ROLE_KO[r], "은", "는")} 버티고 정글이 그쪽을 먼저 챙기기`;
+      opts.push({ t: "카운터", d: `${champ} 상대로 라인전이 편한 챔프`, picks: answers });
+      opts.push({ t: "안정형", d: "라인전에서 크게 지지 않는 챔프로 버티고 다른 라인에서 이기기", picks: safe });
+      if (th.type === "carry") {
+        const press = ourPoolWhere(state, who, "S", punisher);
+        opts.push({ t: "성장 막기", d: "초반 2:2에서 압박해 상대 원딜 성장을 끊는 CC 서폿", picks: press });
+      }
+      ROLES.forEach((x) => (lanes[x] = x === r ? `${champ} 상대로 무리하지 말고 CS·체력 유지, 정글 도움 오면 그때 싸우기`
+        : x === "J" ? `${ROLE_KO[r]} 쪽 시야·커버 우선, ${champ} 성장을 막는 갱이 1순위` : `${j(ROLE_KO[r], "이", "가")} 버티는 동안 ${ROLE_KO[x]}에서 이득 만들기`));
+    }
+    return { comp, opts: opts.filter((o) => o.picks.length), lanes, name, champ };
   }
 
   // ---- 밴픽 완료 후 전략 ----
@@ -648,6 +738,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats,
   };
 })();
