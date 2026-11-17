@@ -1,7 +1,7 @@
 // 대회 참가 팀 기본값 (팀_라인.xlsx 설문 답변 1-9 기준, 2026-11-17)
 // 점수: 마스터 70(고LP 90) · 다이아 60 · 에메랄드 45 · 플래티넘 35 · 골드 25 · 실버 15 · 브론즈 5
 // 숙련도: 3=상, 2=중, 1=하, one=true → 원챔(주력 한 챔프)
-window.SEED_VERSION = 2; // 2: 수빈이의아이들 서폿 계정 변경(11-17)
+window.SEED_VERSION = 3; // 2: 수빈이의아이들 서폿 계정 변경(11-17), 3: 먹 보#냠 이·이수근의도박파티#KR1 계정 정정(11-17)
 window.SEED_OUR_TEAM = "subin";
 window.SEED_TEAMS = [
   { id: "banclutch", name: "반클러치", players: {
@@ -19,7 +19,7 @@ window.SEED_TEAMS = [
   { id: "jaesin", name: "재신형과 아이들", players: {
     T: { riot: "알상#kr1", tier: "에메랄드", pts: 45, pool: [] },
     J: { riot: "우리행복해질까요#하루하루", tier: "플래티넘", pts: 35, pool: [] },
-    M: { riot: "먹보#냠이", tier: "마스터 710LP", pts: 90, pool: [] },
+    M: { riot: "먹 보#냠 이", tier: "마스터 710LP", pts: 90, pool: [] },
     A: { riot: "동탄하늘유치원킥보드도둑엄준식#0000", tier: "골드", pts: 25, pool: [] },
     S: { riot: "감 자#災厄の狐", tier: "플래티넘", pts: 35, pool: [] } } },
   { id: "trionfo", name: "trionfo", players: {
@@ -53,7 +53,7 @@ window.SEED_TEAMS = [
     S: { riot: "tilttilt#tilt", tier: "에메랄드", pts: 45, pool: [] } } },
   { id: "hanjung", name: "한중비즈니스", players: {
     T: { riot: "wind#5959", tier: "다이아", pts: 60, pool: [] },
-    J: { riot: "이수근의도박파티#kr2", tier: "다이아", pts: 60, pool: [] },
+    J: { riot: "이수근의도박파티#KR1", tier: "다이아", pts: 60, pool: [] },
     M: { riot: "고경록#kr1", tier: "에메랄드", pts: 45, pool: [] },
     A: { riot: "김싼타#kr1", tier: "플래티넘", pts: 35, pool: [] },
     S: { riot: "우치하#han", tier: "플래티넘", pts: 35, pool: [] } } },

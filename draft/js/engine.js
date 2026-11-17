@@ -23,7 +23,7 @@ window.Engine = (function () {
     const ok = (x) => x && !x.error && (!x.riot || x.riot === team.players[role].riot);   // 계정이 바뀌었으면 옛 기록 무시
     const R = window.RECENT;
     const rs = R && R.status === "ok" && R.season && team && R.season[team.id] && R.season[team.id][role];
-    if (ok(rs)) return { riot: rs.riot, tier: rs.tier, src: "riot", total: { g: rs.n, w: rs.w }, champs: rs.champs };
+    if (ok(rs)) return { riot: rs.riot, tier: rs.tier, src: "riot", total: { g: rs.n, w: rs.w }, roleN: rs.roleN, champs: rs.champs };
     const S = window.SCOUT;
     const t = S && S.teams && team && S.teams[team.id];
     const x = t && t[role];
@@ -88,9 +88,21 @@ window.Engine = (function () {
   function stackChampRecord(team, role, id) {
     const gr = groupsOf(team);
     if (!gr) return null;
-    const withRole = gr.filter((g) => g.picks && g.picks[role]);
+    const atRole = (g, r) => g.picks && g.picks[r] && (!g.playedRole || !g.playedRole[r] || g.playedRole[r] === r);
+    const withRole = gr.filter((g) => atRole(g, role));
     const games = withRole.filter((g) => g.picks[role] === id);
     return games.length ? { g: games.length, w: games.filter((g) => g.win).length, of: withRole.length } : null;
+  }
+  // 실제로 그 라인에서 한 판수만 쓴다(rr: 라인별 [판, 승]). 그 라인 챔프가 아니고 그 라인 기록도 없으면 제외(null).
+  // 예전 자료(rr 없음)와, 등록 라인 기록이 10판 미만이라 그 라인 챔프폭을 알 수 없는 선수는 전체 기록을 쓰되 '주 라인 아님'으로 표시.
+  function inRole(x, role, strict) {
+    if (!x.rr) return x;
+    if (!strict) return { ...x, offMain: !(x.rr[role] && x.rr[role][0]) };
+    const rr = x.rr[role];
+    const g = rr ? rr[0] : 0, w = rr ? rr[1] : 0;
+    if (!g && !(CH[x.id] && CH[x.id].pos.includes(role))) return null;
+    const other = Object.entries(x.rr).filter(([k]) => k !== role && x.rr[k][0]).map(([k, v]) => [k, v[0]]);
+    return { ...x, g, w, elsewhere: other };
   }
   const MANUAL_SCORE = { 3: 0.75, 2: 0.45, 1: 0.2 };
   function poolMap(team, role) {
@@ -99,11 +111,15 @@ window.Engine = (function () {
     if (!p) return m;
     const sc = scoutOf(team, role);
     const stats = {};
-    if (sc) sc.champs.forEach((x) => { const e = statEntry(x, sc.total, role); if (e) stats[x.id] = e; });
+    // 비중(원챔 판단)은 그 라인에서 한 판수 기준(그 라인 10판 이상일 때)
+    const strict = !!(sc && sc.roleN && sc.roleN[role] >= 10);
+    const roleTotal = strict ? { g: sc.roleN[role] } : sc && sc.total;
+    if (sc) sc.champs.forEach((x0) => { const x = inRole(x0, role, strict); if (!x) return; const e = statEntry(x, roleTotal, role); if (e) stats[x.id] = e; });
     // 최근 경기: 판수·승률로 점수를 올리고, 시즌 기록에 없던 챔프(2판 이상)도 더한다
     const rc = recentOf(team, role);
-    if (rc) rc.champs.forEach((x) => {
-      if (!CH[x.id]) return;
+    if (rc) rc.champs.forEach((x0) => {
+      const x = inRole(x0, role, strict || !(sc && sc.roleN));
+      if (!x || !CH[x.id]) return;
       const wrS = (x.w + 3) / (x.g + 6);
       const rs = Math.min(1, x.g / 12) * 0.7 + Math.max(0, Math.min(1, (wrS - 0.45) / 0.15)) * 0.3;
       const base = stats[x.id] || (x.g >= 2 ? { lv: 1, one: false, score: 0, g: 0, w: 0, wr: 0, mp: 0, scout: true } : null);
@@ -158,7 +174,8 @@ window.Engine = (function () {
     A.forEach(([a, ea]) => Sx.forEach(([sp, es]) => {
       const d = proDuo(a, sp);
       const gr = groupsOf(team);
-      const tg = gr ? gr.filter((g) => g.picks && g.picks.A === a && g.picks.S === sp) : [];
+      const real = (g, r) => !g.playedRole || !g.playedRole[r] || g.playedRole[r] === r;
+      const tg = gr ? gr.filter((g) => g.picks && g.picks.A === a && g.picks.S === sp && real(g, "A") && real(g, "S")) : [];
       let v = lvScore(ea) + lvScore(es);
       if (d) v += Math.min(3, d.g * 0.5) + (d.g >= 3 ? (d.w / d.g - 0.5) * 4 : 0);
       if (tg.length) v += Math.min(3, tg.length) + tg.filter((g) => g.win).length;
@@ -855,7 +872,8 @@ window.Engine = (function () {
         if (pair.w / pair.g >= 0.5) { s += Math.min(4, pair.g * 0.5) + (pair.w / pair.g - 0.5) * 4; why.push(`대회 바텀 조합 ${pair.g}판 ${pair.w}승`); }
         else s -= 1;
       }
-      const together = gr.filter((g) => g.picks && g.picks[role] === id && g.picks[r] === c);
+      const real = (g, k) => !g.playedRole || !g.playedRole[k] || g.playedRole[k] === k;
+      const together = gr.filter((g) => g.picks && g.picks[role] === id && g.picks[r] === c && real(g, role) && real(g, r));
       if (together.length) { s += together.length * 2; why.push(`팀원과 함께 ${together.length}판 ${together.filter((g) => g.win).length}승`); }
       if (fit(other, dirKey) >= 2.5) { s += fit(other, dirKey) * 0.6; why.push(`${COMPS[dirKey].short} 조합 같이`); }
       if (me.st.includes("eng") && other.st.some((x) => x === "burst" || x === "carry")) { s += 1.5; why.push("진입 뒤 마무리"); }
