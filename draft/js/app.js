@@ -139,6 +139,7 @@
       const p = t.players[pr];
       body = pl.length ? `<p class="help pred-h">${ROLE_KO[pr]} ${esc(nick(p.riot))} 선수가 꺼낼 수 있는 챔프 · 눌러서 상대 ${type === "ban" ? "밴" : "픽"}으로 기록</p><div class="recs">${pl.map((x) => `<button class="rec muted pred" data-act="pick" data-id="${x.id}">
         <span class="lab">${esc(x.label)}</span>${icon(x.id, "lg")}<span class="cn">${esc(CH[x.id].ko)}</span><span class="why">${esc(x.d)}${x.meta ? `<br>${esc(x.meta)}` : ""}</span>
+        ${x.vsOurs.length ? `<span class="vs-ours">${x.vsOurs.map(esc).join("<br>")}</span>` : ""}
         ${x.answers.length ? `<span class="ans">우리 대응 ${x.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`).join("")}</div>`
         : `<div class="empty-recs">${ROLE_KO[pr]} 예상 챔프가 없습니다.</div>`;
     } else if (list.length) body = `<div class="recs">${list.map((r, i) => recCard(r, type, who === "enemy", who === "our" ? i + 1 : 0)).join("")}</div>`;

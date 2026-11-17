@@ -647,11 +647,31 @@ window.Engine = (function () {
         .forEach((x) => list.push({ ...x, s: x.mi.score * 6 }));
     }
     const myPool = Object.entries(poolMap(myTeam, role)).filter(([id]) => myAvail.has(id));
+    // 우리 픽에 맞춰 바뀜: 같은 라인 우리 챔프를 카운터하는 챔프는 위로, 우리 조합을 받아치는 성향도 반영
+    const ourPicks = picks(state, me);
+    const ourLaner = ourPicks.find((p) => p.role === role);
+    const ourDir = ourPicks.length ? direction(state, me) : null;
+    const ourIds = ourPicks.map((p) => p.champ);
+    list.forEach((x) => {
+      x.adj = [];
+      if (ourLaner) {
+        const m = muWr(x.id, ourLaner.champ);
+        if (lanesCounter(x.id, ourLaner.champ)) { x.s += 12; x.adj.push({ t: "카운터 픽", d: `우리 ${ko(ourLaner.champ)} 상대로 강함${m && m.g >= 150 ? ` (${m.wr}%)` : ""}` }); }
+        else if (lanesCounter(ourLaner.champ, x.id)) { x.s -= 8; x.adj.push({ t: "", d: `우리 ${ko(ourLaner.champ)}에 불리${m && m.g >= 150 ? ` (${m.wr}%)` : ""}` }); }
+      }
+      const others = ourIds.filter((id) => id !== (ourLaner && ourLaner.champ) && lanesCounter(x.id, id));
+      if (others.length) { x.s += 2; x.adj.push({ t: "", d: `우리 ${others.slice(0, 2).map(ko).join("·")} 견제` }); }
+      if (ourDir) {
+        const best = COMP_KEYS.filter((k) => COMPS[k].beats.includes(ourDir)).map((k) => ({ k, f: fit(CH[x.id], k) })).sort((a, b) => b.f - a.f)[0];
+        if (best && best.f >= 2.5) { x.s += 3; x.adj.push({ t: "", d: `우리 ${COMPS[ourDir].short} 조합 받아치기(${COMPS[best.k].short})` }); }
+      }
+    });
     return list.sort((a, b) => b.s - a.s).slice(0, 8).map((x) => {
       const answers = myPool.filter(([id]) => lanesCounter(id, x.id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([id]) => id);
-      const label = x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
+      const counterTag = x.adj.find((a) => a.t === "카운터 픽");
+      const label = counterTag ? "카운터 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
       const d = x.e ? statText(x.e) : metaText(x.mi);
-      return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers };
+      return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers: ourLaner ? [] : answers, vsOurs: x.adj.map((a) => a.d) };
     });
   }
 
