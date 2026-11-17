@@ -121,7 +121,7 @@ window.Engine = (function () {
   function statText(e) {
     if (!e) return "";
     const rec = e.rg ? ` · 최근 ${e.rg}판 ${e.rw}승` : "";
-    if (e.manual) return `${e.one ? "원챔" : "자신감 " + LEVEL_KO[e.lv]} (본인 평가)${e.g ? ` · 시즌 ${e.g}판` : ""}${rec}`;
+    if (e.manual) return `${e.g ? `시즌 ${e.g}판` : "본인 추천 챔프"}${rec}`;
     if (e.g) return `${e.g}판 ${Math.round(e.wr)}%${e.one ? " · 원챔" : ""}${rec}`;
     if (e.rg) return `최근 ${e.rg}판 ${e.rw}승`;
     if (e.mp && !e.manual) return `숙련도 ${Math.round(e.mp / 1000)}k`;
@@ -344,7 +344,7 @@ window.Engine = (function () {
     const myAvail = new Set(available(state, who).map((c) => c.id));
     const myOpen = openRoles(state, who);
     const myComfort = [];
-    myOpen.forEach((r) => Object.entries(poolMap(myTeam, r)).forEach(([id, e]) => (e.lv >= 3 || e.one) && myAvail.has(id) && !myComfort.includes(id) && myComfort.push(id)));
+    myOpen.filter((r) => oppOpen.includes(r)).forEach((r) => Object.entries(poolMap(myTeam, r)).forEach(([id, e]) => (e.lv >= 3 || e.one) && myAvail.has(id) && !myComfort.find((x) => x.id === id) && myComfort.push({ id, r })));
     const res = [];
     for (const c of available(state, opp)) {
       const reasons = [];
@@ -354,7 +354,9 @@ window.Engine = (function () {
         if (!e) continue;
         const p = oppTeam.players[r];
         const f = strengthFactor(p);
-        const v = Math.max(e.one ? 40 : 0, 8 + 34 * e.score) * f;
+        // 그 라인에 안 서는 챔프(다른 라인으로 했던 기록)는 원챔·큰 비중이 아니면 이 라인 위협으로 약하게 본다
+        const offRole = !c.pos.includes(r) && !e.one && !(e.share >= 0.2);
+        const v = Math.max(e.one ? 40 : 0, 8 + 34 * e.score) * f * (offRole ? 0.35 : 1);
         if (v > s) {
           s = v;
           const t = e.one ? "원챔 차단" : e.g >= 15 && e.wr >= 60 ? "고승률 차단" : e.score >= 0.6 ? "숙련도 높음" : "상대 챔프폭";
@@ -372,15 +374,17 @@ window.Engine = (function () {
         const f2 = fit(c, oppDir);
         if (f2 >= 2.5) { const v = 8 + f2 * 2; s += v; reasons.push({ t: `${COMPS[oppDir].short} 조합 차단`, d: `상대가 ${COMPS[oppDir].name} 방향`, v }); }
       }
+      // 라인 카운터는 상대가 그 라인을 아직 비워 두었고, 이 챔프가 그 라인에 설 수 있을 때만 의미가 있다
       for (const p of myPicks) {
+        if (!p.role || !oppOpen.includes(p.role) || !c.pos.includes(p.role)) continue;
         if (lanesCounter(c.id, p.champ)) {
-          const v = 12 + (c.pos.includes(p.role) ? 4 : 0);
+          const v = 16;
           s += v; reasons.push({ t: "카운터 차단", d: `우리 ${ko(p.champ)} 상대로 강함`, v });
         }
       }
       {
         let k = 0;
-        for (const id of myComfort) if (lanesCounter(c.id, id) && k < 2) { k++; s += 4; reasons.push({ t: "카운터 차단", d: `우리 ${ko(id)} 상대로 강함`, v: 4 }); }
+        for (const { id, r } of myComfort) if (c.pos.includes(r) && lanesCounter(c.id, id) && k < 2) { k++; s += 4; reasons.push({ t: "카운터 차단", d: `우리 ${ko(id)} 상대로 강함`, v: 4 }); }
       }
       if (c.pos.length >= 2 && onRole) s += 1;
       const mi = onRole ? metaInfo(c.id, c.pos.find((r) => oppOpen.includes(r))) : null;
@@ -470,13 +474,42 @@ window.Engine = (function () {
       if (best.s <= 0 && !best.reasons.some((x) => x.v > 0)) best.reasons.push({ t: `${ROLE_KO[best.r]} 기본 픽`, d: "챔프폭 정보 없음 · 라인 주 챔프", v: 0.1 });
       const pos = best.reasons.filter((x) => x.v > 0).sort((a, b) => b.v - a.v);
       const compR = best.reasons.find((x) => x.comp);
+      const pp2 = prosCons(c, best, theirs);
       res.push({
         id: c.id, score: best.s, role: best.r,
         label: compR ? compR.t : pos[0] ? pos[0].t : "추천",
         reasons: best.reasons.sort((a, b) => b.v - a.v),
+        good: pp2.good, bad: pp2.bad,
       });
     }
     return res.sort((a, b) => b.score - a.score).slice(0, 6);
+  }
+
+  // 추천 카드용 짧은 장단점: 무엇에 좋고 무엇에 약한지
+  function prosCons(c, best, theirs) {
+    const good = [], bad = [];
+    best.reasons.forEach((x) => {
+      if (x.v <= 0) return;
+      if (x.comp) good.push(x.t.replace(" 조합", " 조합에 맞음"));
+      else if (x.t === "카운터 픽") good.push(x.d.replace(/^vs (.+) 라인전 우위$/, "$1 상대 강함"));
+      else if (x.t === "앞라인 보강") good.push("앞라인 보강");
+      else if (x.t === "AP 딜 보강" || x.t === "AD 딜 보강") good.push(x.t);
+      else if (x.t === "갱 대비") good.push("갱 버팀");
+      else if (x.t === "요주의 대비") good.push(x.d.replace(/^상대 \S+ /, "").replace(" 상대로 유리", " 상대 강함"));
+      else if (x.t === "상대 주력 뺏기") good.push("상대 주력 뺏기");
+      else if (x.t === "팀 경기 기록") good.push(x.d.replace("팀원과 함께 ", "팀 경기 "));
+      else if (x.t === "메타 강세") good.push("대회 메타 픽");
+    });
+    best.reasons.forEach((x) => { if (x.t === "주의") bad.push(x.d.replace(" 상대로 불리", " 상대 불리")); });
+    // 성향상 약한 조합 (이 챔프의 주 성향을 잡는 조합)
+    const sc = compScores([c.id])[0];
+    if (sc && sc.score > 0) {
+      const weak = COMP_KEYS.filter((k) => COMPS[k].beats.includes(sc.key)).map((k) => COMPS[k].short);
+      if (weak.length) bad.push(`${weak.slice(0, 2).join("·")} 조합에 약함`);
+    }
+    if (window.KB.SLIPPERY.includes(c.id) === false && c.st.includes("carry") && !c.st.includes("dive")) bad.push("돌진에 취약");
+    const rank = (g) => (/상대 강함/.test(g) ? 0 : /조합에 맞음/.test(g) ? 1 : g === "갱 버팀" ? 2 : g === "앞라인 보강" ? 3 : /딜 보강/.test(g) ? 4 : /팀 경기/.test(g) ? 5 : g === "상대 주력 뺏기" ? 6 : 7);
+    return { good: [...new Set(good)].sort((a, b) => rank(a) - rank(b)).slice(0, 2), bad: [...new Set(bad)].slice(0, 1) };
   }
 
   // ---- 픽 순서 전략: 남은 우리 픽 차례에 어느 라인을 넣을지 ----

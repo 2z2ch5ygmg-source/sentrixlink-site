@@ -112,7 +112,9 @@
   }
 
   function recCard(r, type, muted, rank) {
-    const why = r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
+    // 우리 픽: 무엇에 좋고 무엇에 약한지만 짧게. 밴·상대 예상: 근거 두 줄
+    const why = r.good ? [...r.good.map((g) => `<span class="pc-good">+ ${esc(g)}</span>`), ...r.bad.map((b) => `<span class="pc-bad">− ${esc(b)}</span>`)].join("<br>")
+      : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""}" data-act="pick" data-id="${r.id}">
       ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg")}<span class="cn">${esc(CH[r.id].ko)}</span>
       ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span></button>`;
