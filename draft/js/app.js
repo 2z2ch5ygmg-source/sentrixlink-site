@@ -66,12 +66,14 @@
     }
     const pool = (t.players[r].pool || []).slice().sort((a, b) => (b[2] ? 4 : b[1]) - (a[2] ? 4 : a[1]));
     if (!pool.length) return `<span class="dim">직접 입력한 챔프 없음 (op.gg 전적은 자동 반영)</span>`;
-    return pool.map(([id, lv, one]) => `<span class="chip ${opts && opts.edit ? "ed-chip" : ""}" ${opts && opts.edit ? `data-act="cycle" data-team="${t.id}" data-role="${r}" data-id="${id}"` : ""}>${icon(id, "sm")}${esc(CH[id] ? CH[id].ko : id)} ${lvTag({ lv, one })}${opts && opts.edit ? `<span class="del" data-act="del" data-team="${t.id}" data-role="${r}" data-id="${id}" title="삭제">×</span>` : ""}</span>`).join("");
+    return pool.map(([id, lv, one]) => `<span class="chip ${opts && opts.edit ? "ed-chip" : ""}" ${opts && opts.edit ? `data-act="cycle" data-team="${t.id}" data-role="${r}" data-id="${id}"` : ""}>${icon(id, "sm")}${esc(CH[id] ? CH[id].ko : id)} ${lvTag({ lv, one })}${opts && opts.edit ? `<span class="del" data-act="del" data-team="${t.id}" data-role="${r}" data-id="${id}" title="삭제" role="button" aria-label="삭제"><svg class="ico-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>` : ""}</span>`).join("");
   }
+  const TIER_KO = { IRON: "아이언", BRONZE: "브론즈", SILVER: "실버", GOLD: "골드", PLATINUM: "플래티넘", EMERALD: "에메랄드", DIAMOND: "다이아", MASTER: "마스터", GRANDMASTER: "그랜드마스터", CHALLENGER: "챌린저" };
   function totalTxt(t, r) {
     const sc = E.scoutOf(t, r);
-    if (!sc || !sc.total || !sc.total.g) return window.SCOUT && window.SCOUT.teams && window.SCOUT.teams[t.id] && window.SCOUT.teams[t.id][r] && window.SCOUT.teams[t.id][r].error ? " · 전적 못 읽음" : "";
-    return ` · 시즌 ${sc.total.g}판 ${Math.round((sc.total.w / sc.total.g) * 100)}%`;
+    if (!sc || !sc.total || !sc.total.g) return "";
+    const tierTxt = sc.tier ? ` · 솔랭 ${TIER_KO[sc.tier.tier] || sc.tier.tier}${sc.tier.rank && !/MASTER|CHALLENGER/.test(sc.tier.tier) ? " " + ({ I: 1, II: 2, III: 3, IV: 4 }[sc.tier.rank] || sc.tier.rank) : ""}` : "";
+    return `${tierTxt} · 랭크 ${sc.total.g}판 ${Math.round((sc.total.w / sc.total.g) * 100)}%`;
   }
   function opgg(riot) {
     const [n, tag] = String(riot).split("#");
@@ -109,7 +111,7 @@
     const bans = sideIdx(side, "ban").map((i) => {
       const s = S.draft.steps[i];
       const now = i === S.draft.idx ? "now" : "";
-      return `<div class="slot-ban ${now}">${s.champ ? `<img src="${IMG(s.champ)}" alt="${esc(CH[s.champ].ko)}" title="${esc(CH[s.champ].ko)}" onerror="this.remove()"><span class="x">✕</span>` : s.skip ? `<span class="dim">없음</span>` : ""}</div>`;
+      return `<div class="slot-ban ${now}">${s.champ ? `<img src="${IMG(s.champ)}" alt="${esc(CH[s.champ].ko)}" title="${esc(CH[s.champ].ko)}" onerror="this.remove()"><span class="x"><svg class="ico-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></span>` : s.skip ? `<span class="dim">없음</span>` : ""}</div>`;
     }).join("");
     const picks = sideIdx(side, "pick").map((i) => {
       const s = S.draft.steps[i];
@@ -129,7 +131,7 @@
     // 우리 픽: 무엇에 좋고 무엇에 약한지만 짧게. 밴·상대 예상: 근거 두 줄
     const why = r.good ? [...r.good.map((g) => `<span class="pc-good">+ ${esc(g)}</span>`), ...r.bad.map((b) => `<span class="pc-bad">− ${esc(b)}</span>`)].join("<br>")
       : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
-    return `<button class="rec ${type} ${muted ? "muted" : ""}" data-act="pick" data-id="${r.id}">
+    return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 ? "first" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
       ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg")}<span class="cn">${esc(CH[r.id].ko)}</span>
       ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span></button>`;
   }
@@ -249,7 +251,8 @@
     const lanes = ROLES.filter((r) => a.lanes[r]).map((r) => `<li><b>${ROLE_KO[r]}</b> ${esc(a.lanes[r])}</li>`).join("");
     const second = k.second && k.second.champ ? `<span class="help">다음: ${ROLE_KO[k.second.r]} ${esc(k.second.p.riot.split("#")[0])} · ${esc(CH[k.second.champ].ko)}</span>` : "";
     return `<section class="threat-box ${compact ? "compact" : ""}">
-      <div class="th-h">${th.champ ? icon(th.champ, "lg") : ""}<div class="th-who"><div class="th-k">요주의 인물 <span class="pill bad">${typeTxt}</span>${th.picked ? ` <span class="pill">픽 확정</span>` : ` <span class="pill">예상 픽</span>`}</div>
+      <div class="now-h th-head"><span class="what th-title">요주의 인물</span><span class="pill bad">${typeTxt}</span><span class="pill">${th.picked ? "픽 확정" : "예상 픽"}</span></div>
+      <div class="th-h">${th.champ ? icon(th.champ, "lg") : ""}<div class="th-who">
         <div class="th-n">${ROLE_KO[th.r]} ${esc(th.p.riot.split("#")[0])} · ${esc(th.champ ? CH[th.champ].ko : "-")}</div>
         <div class="help">${esc(th.why.join(" · "))}</div>${second}</div></div>
       <p class="th-comp">${esc(a.comp)}</p>
@@ -364,7 +367,7 @@
     const stackTxt = R && R.status === "ok" ? S.teams.map((t) => { const st = E.groupsOf(t); return `${esc(t.name)} ${st === null ? "미확보" : st.length + "판" + (st.some((g) => g.n === 5) ? `(5인 ${st.filter((g) => g.n === 5).length})` : "")}`; }).join(" · ") : "미확보";
     const last = R && R.lastAttempt && !R.lastAttempt.ok ? ` · 마지막 시도 ${esc(R.lastAttempt.at)} 실패: ${esc(R.lastAttempt.reason)}` : "";
     const rows = [
-      ["선수 시즌 전적", "op.gg 공개 프로필", SC ? SC.at : "미확보", SC ? okCount(SC.teams, (x) => !x.error) : "-"],
+      ["선수 전적 (티어·숙련도·최근 랭크)", "Riot API (league·champion-mastery·match)", R && R.status === "ok" && R.season ? R.at : "미확보", R && R.status === "ok" && R.season ? okCount(R.season, (x) => !x.error) + ` · 선수당 최근 랭크 ${R.seasonCap}판` : "새 키로 수집 전"],
       ["최근 랭크 (11/10~)", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", (R && R.status === "ok" ? okCount(R.players, (x) => !x.error) + ` · 선수당 최대 ${R.cap}판` : (R ? esc(R.reason || "") : "-")) + last],
       ["함께 한 경기(2인 이상)", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", stackTxt],
       ["메타·라인 상성", "op.gg 솔랭 · gol.gg 시즌 통계", M ? M.at : "미확보", M ? `패치 ${esc(M.patch)} · 상성 ${Object.keys(M.mu || {}).length}챔프` : "-"],
@@ -537,6 +540,7 @@
   }
 
   function render() {
+    if (typeof hideHover === "function") hideHover();
     renderTop();
     const v = document.getElementById("view");
     const keepFocus = document.activeElement && document.activeElement.id === "q";
@@ -659,6 +663,40 @@
     }
     render();
   }
+
+  // ---------- 픽 후보 정보 카드 (PC 전용: 마우스 올림·키보드 초점) ----------
+  const hc = document.createElement("div");
+  hc.className = "hovercard"; hc.hidden = true; hc.setAttribute("role", "tooltip"); hc.id = "hovercard";
+  document.body.appendChild(hc);
+  let hcFor = null;
+  const pcPointer = matchMedia("(hover: hover) and (pointer: fine) and (min-width: 761px)");
+  function hcAllowed() { const st = curStep(); return pcPointer.matches && S.tab === "live" && st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our"; }
+  function showHover(el) {
+    if (!hcAllowed() || !CH[el.dataset.id]) return;
+    const id = el.dataset.id;
+    const role = el.dataset.role || E.guessRole(S, "our", id);
+    if (!role) return;
+    const h = E.hoverInfo(S, "our", id, role);
+    const row = (x) => `<li>${icon(x.id, "sm")}<span><b>${esc(CH[x.id].ko)}</b><small>${esc(x.d)}</small></span></li>`;
+    hc.innerHTML = `<div class="hc-h">${icon(id, "sm")}<b>${esc(CH[id].ko)}</b><span class="pill">${ROLE_KO[role]}</span></div>
+      <div class="hc-sec"><div class="hc-t bad">${h.laner ? "상대 같은 라인" : "카운터 위험 · 상대 " + ROLE_KO[role]}</div>${h.threats.length ? `<ul>${h.threats.map(row).join("")}</ul>` : `<p class="help">상대 챔프폭에 뚜렷한 카운터 없음</p>`}</div>
+      <div class="hc-sec"><div class="hc-t good">우리 팀 시너지</div>${h.synergy.length ? `<ul>${h.synergy.map(row).join("")}</ul>` : `<p class="help">남은 라인 챔프폭에서 뚜렷한 시너지 없음</p>`}</div>`;
+    hc.hidden = false;
+    hcFor = el;
+    el.setAttribute("aria-describedby", "hovercard");
+    const r = el.getBoundingClientRect(), w = hc.offsetWidth, hgt = hc.offsetHeight, gap = 10;
+    let left = r.right + gap; if (left + w > innerWidth - 8) left = r.left - w - gap; if (left < 8) left = Math.min(innerWidth - w - 8, Math.max(8, r.left));
+    let top = r.top; if (top + hgt > innerHeight - 8) top = innerHeight - hgt - 8; if (top < 8) top = 8;
+    hc.style.left = left + "px"; hc.style.top = top + "px";
+  }
+  function hideHover() { if (hcFor) hcFor.removeAttribute("aria-describedby"); hc.hidden = true; hcFor = null; }
+  document.addEventListener("mouseover", (ev) => {
+    const el = ev.target.closest("[data-act='pick'][data-id]");
+    if (el === hcFor) return;
+    if (el) showHover(el); else if (hcFor && !ev.target.closest(".hovercard")) hideHover();
+  });
+  document.addEventListener("focusin", (ev) => { const el = ev.target.closest("[data-act='pick'][data-id]"); if (el) showHover(el); else hideHover(); });
+  window.addEventListener("scroll", () => hcFor && hideHover(), { passive: true });
 
   document.getElementById("champList").innerHTML = window.CHAMPIONS.map((c) => `<option value="${esc(c.ko)}">`).join("");
   render();

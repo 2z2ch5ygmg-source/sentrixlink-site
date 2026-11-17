@@ -18,12 +18,16 @@ window.Engine = (function () {
 
   // ---- 챔프폭 ----
   // op.gg 전적(tools/scout.py → js/scout.js)
+  // 선수 전적: Riot API(tools/recent.py의 season — 티어·숙련도·최근 랭크 N판). 없으면(시험 등) 옛 scout 자료.
   function scoutOf(team, role) {
+    const ok = (x) => x && !x.error && (!x.riot || x.riot === team.players[role].riot);   // 계정이 바뀌었으면 옛 기록 무시
+    const R = window.RECENT;
+    const rs = R && R.status === "ok" && R.season && team && R.season[team.id] && R.season[team.id][role];
+    if (ok(rs)) return { riot: rs.riot, tier: rs.tier, src: "riot", total: { g: rs.n, w: rs.w }, champs: rs.champs };
     const S = window.SCOUT;
     const t = S && S.teams && team && S.teams[team.id];
     const x = t && t[role];
-    // 계정이 바뀌었으면 옛 선수 기록은 쓰지 않는다
-    return x && !x.error && (!x.riot || x.riot === team.players[role].riot) ? x : null;
+    return ok(x) ? { ...x, src: "opgg" } : null;
   }
   // 판수·승률(표본 보정)·숙련도 점수·라인 일치로 0~1 숙련 점수를 만든다
   function statEntry(x, total, role) {
@@ -114,7 +118,8 @@ window.Engine = (function () {
       const st = stats[id];
       // 자기평가 우선: 점수는 본인이 정한 자신감으로, 전적은 참고 표시만
       m[id] = { lv: lv || 1, one: !!one, score: one ? 1 : MANUAL_SCORE[lv || 1], manual: true };
-      if (st) Object.assign(m[id], { g: st.g, w: st.w, wr: st.wr, kda: st.kda, mp: st.mp, rg: st.rg, rw: st.rw });
+      // 전적 점수·원챔 여부는 따로 보관: 우리 픽 추천은 본인 평가로, 상대 입장의 위협 계산은 실제 기록까지 본다
+      if (st) Object.assign(m[id], { g: st.g, w: st.w, wr: st.wr, kda: st.kda, mp: st.mp, rg: st.rg, rw: st.rw, sscore: st.score, sone: st.one, share: st.share });
     });
     // 자기평가가 있는 선수는 그 목록만 쓴다. 없는 선수는 전적 전체.
     if (!manual.length) Object.entries(stats).forEach(([id, e]) => {
@@ -365,11 +370,13 @@ window.Engine = (function () {
         const p = oppTeam.players[r];
         const f = strengthFactor(p);
         // 그 라인에 안 서는 챔프(다른 라인으로 했던 기록)는 원챔·큰 비중이 아니면 이 라인 위협으로 약하게 본다
-        const offRole = !c.pos.includes(r) && !e.one && !(e.share >= 0.2);
-        const v = Math.max(e.one ? 40 : 0, 8 + 34 * e.score) * f * (offRole ? 0.35 : 1);
+        const one = e.one || e.sone;
+        const sc = Math.max(e.score, e.sscore || 0);
+        const offRole = !c.pos.includes(r) && !one && !(e.share >= 0.2);
+        const v = Math.max(one ? 48 : 0, 8 + 34 * sc) * f * (offRole ? 0.35 : 1);
         if (v > s) {
           s = v;
-          const t = e.one ? "원챔 차단" : e.g >= 15 && e.wr >= 60 ? "고승률 차단" : e.score >= 0.6 ? "숙련도 높음" : "상대 챔프폭";
+          const t = one ? "원챔 차단" : e.g >= 15 && e.wr >= 60 ? "고승률 차단" : sc >= 0.6 ? "숙련도 높음" : "상대 챔프폭";
           reasons[0] = { t, d: `${ROLE_KO[r]} ${p.riot.split("#")[0]} · ${statText(e)}`, v };
           tgt = r;
         }
@@ -409,7 +416,8 @@ window.Engine = (function () {
     const pool = res.slice(0, 30);
     while (out.length < 6 && pool.length) {
       let bi = 0, bv = -1;
-      pool.forEach((r, i) => { const v = r.tgt ? r.score * Math.pow(0.7, hits[r.tgt] || 0) : r.score; if (v > bv) { bv = v; bi = i; } });
+      // 원챔은 그 선수의 대표 위협이라 분산 감점에서 뺀다
+      pool.forEach((r, i) => { const v = r.tgt && r.label !== "원챔 차단" ? r.score * Math.pow(0.7, hits[r.tgt] || 0) : r.score; if (v > bv) { bv = v; bi = i; } });
       const r = pool.splice(bi, 1)[0];
       if (r.tgt) hits[r.tgt] = (hits[r.tgt] || 0) + 1;
       out.push(r);
@@ -811,6 +819,56 @@ window.Engine = (function () {
     });
   }
 
+  // ---- 픽 후보 정보 카드: 이 챔프를 카운터할 수 있는 상대 챔프 5 + 우리 팀 시너지 5 ----
+  function hoverInfo(state, who, id, role) {
+    const opp = who === "our" ? "enemy" : "our";
+    const oppTeam = teamOf(state, opp), myTeam = teamOf(state, who);
+    const oppAvail = new Set(available(state, opp).map((c) => c.id));
+    const myAvail = new Set(available(state, who).map((c) => c.id));
+    const pct = (m) => (m && m.g >= 150 ? m.wr : null);
+    const theirLaner = picks(state, opp).find((p) => p.role === role);
+    let threats = [];
+    if (theirLaner) {
+      const m = pct(muWr(theirLaner.champ, id));
+      threats = [{ id: theirLaner.champ, d: lanesCounter(theirLaner.champ, id) ? `이미 픽 · ${ko(id)} 상대 강함${m ? ` (상대 승률 ${m}%)` : ""}` : `이미 픽 · 상성 ${m ? `상대 승률 ${m}%` : "비슷"}` }];
+    } else {
+      threats = Object.entries(poolMap(oppTeam, role)).filter(([c]) => oppAvail.has(c) && lanesCounter(c, id))
+        .sort((a, b) => lvScore(b[1]) - lvScore(a[1]))
+        .map(([c, e]) => { const m = pct(muWr(c, id)); return { id: c, d: `상대 챔프폭 · ${statText(e)}${m ? ` · 상대 승률 ${m}%` : ""}` }; }).slice(0, 5);
+      if (threats.length < 5) {
+        const gen = window.CHAMPIONS.filter((c) => c.pos.includes(role) && oppAvail.has(c.id) && c.id !== id && !threats.find((t) => t.id === c.id) && lanesCounter(c.id, id))
+          .map((c) => { const m = pct(muWr(c.id, id)); return { id: c.id, wr: m || 0, d: `일반 카운터${m ? ` · 상대 승률 ${m}%` : ""}` }; })
+          .sort((a, b) => b.wr - a.wr);
+        threats = threats.concat(gen.slice(0, 5 - threats.length));
+      }
+    }
+    const dirKey = compScores([id])[0].key;
+    const gr = groupsOf(myTeam) || [];
+    const me = CH[id];
+    const cands = [];
+    openRoles(state, who).filter((r) => r !== role).forEach((r) => Object.entries(poolMap(myTeam, r)).forEach(([c, e]) => {
+      if (!myAvail.has(c) || c === id || !CH[c]) return;
+      const other = CH[c], why = [];
+      let s = 0;
+      const pair = role === "A" && r === "S" ? proDuo(id, c) : role === "S" && r === "A" ? proDuo(c, id) : null;
+      if (pair && pair.g >= 2) {
+        if (pair.w / pair.g >= 0.5) { s += Math.min(4, pair.g * 0.5) + (pair.w / pair.g - 0.5) * 4; why.push(`대회 바텀 조합 ${pair.g}판 ${pair.w}승`); }
+        else s -= 1;
+      }
+      const together = gr.filter((g) => g.picks && g.picks[role] === id && g.picks[r] === c);
+      if (together.length) { s += together.length * 2; why.push(`팀원과 함께 ${together.length}판 ${together.filter((g) => g.win).length}승`); }
+      if (fit(other, dirKey) >= 2.5) { s += fit(other, dirKey) * 0.6; why.push(`${COMPS[dirKey].short} 조합 같이`); }
+      if (me.st.includes("eng") && other.st.some((x) => x === "burst" || x === "carry")) { s += 1.5; why.push("진입 뒤 마무리"); }
+      if (other.st.includes("eng") && me.st.some((x) => x === "burst" || x === "carry")) { s += 1.5; why.push("진입을 열어 줌"); }
+      if (other.st.includes("prot") && me.st.includes("carry")) { s += 1.5; why.push("보호해 줌"); }
+      if (!why.length) return;
+      s += lvScore(e) * 0.6;
+      cands.push({ id: c, role: r, s, d: `${ROLE_KO[r]} · ${why.slice(0, 2).join(" · ")}` });
+    }));
+    const synergy = cands.sort((a, b) => b.s - a.s).filter((x, i, arr) => arr.findIndex((y) => y.id === x.id) === i).slice(0, 5);
+    return { role, threats, synergy, laner: !!theirLaner };
+  }
+
   // ---- 밴픽 완료 후 전략 ----
   function buildStrategy(state) {
     const our = picks(state, "our");
@@ -981,6 +1039,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo,
   };
 })();
