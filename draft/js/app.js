@@ -22,7 +22,21 @@
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) { const s = JSON.parse(raw); if (s && s.teams && s.draft) return Object.assign(fresh(), s); }
+      if (raw) {
+        const s = JSON.parse(raw);
+        if (s && s.teams && s.draft) {
+          // 기본 명단이 바뀌면(계정·티어) 저장된 팀에도 반영하고, 직접 넣은 챔프폭은 유지
+          if (s.seed !== window.SEED_VERSION) {
+            window.SEED_TEAMS.forEach((st) => {
+              const t = s.teams.find((x) => x.id === st.id);
+              if (!t) return;
+              Object.keys(st.players).forEach((r) => { const p = t.players[r] || (t.players[r] = { pool: [] }); Object.assign(p, { riot: st.players[r].riot, tier: st.players[r].tier, pts: st.players[r].pts }); });
+            });
+            s.seed = window.SEED_VERSION;
+          }
+          return Object.assign(fresh(), s);
+        }
+      }
     } catch (e) { /* 저장소를 못 쓰는 환경: 기본값 */ }
     return fresh();
   }
@@ -313,8 +327,10 @@
     const R = window.RECENT;
     if (!R) return "";
     if (R.status !== "ok") return `<div class="help">11/10~ 최근 기록 미확보</div>`;
-    const x = R.players && R.players[t.id] && R.players[t.id][r];
-    if (!x || x.error) return `<div class="help">11/10~ 최근 기록 미확보 (계정 조회 실패)</div>`;
+    const raw = R.players && R.players[t.id] && R.players[t.id][r];
+    if (raw && raw.riot && raw.riot !== t.players[r].riot) return `<div class="help">11/10~ 최근 기록 미확보 (계정 변경 — 다음 수집 때 반영)</div>`;
+    const x = E.recentOf(t, r);
+    if (!x) return `<div class="help">11/10~ 최근 기록 미확보 (계정 조회 실패)</div>`;
     const ar = E.actualRole(t, r);
     const top = (x.champs || []).slice(0, 3).map((c) => `${CH[c.id] ? CH[c.id].ko : c.id} ${c.g}`).join(" · ");
     return `<div class="help">11/10~ 랭크 ${x.n}판${x.n ? ` ${Math.round((x.w / x.n) * 100)}%` : ""}${top ? ` · ${esc(top)}` : ""}</div>`

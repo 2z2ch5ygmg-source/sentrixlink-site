@@ -21,7 +21,9 @@ window.Engine = (function () {
   function scoutOf(team, role) {
     const S = window.SCOUT;
     const t = S && S.teams && team && S.teams[team.id];
-    return t && t[role] && !t[role].error ? t[role] : null;
+    const x = t && t[role];
+    // 계정이 바뀌었으면 옛 선수 기록은 쓰지 않는다
+    return x && !x.error && (!x.riot || x.riot === team.players[role].riot) ? x : null;
   }
   // 판수·승률(표본 보정)·숙련도 점수·라인 일치로 0~1 숙련 점수를 만든다
   function statEntry(x, total, role) {
@@ -45,7 +47,8 @@ window.Engine = (function () {
     const R = window.RECENT;
     if (!R || R.status !== "ok" || !team) return null;
     const t = R.players && R.players[team.id];
-    return t && t[role] && !t[role].error ? t[role] : null;
+    const x = t && t[role];
+    return x && !x.error && (!x.riot || x.riot === team.players[role].riot) ? x : null;
   }
   // 실제로 가장 많이 간 라인 (8판 이상, 60% 이상일 때만)
   function actualRole(team, role) {
@@ -67,7 +70,14 @@ window.Engine = (function () {
   function groupsOf(team) {
     const R = window.RECENT;
     if (!R || R.status !== "ok" || !team) return null;
-    if (R.groups) return R.groups[team.id] === undefined ? null : R.groups[team.id];
+    if (R.groups) {
+      const g = R.groups[team.id];
+      if (g === undefined || g === null) return null;
+      // 계정이 바뀐 라인의 기록은 빼고, 남은 선수가 2명 이상인 경기만
+      const changed = ROLES.filter((r) => { const x = R.players[team.id] && R.players[team.id][r]; return x && x.riot && x.riot !== team.players[r].riot; });
+      if (!changed.length) return g;
+      return g.map((x) => { const picks = { ...x.picks }; changed.forEach((r) => delete picks[r]); return { ...x, picks, n: Object.keys(picks).length }; }).filter((x) => x.n >= 2);
+    }
     const st = stacksOf(team);
     return st ? st.map((g) => ({ ...g, n: 5 })) : null;
   }

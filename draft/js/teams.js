@@ -1,7 +1,7 @@
 // 대회 참가 팀 기본값 (팀_라인.xlsx 설문 답변 1-9 기준, 2026-11-17)
 // 점수: 마스터 70(고LP 90) · 다이아 60 · 에메랄드 45 · 플래티넘 35 · 골드 25 · 실버 15 · 브론즈 5
 // 숙련도: 3=상, 2=중, 1=하, one=true → 원챔(주력 한 챔프)
-window.SEED_VERSION = 1;
+window.SEED_VERSION = 2; // 2: 수빈이의아이들 서폿 계정 변경(11-17)
 window.SEED_OUR_TEAM = "subin";
 window.SEED_TEAMS = [
   { id: "banclutch", name: "반클러치", players: {
@@ -43,7 +43,7 @@ window.SEED_TEAMS = [
       ["Azir", 3], ["Orianna", 3], ["Lissandra", 2], ["Malzahar", 2], ["Galio", 1]] },
     A: { riot: "한다면 하는 남자#참회하기", tier: "다이아", pts: 60, pool: [
       ["Ezreal", 3], ["Kaisa", 3], ["Lucian", 2], ["Caitlyn", 2], ["Yunara", 1]] },
-    S: { riot: "나를존경하고받들어라나약한실골들#KR1", tier: "플래티넘", pts: 35, pool: [
+    S: { riot: "평가원국어담당#kr1", tier: "플래티넘 2", pts: 35, pool: [
       ["Nautilus", 3], ["Blitzcrank", 3], ["Leona", 2], ["Alistar", 2], ["Lulu", 1], ["Braum", 1], ["Thresh", 1]] } } },
   { id: "1seung", name: "1승쫑", players: {
     T: { riot: "원제대#kr00", tier: "다이아", pts: 60, pool: [] },
