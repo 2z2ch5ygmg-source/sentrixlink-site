@@ -538,7 +538,13 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .dit { color: var(--muted); min-width: 0; }
 .dnote { margin: 0; font-size: 13px; color: #cfd6e4; background: var(--panel2); border-radius: 8px; padding: 8px 10px; }
 .dq { margin: 0; font-size: 15px; font-weight: 800; }
-.dgrid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.dgrid { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.dmap .dzoom { position: absolute; max-width: none; height: auto; display: block; }
+.dmini { position: absolute; left: 8px; top: 8px; width: 22%; aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.35); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); z-index: 1; }
+.dmini img { width: 100%; height: 100%; display: block; }
+.dmini i { position: absolute; border: 2px solid var(--gold); border-radius: 2px; }
+/* 보기 이름은 핀 아래에 — 핀 옆 지형(강·부쉬)을 가리지 않게 */
+.dpin-l { position: absolute; transform: translate(-50%, 19px); font-size: 12px; font-weight: 800; color: #fff; background: rgba(11, 14, 20, 0.62); padding: 1px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 2px #000; }
 .dmap.pos { background: #101826; }
 .dfield { position: absolute; inset: 0; }
 .df-fog { position: absolute; display: grid; place-items: start center; padding-top: 8px; background: repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.55) 0 6px, rgba(0, 0, 0, 0.3) 6px 12px); color: var(--muted); font-size: 12px; font-weight: 700; border-radius: 8px; }
@@ -574,3 +580,27 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .vsrc { margin: 0; font-size: 12px; color: var(--muted); }
 .vsrc a { color: #9cc0ff; }
 @media (max-width: 760px) { .vlink { min-height: 32px; padding: 4px 8px; } }
+
+.champs-empty { grid-column: 1 / -1; white-space: nowrap; }
+
+/* 단계별 배우기 */
+.lus { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.lu { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg2); color: var(--text); cursor: pointer; min-height: 44px; }
+.lu:hover { border-color: var(--gold); }
+.lu-n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--panel2); color: var(--gold); font: 800 13px/1 var(--font-num); }
+.lu.fin .lu-n { background: var(--good-bg); color: var(--good); }
+.lu-b { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.lu-b b { font-size: 14px; } .lu-b > span { font-size: 12px; color: var(--muted); line-height: 1.4; } .lu-b small { font-size: 12px; color: var(--dim); }
+.lu-p { height: 4px; border-radius: 4px; background: var(--panel2); overflow: hidden; } .lu-p i { display: block; height: 100%; background: var(--good); }
+.lhead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 15px; } .lhead .dim { font-size: 12px; }
+.lsteps { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; }
+.lsteps li { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; background: var(--panel2); color: var(--dim); }
+.lsteps li.on { background: var(--gold-bg); color: var(--gold); }
+.lcore { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.lcore li { display: grid; gap: 6px; background: var(--bg2); border-radius: 10px; padding: 12px; }
+.lcore b { font-size: 14px; } .lcore p { margin: 0; font-size: 13px; color: #cfd6e4; line-height: 1.55; }
+.lprog { margin: 0; font-size: 12px; color: var(--gold); font-weight: 800; }
+.lsum { margin: 0; padding: 10px 12px; border-radius: 10px; font-weight: 800; font-size: 14px; } .lsum.ok { background: var(--good-bg); color: var(--good); } .lsum.no { background: var(--bad-bg); color: var(--bad); }
+.lres { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.lres li { display: flex; align-items: center; gap: 8px; font-size: 13px; } .lres li.ok { color: var(--good); } .lres li.no { color: var(--bad); } .lres li span { color: var(--text); }
+@media (max-width: 760px) { .dpin-l { display: none; } }

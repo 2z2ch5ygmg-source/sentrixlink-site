@@ -161,10 +161,19 @@
       || window.CHAMPIONS.find((c) => norm(c.ko).startsWith(q) || c.id.toLowerCase().startsWith(q))
       || null;
   }
+  // 초성: "ㅁㅍ" → 말파이트. 글자 조합 중인 끝 자음(예: "말ㅍ")도 초성으로 비교
+  const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+  const cho = (s) => [...s].map((ch) => { const k = ch.charCodeAt(0) - 0xac00; return k >= 0 && k <= 11171 ? CHO[Math.floor(k / 588)] : ch; }).join("");
   function matches(c, q) {
     if (!q) return true;
     q = q.toLowerCase().replace(/\s+/g, "");
-    return c.ko.replace(/\s+/g, "").includes(q) || c.id.toLowerCase().includes(q) || c.al.replace(/\s+/g, "").includes(q);
+    const names = [c.ko.replace(/\s+/g, ""), c.al.replace(/\s+/g, "")].filter(Boolean);
+    if (names.some((n) => n.includes(q)) || c.id.toLowerCase().includes(q)) return true;
+    if (/[ㄱ-ㅎ]/.test(q)) {
+      // 앞부분은 글자 그대로, 자음만 친 부분은 초성으로
+      return names.some((n) => { for (let i = 0; i + q.length <= n.length; i++) { const part = n.slice(i, i + q.length); if ([...q].every((ch, k) => ch === part[k] || (/[ㄱ-ㅎ]/.test(ch) && cho(part[k]) === ch))) return true; } return false; });
+    }
+    return false;
   }
 
   // ---------- header ----------
@@ -270,7 +279,8 @@
       <div class="dstat-act">${st && st[1] === "ban" ? `<button class="btn sm ghost" data-act="skip">밴 넘기기</button>` : ""}<button class="btn sm" data-act="undo" ${S.draft.idx ? "" : "disabled"}>되돌리기</button>${done ? "" : `<button class="btn sm primary m-only" data-act="sheet">고르기</button>`}</div></div>`;
   }
 
-  function renderGrid() {
+  // 챔피언 버튼 목록만 따로 만든다: 검색 입력 중에는 이것만 바꿔서 한글 조합(ㄹ+ㅜ→루)이 끊기지 않게
+  function champButtons() {
     const st = curStep();
     const who = st ? E.whoOfSide(S, st[0]) : "our";
     const taken = E.taken(S);
@@ -280,15 +290,19 @@
     ROLES.forEach((r) => (ot.players[r].pool || []).forEach((p) => ourPool.add(p[0])));
     const u = S.ui;
     const list = window.CHAMPIONS.filter((c) => matches(c, u.q) && (!u.role || c.pos.includes(u.role)) && (!u.onlyPool || ourPool.has(c.id)));
-    const btns = list.map((c) => {
+    return list.map((c) => {
       const dis = !st || taken.has(c.id) || locked.has(c.id);
       return `<button class="cbtn ${ourPool.has(c.id) ? "mine" : ""} ${locked.has(c.id) ? "locked" : ""}" data-act="pick" data-id="${c.id}" ${dis ? "disabled" : ""} aria-label="${esc(c.ko)}">${icon(c.id).replace(/ title="[^"]*"/, "")}<span>${esc(c.ko)}</span></button>`;
-    }).join("");
+    }).join("") || `<span class="muted champs-empty">검색 결과 없음</span>`;
+  }
+  function renderGrid() {
+    const u = S.ui;
+    const btns = champButtons();
     const roleBtns = [["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])).map(([r, n]) => `<button aria-pressed="${u.role === r}" data-act="frole" data-r="${r}">${n}</button>`).join("");
     return `<div class="pool"><div class="sheet-h m-only"><b>챔피언 고르기</b><button class="btn sm" data-act="sheet">닫기</button></div><div class="pool-bar"><input id="q" class="input" placeholder="챔피언 검색 (예: 말파, 오리)" value="${esc(u.q)}" autocomplete="off">
       <div class="seg">${roleBtns}</div>
       <button class="btn sm ${u.onlyPool ? "primary" : ""}" data-act="onlypool">우리 챔프폭만</button></div>
-      <div class="champs" id="champs">${btns || `<span class="muted">검색 결과 없음</span>`}</div></div>`;
+      <div class="champs" id="champs">${btns}</div></div>`;
   }
 
   function renderFearless() {
@@ -706,12 +720,30 @@
     return { jId, jPicked: !!enJ, gank, sId, sPicked: !!ourS, engage };
   }
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
+  // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
+  function redXY(x, y) {
+    const sp = window.VISION.spots.find((p) => p.x === x && p.y === y);
+    return sp && sp.rx != null ? { x: sp.rx, y: sp.ry } : { x: y, y: x };
+  }
+  // 문제 목록 + 레드 진영 변형(-r): 강의가 "레드(퍼플)일 때도 같다/반대편"이라고 한 와드 문제
+  function allDrills() {
+    const V = window.VISION;
+    if (V._all) return V._all;
+    const out = [];
+    V.drills.forEach((d) => {
+      out.push(d);
+      if (d.mirror) out.push({ ...d, id: d.id + "-r", side: "R", title: d.title + " (레드)", opts: d.opts.map((o) => ({ ...o, ...(o.rx != null ? { x: o.rx, y: o.ry } : redXY(o.x, o.y)) })) });
+    });
+    V._all = out;
+    return out;
+  }
+  const drillById = (id) => allDrills().find((d) => d.id === id);
   function renderVision() {
     const V = window.VISION;
     if (!V) return `<div class="card">시야 자료를 불러오지 못했습니다.</div>`;
-    const mode = S.ui.vMode || "spots";
-    const head = `<div class="vmode">${vseg("vmode", mode, [["spots", "자리 보기"], ["drill", "상황 훈련"]], "시야 공부 보기")}</div>`;
-    return head + (mode === "drill" ? renderDrill(V) : renderSpots(V));
+    const mode = S.ui.vMode || "learn";
+    const head = `<div class="vmode">${vseg("vmode", mode, [["learn", "단계별 배우기"], ["spots", "자리 보기"], ["drill", "문제 모음"]], "시야 공부 보기")}</div>`;
+    return head + (mode === "drill" ? renderDrill(V) : mode === "spots" ? renderSpots(V) : renderLearn(V));
   }
   const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
   const vlink = (V, t) => `<a class="vlink" href="${V.source.url}&t=${t}s" target="_blank" rel="noopener" title="${esc(V.source.title)} ${mmss(t)} 장면 열기">${ico("eye")}영상 ${mmss(t)}</a>`;
@@ -723,7 +755,7 @@
     const role = u.vRole || "", purp = u.vPurp || "";
     const f = visionFocus();
     const pri = (l) => (f.gank && l.tag === "def") || (f.engage && l.tag === "agg");
-    const pos = (sp) => (side === "B" ? { x: sp.x, y: sp.y } : { x: sp.y, y: sp.x });   // 레드는 강을 기준으로 뒤집기
+    const pos = (sp) => (side === "B" ? { x: sp.x, y: sp.y } : redXY(sp.x, sp.y));   // 레드는 강을 기준으로 뒤집기
     const spotOf = (id) => V.spots.find((x) => x.id === id);
     // 역할·목적을 고르면 나머지는 아예 숨긴다
     const lessons = V.lessons.filter((l) => l.phase === phase.id && (!role || l.roles.includes(role)) && (!purp || l.tag === purp));
@@ -771,44 +803,96 @@
       <p class="vkey"><span><i class="vm p-def"></i>갱·카정 대비</span><span><i class="vm p-agg"></i>낚시·정보</span><span><i class="vm p-obj"></i>오브젝트</span><span><i class="vm p-def t-ctrl"></i>분홍 테두리 = 제어 와드</span><span class="dim">번호 둘레 = 강의 장면의 구역</span></p>
     </section>`;
   }
-  // 상황 훈련: 상황(시간·오브젝트·양 팀 레벨·아이템)을 보고 와드 자리·한타 판단·포지셔닝을 고른다
-  function renderDrill(V) {
-    const D = V.drills, u = S.ui;
-    const cats = ["전체", ...new Set(D.map((d) => d.cat))];
-    const cat = u.dCat || "전체";
-    const pool = D.filter((d) => cat === "전체" || d.cat === cat);
-    const k = Math.min(u.dIdx || 0, pool.length - 1);
-    const d = pool[k];
-    const ans = u.dAns && u.dAns.id === d.id ? u.dAns.i : null;
+  // 문제 한 장: 상황(시간·오브젝트·양 팀 레벨·아이템) → 질문 → 고르기 → 왜 맞고 틀린지
+  function drillCard(V, d, numLabel) {
+    const ans = (S.ui.ans || {})[d.id];
     const done = ans != null;
-    const score = u.dScore || {};
-    const right = Object.values(score).filter(Boolean).length, tried = Object.keys(score).length;
     const team = (arr, cls) => `<div class="dteam ${cls}">${arr.map(([id, lv, it]) => `<span class="dch">${icon(id, "sm")}<b>${esc(CH[id].ko)}</b><span class="dlv">${lv}레벨</span><span class="dit">${esc(it)}</span></span>`).join("")}</div>`;
     const optCls = (o, i) => !done ? "" : o.ok ? "ok" : i === ans ? "no" : "";
     let body;
     if (d.kind === "map" || d.kind === "pos") {
       const F = d.field || {};
       const champ = ([id, x, y], cls) => `<span class="df-ch ${cls}" style="left:${x}%;top:${y}%" title="${esc(CH[id].ko)}">${icon(id, "sm")}</span>`;
-      const bg = d.kind === "map" ? `<img src="https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png" alt="소환사의 협곡 미니맵">`
-        : `<div class="dfield">${F.fog ? `<span class="df-fog" style="left:${F.fog.x}%;top:${F.fog.y}%;width:${F.fog.w}%;height:${F.fog.h}%">${esc(F.fog.t)}</span>` : ""}
+      const bg = `<div class="dfield">${F.fog ? `<span class="df-fog" style="left:${F.fog.x}%;top:${F.fog.y}%;width:${F.fog.w}%;height:${F.fog.h}%">${esc(F.fog.t)}</span>` : ""}
           ${(F.danger || []).map((z) => `<span class="df-zone" style="left:${z.x}%;top:${z.y}%;width:${z.r * 2}%;height:${z.r * 2}%"><em>${esc(z.t)}</em></span>`).join("")}
           ${(F.them || []).map((c) => champ(c, "them")).join("")}${(F.us || []).map((c) => champ(c, "us")).join("")}
           <span class="df-side them">상대</span><span class="df-side us">우리</span></div>`;
-      const pins = d.opts.map((o, i) => `<button class="dpin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>`).join("");
-      body = `<div class="dgrid"><div class="vmap dmap ${d.kind}">${bg}${pins}</div><ol class="dopts">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol></div>`;
+      // 맵 훈련: 보기들이 있는 구역만 확대(옆 구역과 헷갈리지 않게) + 모서리에 전체 맵·확대 위치
+      let vx = 0, vy = 0, vs = 100;
+      if (d.kind === "map") {
+        const xs = d.opts.map((o) => o.x), ys = d.opts.map((o) => o.y);
+        vs = Math.min(100, Math.max(40, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 22));
+        vx = Math.max(0, Math.min(100 - vs, (Math.max(...xs) + Math.min(...xs)) / 2 - vs / 2));
+        vy = Math.max(0, Math.min(100 - vs, (Math.max(...ys) + Math.min(...ys)) / 2 - vs / 2));
+      }
+      const px = (v, o) => ((v - o) / vs) * 100;
+      const mapImg = `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`;
+      const zoomBg = d.kind === "map" ? `<img class="dzoom" src="${mapImg}" alt="소환사의 협곡 미니맵 확대" style="width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%">
+        ${vs < 100 ? `<span class="dmini" aria-hidden="true"><img src="${mapImg}" alt=""><i style="left:${vx}%;top:${vy}%;width:${vs}%;height:${vs}%"></i></span>` : ""}` : bg;
+      const pins = d.opts.map((o, i) => { const l = px(o.x, vx), t = px(o.y, vy); return `<button class="dpin ${optCls(o, i)}" style="left:${l}%;top:${t}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>${d.kind === "map" ? `<span class="dpin-l" style="left:${l}%;top:${t}%" aria-hidden="true">${esc(o.t)}</span>` : ""}`; }).join("");
+      body = `<div class="dgrid"><div class="vmap dmap ${d.kind}">${zoomBg}${pins}</div><ol class="dopts">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol></div>`;
     } else {
-      body = `<ol class="dopts wide">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol>`;
+      body = `<ol class="dopts wide">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol>`;
     }
     const verdict = done ? (d.opts[ans].ok ? `<p class="dres ok">맞음 — ${esc(d.opts[ans].why)}</p>` : `<p class="dres no">아쉬움 — 정답은 ${"ABCD"[d.opts.findIndex((o) => o.ok)]}. ${esc(d.opts.find((o) => o.ok).why)}</p>`) : "";
-    return `<section class="card vbox drill">
-      <div class="dtop">${vseg("dcat", cat, cats.map((c) => [c, c]), "훈련 종류")}<span class="dsc">맞힘 ${right} / 푼 문제 ${tried} · 전체 ${D.length}</span></div>
-      <div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${k + 1}. ${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)} · ${esc(d.obj)}</span><span class="dim">블루 진영(우리 = 왼쪽 아래)</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
+    const sideTxt = d.side === "R" ? "레드 진영(우리 = 오른쪽 위)" : "블루 진영(우리 = 왼쪽 아래)";
+    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)} · ${esc(d.obj)}</span><span class="dim">${sideTxt}</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
       <div class="dteams"><div><span class="dt-l us">우리</span>${team(d.us, "us")}</div><div><span class="dt-l them">상대</span>${team(d.them, "them")}</div></div>
       ${d.note ? `<p class="dnote">${esc(d.note)}</p>` : ""}
-      <p class="dq">${esc(d.q)}</p>
-      ${body}${verdict}
-      <div class="dnav"><button class="btn sm" data-act="dprev" ${k ? "" : "disabled"}>이전</button><button class="btn sm primary" data-act="dnext" ${k < pool.length - 1 ? "" : "disabled"}>다음 문제</button>${tried ? `<button class="btn sm ghost" data-act="dreset">점수 지우기</button>` : ""}</div>
+      <p class="dq">${esc(d.q)}</p>${body}${verdict}`;
+  }
+  // 문제 모음: 종류별로 차례대로
+  function renderDrill(V) {
+    const D = allDrills(), u = S.ui;
+    const cats = ["전체", ...new Set(D.map((d) => d.cat))];
+    const cat = u.dCat || "전체";
+    const pool = D.filter((d) => cat === "전체" || d.cat === cat);
+    const k = Math.min(u.dIdx || 0, pool.length - 1);
+    const d = pool[k];
+    const score = u.dScore || {};
+    const right = Object.values(score).filter(Boolean).length, tried = Object.keys(score).length;
+    return `<section class="card vbox drill">
+      <div class="dtop">${vseg("dcat", cat, cats.map((c) => [c, c]), "문제 종류")}<span class="dsc">맞힘 ${right} / 푼 문제 ${tried} · 전체 ${D.length}</span></div>
+      ${drillCard(V, d, `${k + 1}.`)}
+      <div class="dnav"><button class="btn sm" data-act="dprev" ${k ? "" : "disabled"}>이전</button><button class="btn sm primary" data-act="dnext" ${k < pool.length - 1 ? "" : "disabled"}>다음 문제</button>${(u.ans && u.ans[d.id] != null) ? `<button class="btn sm ghost" data-act="dretry" data-id="${d.id}">다시 풀기</button>` : ""}${tried ? `<button class="btn sm ghost" data-act="dreset">점수 지우기</button>` : ""}</div>
     </section>`;
+  }
+  // 단계별 배우기: 단원 고르기 → ① 핵심(강의 요약·영상) → ② 문제 → ③ 틀린 문제 다시 → 완료
+  function renderLearn(V) {
+    const T = S.ui.tut || {};
+    const units = V.units;
+    const lessonByT = (t) => V.lessons.find((l) => l.t === t);
+    const unitScore = (un) => { const sc = (S.ui.dScore || {}); const ok = un.drills.filter((id) => sc[id]).length; return { ok, n: un.drills.length }; };
+    if (!T.u) {
+      const cards = units.map((un, i) => { const sc = unitScore(un); const fin = (S.ui.tutDone || {})[un.id];
+        return `<button class="lu ${fin ? "fin" : ""}" data-act="tunit" data-v="${un.id}"><span class="lu-n">${fin ? ico("shield") : i + 1}</span><span class="lu-b"><b>${esc(un.title)}</b><span>${esc(un.goal)}</span><span class="lu-p"><i style="width:${(sc.ok / sc.n) * 100}%"></i></span><small>${fin ? "완료" : `문제 ${sc.n}개 · 맞힘 ${sc.ok}`}</small></span></button>`; }).join("");
+      return `<section class="card vbox"><div class="now-h"><span class="what">단계별 배우기</span><span class="step">핵심 보기 → 문제 → 틀린 문제 다시 · 와드는 ${esc(V.source.author)} 강의 기준</span></div><div class="lus">${cards}</div></section>`;
+    }
+    const un = units.find((x) => x.id === T.u);
+    const steps = [["learn", "① 핵심"], ["quiz", "② 문제"], ["review", "③ 정리"]];
+    const stepBar = `<ol class="lsteps">${steps.map(([k, n]) => `<li class="${T.step === k ? "on" : ""}">${n}</li>`).join("")}</ol>`;
+    const top = `<div class="lhead"><button class="btn sm ghost" data-act="tback">← 단원 목록</button><b>${esc(un.title)}</b><span class="dim">${esc(un.goal)}</span></div>${stepBar}`;
+    let body = "";
+    if (T.step === "learn") {
+      const ls = un.lessons.map(lessonByT).filter(Boolean);
+      body = ls.length ? `<ol class="lcore">${ls.map((l) => `<li><b>${esc(l.title)}</b><p>${esc(l.text)}</p>${vlink(V, l.t)}</li>`).join("")}</ol>`
+        : `<p class="dnote">영상 밖 기본 원칙: 한타는 숫자(몇 대 몇)·체력·이니시 궁·상대 딜러 위치를 보고 판단합니다. 문제에서 바로 연습해 보세요.</p>`;
+      body += `<div class="dnav"><button class="btn sm primary" data-act="tstart">문제 풀기 (${un.drills.length}문제)</button></div>`;
+    } else if (T.step === "quiz") {
+      const q = T.queue || un.drills, k = Math.min(T.k || 0, q.length - 1);
+      const d = drillById(q[k]);
+      const answered = (S.ui.ans || {})[d.id] != null;
+      body = `<p class="lprog">${T.retry ? "틀린 문제 다시 · " : ""}${k + 1} / ${q.length}</p>${drillCard(V, d, "")}
+        <div class="dnav">${answered ? `<button class="btn sm primary" data-act="tnext">${k < q.length - 1 ? "다음 문제" : "정리 보기"}</button>` : `<span class="dim">보기를 하나 고르세요</span>`}</div>`;
+    } else {
+      const res = un.drills.map((id) => ({ d: drillById(id), ok: !!(S.ui.dScore || {})[id] }));
+      const wrong = res.filter((r) => !r.ok);
+      body = `<p class="lsum ${wrong.length ? "no" : "ok"}">${wrong.length ? `${res.length}문제 중 ${res.length - wrong.length}개 맞힘 — 틀린 ${wrong.length}문제를 다시 풀면 단원 완료` : `${res.length}문제 모두 맞힘 — 단원 완료`}</p>
+        <ol class="lres">${res.map((r) => `<li class="${r.ok ? "ok" : "no"}">${ico(r.ok ? "shield" : "alert")}<span>${esc(r.d.title)}</span></li>`).join("")}</ol>
+        <div class="dnav">${wrong.length ? `<button class="btn sm primary" data-act="tretry">틀린 문제 다시 (${wrong.length})</button><button class="btn sm ghost" data-act="tlearn">핵심 다시 보기</button>`
+          : `${units.indexOf(un) < units.length - 1 ? `<button class="btn sm primary" data-act="tunit" data-v="${units[units.indexOf(un) + 1].id}">다음 단원</button>` : ""}<button class="btn sm ghost" data-act="tback">단원 목록</button>`}</div>`;
+    }
+    return `<section class="card vbox drill">${top}${body}</section>`;
   }
 
   function render() {
@@ -854,11 +938,23 @@
       case "vmode": S.ui.vMode = el.dataset.v; save(); render(); break;
       case "vpurp": S.ui.vPurp = S.ui.vPurp === el.dataset.v ? "" : el.dataset.v; S.ui.vSpot = null; save(); render(); break;
       case "dcat": S.ui.dCat = el.dataset.v; S.ui.dIdx = 0; S.ui.dAns = null; save(); render(); break;
-      case "dans": { const V = window.VISION; const cat = S.ui.dCat || "전체"; const pool = V.drills.filter((x) => cat === "전체" || x.cat === cat); const d = pool[Math.min(S.ui.dIdx || 0, pool.length - 1)];
-        const i = Number(el.dataset.i); S.ui.dAns = { id: d.id, i }; S.ui.dScore = { ...(S.ui.dScore || {}), [d.id]: !!d.opts[i].ok }; save(); render(); break; }
-      case "dnext": S.ui.dIdx = (S.ui.dIdx || 0) + 1; S.ui.dAns = null; save(); render(); window.scrollTo(0, 0); break;
-      case "dprev": S.ui.dIdx = Math.max(0, (S.ui.dIdx || 0) - 1); S.ui.dAns = null; save(); render(); window.scrollTo(0, 0); break;
-      case "dreset": S.ui.dScore = {}; S.ui.dAns = null; save(); render(); break;
+      case "dans": { const d = drillById(el.dataset.id); if (!d) break; const i = Number(el.dataset.i);
+        S.ui.ans = { ...(S.ui.ans || {}), [d.id]: i }; S.ui.dScore = { ...(S.ui.dScore || {}), [d.id]: !!d.opts[i].ok }; save(); render(); break; }
+      case "dretry": { const a = { ...(S.ui.ans || {}) }; delete a[el.dataset.id]; S.ui.ans = a; save(); render(); break; }
+      case "dnext": S.ui.dIdx = (S.ui.dIdx || 0) + 1; save(); render(); window.scrollTo(0, 0); break;
+      case "dprev": S.ui.dIdx = Math.max(0, (S.ui.dIdx || 0) - 1); save(); render(); window.scrollTo(0, 0); break;
+      case "dreset": S.ui.dScore = {}; S.ui.ans = {}; save(); render(); break;
+      // 단계별 배우기
+      case "tunit": S.ui.tut = { u: el.dataset.v, step: "learn" }; save(); render(); window.scrollTo(0, 0); break;
+      case "tback": S.ui.tut = {}; save(); render(); window.scrollTo(0, 0); break;
+      case "tlearn": S.ui.tut = { ...S.ui.tut, step: "learn" }; save(); render(); break;
+      case "tstart": { const un = window.VISION.units.find((x) => x.id === S.ui.tut.u); const a = { ...(S.ui.ans || {}) }; un.drills.forEach((id) => delete a[id]); S.ui.ans = a;
+        S.ui.tut = { ...S.ui.tut, step: "quiz", queue: un.drills.slice(), k: 0, retry: false }; save(); render(); window.scrollTo(0, 0); break; }
+      case "tnext": { const T = S.ui.tut; if ((T.k || 0) < T.queue.length - 1) S.ui.tut = { ...T, k: (T.k || 0) + 1 };
+        else { const un = window.VISION.units.find((x) => x.id === T.u); const allOk = un.drills.every((id) => (S.ui.dScore || {})[id]); if (allOk) S.ui.tutDone = { ...(S.ui.tutDone || {}), [un.id]: true }; S.ui.tut = { ...T, step: "review" }; }
+        save(); render(); window.scrollTo(0, 0); break; }
+      case "tretry": { const un = window.VISION.units.find((x) => x.id === S.ui.tut.u); const wrong = un.drills.filter((id) => !(S.ui.dScore || {})[id]); const a = { ...(S.ui.ans || {}) }; wrong.forEach((id) => delete a[id]); S.ui.ans = a;
+        S.ui.tut = { ...S.ui.tut, step: "quiz", queue: wrong, k: 0, retry: true }; save(); render(); window.scrollTo(0, 0); break; }
       case "vspot": S.ui.vSpot = S.ui.vSpot === Number(el.dataset.id) ? null : Number(el.dataset.id); render(); break;
       case "sheet": S.ui.sheet = !S.ui.sheet; render(); if (S.ui.sheet) { const q = document.getElementById("q"); if (q && matchMedia("(min-width: 761px)").matches) q.focus(); } break;
       case "edit": editing = el.dataset.team; renderEditor(); break;
@@ -876,7 +972,7 @@
   });
   document.addEventListener("input", (ev) => {
     const t = ev.target;
-    if (t.id === "q") { S.ui.q = t.value; render(); return; }
+    if (t.id === "q") { S.ui.q = t.value; const box = document.getElementById("champs"); if (box) box.innerHTML = champButtons(); else render(); return; }
     if (t.dataset && t.dataset.f && editing) {
       const p = team(editing).players[t.dataset.role];
       p[t.dataset.f] = t.dataset.f === "pts" ? Number(t.value) || 0 : t.value; save();
