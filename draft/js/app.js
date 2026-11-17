@@ -273,6 +273,31 @@
     try { return renderThreat(false); } finally { Object.assign(S, keep); }
   }
 
+  // 큰 그림: 1차 밴 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 (픽마다 갱신, 칸마다 대체 픽)
+  function renderScenarios() {
+    const list = E.scenarios(S, "our");
+    if (!list || !list.length) return "";
+    const cur = list.find((x) => x.key === S.ui.scen) || list[0];
+    const st = curStep();
+    const ourTurn = st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
+    const tabs = list.map((x, k) => `<button data-act="scen" data-k="${x.key}" aria-pressed="${x === cur}">${"ABC"[k]} ${esc(x.short)}</button>`).join("");
+    const chip = (id, r, notes, main) => `<button class="chip pp-c ${main ? "sc-main" : ""}" data-act="${ourTurn ? "pick" : ""}" data-id="${id}" data-role="${r}" ${notes && notes.length ? `title="${esc(notes.join(" · "))}"` : ""}>${icon(id, "sm")}${esc(CH[id].ko)}</button>`;
+    const rows = ROLES.map((r) => {
+      const x = cur.slots[r];
+      if (!x) return "";
+      if (x.done) return `<div class="sc-row done"><span class="pp-role">${ROLE_KO[r]}</span><span class="sc-pick">${icon(x.id, "sm")}<b>${esc(CH[x.id].ko)}</b><span class="dim">확정</span></span></div>`;
+      const lostTxt = x.lost && x.lost.length ? `<span class="sc-lost">잘림 ${x.lost.map((l) => `${esc(CH[l.id].ko)}(${esc(l.st)})`).join("·")}</span>` : "";
+      const main = x.id ? chip(x.id, r, x.notes, true) : `<span class="dim">남은 챔프폭 없음</span>`;
+      const alts = x.alts && x.alts.length ? `<span class="sc-alt-l">대체</span>${x.alts.map((a) => chip(a.id, r, a.notes)).join("")}` : x.id ? `<span class="sc-warn">대체 없음</span>` : "";
+      const notes = x.notes && x.notes.length ? `<span class="sc-note">${x.notes.map(esc).join(" · ")}</span>` : "";
+      return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells"><div class="row-chips">${main}${alts}</div>${notes}${lostTxt}</div></div>`;
+    }).join("");
+    return `<section class="plan-box scen-box"><div class="now-h"><span class="what">큰 그림</span><span class="step">남은 챔프로 만들 수 있는 조합 · 픽마다 갱신</span><div class="seg" role="group" aria-label="시나리오">${tabs}</div></div>
+      <p class="sc-sum"><b>${esc(cur.name)}</b> — ${esc(cur.win)}${cur.why.length ? `<br><span class="help">${cur.why.map(esc).join(" · ")}</span>` : ""}</p>
+      <div class="sc-rows">${rows}</div>
+      <p class="help sc-foot">고른 시나리오의 챔프가 추천 순서에서 앞으로 옵니다${ourTurn ? " · 칩을 누르면 바로 픽" : ""}</p></section>`;
+  }
+
   function renderPlan() {
     const p = E.pickPlan(S, "our");
     if (!p.plan.some((s) => s.items.some((x) => !x.done && x.role))) return "";
@@ -308,7 +333,7 @@
     ${renderStatus("dstat-m")}
     <div class="board">
       <div class="dh">${renderSide("B", planned)}${renderStatus()}${renderSide("R", planned)}</div>
-      <div class="col-main">${renderNow()}${renderThreat(true)}${renderPlan()}</div>
+      <div class="col-main">${renderNow()}${renderScenarios()}${renderThreat(true)}${renderPlan()}</div>
       <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
     </div>
     ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
@@ -524,7 +549,7 @@
   }
 
   // ---------- actions ----------
-  function choose(id) {
+  function choose(id, wantRole) {
     const st = curStep();
     if (!st || !CH[id]) return;
     const who = E.whoOfSide(S, st[0]);
@@ -534,6 +559,7 @@
     step.cands = undefined;
     if (st[1] !== "pick") step.role = null;
     else if (who === "enemy" && S.ui.predRole && E.openRoles(S, "enemy").includes(S.ui.predRole)) step.role = S.ui.predRole;
+    else if (who === "our" && wantRole && E.openRoles(S, "our").includes(wantRole)) step.role = wantRole;
     else { const pr = E.pickRole(S, who, id); step.role = pr.role; step.cands = pr.cands; }
     S.draft.idx++;
     if (S.ui.predRole && !E.openRoles(S, "enemy").includes(S.ui.predRole)) S.ui.predRole = "";
@@ -567,7 +593,7 @@
     const a = el.dataset.act;
     if (a === "close" && ev.target !== el && el.classList.contains("modal-bg")) return; // 모달 안쪽 클릭
     switch (a) {
-      case "pick": choose(el.dataset.id); break;
+      case "pick": choose(el.dataset.id, el.dataset.role); break;
       case "skip": { const st = curStep(); if (st && st[1] === "ban") { S.draft.steps[S.draft.idx].skip = true; S.draft.idx++; save(); render(); } break; }
       case "undo": if (S.draft.idx > 0) { S.draft.idx--; S.draft.steps[S.draft.idx] = { champ: null, role: null, skip: false }; save(); render(); } break;
       case "resetGame": if (confirm("이번 세트 밴픽을 지울까요?")) { S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
@@ -586,6 +612,7 @@
       case "frole": S.ui.role = el.dataset.r; save(); render(); break;
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
       case "pred": S.ui.predRole = el.dataset.r; render(); break;
+      case "scen": S.ui.scen = el.dataset.k; save(); render(); break;
       case "sheet": S.ui.sheet = !S.ui.sheet; render(); if (S.ui.sheet) { const q = document.getElementById("q"); if (q && matchMedia("(min-width: 761px)").matches) q.focus(); } break;
       case "edit": editing = el.dataset.team; renderEditor(); break;
       case "close": editing = null; renderEditor(); break;

@@ -556,6 +556,8 @@ window.Engine = (function () {
     const oppOpen = openRoles(state, opp);
     const sy = sylasRisk(state, who);
     // 우리 밴이 남아 있으면(2차 밴) 사일러스를 밴해서 막을 수 있으니 감점을 줄이고 밴을 권한다
+    // 고른 큰 그림 시나리오: 그 칸의 주 픽·대체 픽을 앞으로
+    const scen = who === "our" && state.ui && state.ui.scen ? (scenarios(state, who) || []).find((x) => x.key === state.ui.scen) : null;
     const myBanLeft = ORDER.some(([sd, t], i) => i >= state.draft.idx && t === "ban" && sd === sideOf(state, who));
     const theirUlt = theirs.filter((t) => ULT[t.champ]);
     const res = [];
@@ -571,6 +573,11 @@ window.Engine = (function () {
         const lv = lvScore(e);
         if (lv) { s += lv * 9; reasons.push({ t: lv >= 2.9 ? "숙련도 높음" : `숙련도 ${LEVEL_KO[e.lv]}`, d: `${ROLE_KO[r]} ${team.players[r].riot.split("#")[0]} · ${statText(e)}`, v: lv * 9 }); }
         else s -= teamHasPools(team) && !bp ? 8 : 0;
+        if (scen && scen.slots[r] && !scen.slots[r].done) {
+          const sl = scen.slots[r];
+          if (sl.id === c.id) { s += 8; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 주 픽`, v: 8 }); }
+          else if (sl.alts.some((a) => a.id === c.id)) { s += 4; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 대체 픽`, v: 4 }); }
+        }
         if (bp) { s += bp.v; reasons.push({ t: "바텀 세트", d: `${j(ko(bp.partner), "과", "와")} 세트 · ${bp.d}`, v: bp.v }); }
         const ut = ULT[c.id];
         if (ut && sy > 0) {
@@ -642,6 +649,7 @@ window.Engine = (function () {
       if (x.comp) good.push(x.t.replace(" 조합", " 조합에 맞음"));
       else if (x.t === "카운터 픽") good.push(x.d.replace(/^vs (.+?) 라인전 우위(.*)$/, "$1 상대 강함$2"));
       else if (x.t === "바텀 세트") good.push(x.d.split(" · ")[0]);
+      else if (x.t === "큰 그림") good.push(x.d);
       else if (x.t === "궁 뺏기") good.push("상대 궁 뺏어 쓰기");
       else if (x.t === "앞라인 보강") good.push("앞라인 보강");
       else if (x.t === "AP 딜 보강" || x.t === "AD 딜 보강") good.push(x.t);
@@ -822,6 +830,77 @@ window.Engine = (function () {
     const cut = ROLES.filter((r) => outlook[r].mains.some((m) => m.st !== "가능"));
     if (cut.length) summary.push(`주력이 잘린 라인: ${cut.map((r) => `${ROLE_KO[r]}(${outlook[r].mains.filter((m) => m.st !== "가능").map((m) => ko(m.id)).join("·")})`).join(", ")}`);
     return { side, plan, summary, outlook, nextRole: nextRoles[0] ? nextRoles[0].role : null, order };
+  }
+
+  // ---- 큰 그림: 1차 밴이 끝난 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 ----
+  // 밴·상대 픽·피어리스 잠금을 뺀 챔프폭으로 조합별 5칸을 채우고(주 픽 + 대체 2), 양쪽 픽이 들어올 때마다 다시 계산한다.
+  function scenarios(state, who) {
+    who = who || "our";
+    if (state.draft.idx < 6) return null;
+    const opp = who === "our" ? "enemy" : "our";
+    const team = teamOf(state, who);
+    if (!teamHasPools(team)) return null;
+    const open = openRoles(state, who);
+    if (!open.length) return null;
+    const mine = picks(state, who);
+    const theirs = picks(state, opp);
+    const avail = new Set(available(state, who).map((c) => c.id));
+    const oppDir = theirs.length ? direction(state, opp) : null;
+    const sy = sylasRisk(state, who);
+    const lost = {};
+    open.forEach((r) => (lost[r] = roleOutlook(state, who, r).mains.filter((m) => m.st !== "가능").map((m) => ({ id: m.id, st: m.st }))));
+    const out = [];
+    for (const key of COMP_KEYS) {
+      const slots = {};
+      const used = new Set();
+      mine.forEach((p) => { if (p.role) { slots[p.role] = { r: p.role, id: p.champ, done: true, alts: [], notes: [] }; used.add(p.champ); } });
+      let hasFront = mine.some((p) => CH[p.champ].st.includes("front"));
+      let comfort = 0;
+      // 챔프폭이 좁은 라인부터 채워 겹침을 줄인다
+      const order = open.slice().sort((a, b) => Object.keys(poolMap(team, a)).length - Object.keys(poolMap(team, b)).length);
+      for (const r of order) {
+        const pm = poolMap(team, r);
+        const laner = theirs.find((p) => p.role === r);
+        const maybe = !laner && theirs.find((p) => !p.role && p.cands && p.cands.includes(r));
+        const mate = r === "A" ? slots.S : r === "S" ? slots.A : null;
+        const cands = Object.keys(pm).filter((id) => avail.has(id) && CH[id] && !used.has(id)).map((id) => {
+          const c = CH[id], notes = [];
+          let v = lvScore(pm[id]) * 4 + fit(c, key) * 2;
+          if (!hasFront && c.st.includes("front") && "TJS".includes(r)) v += 3;
+          const vs = laner || maybe;
+          if (vs && lanesCounter(id, vs.champ)) { v += laner ? 4 : 2; notes.push(`${ko(vs.champ)} 상대 강함${laner ? "" : "(라인 모름)"}`); }
+          if (vs && lanesCounter(vs.champ, id)) { v -= laner ? 4 : 2; notes.push(`${ko(vs.champ)} 상대 불리${laner ? "" : "(라인 모름)"}`); }
+          const bp = mate && mate.id ? (r === "A" ? pairBonus(id, mate.id) : pairBonus(mate.id, id)) : null;
+          if (bp) { v += bp.v * 0.3; notes.push(`${j(ko(mate.id), "과", "와")} 세트`); }
+          if (ULT[id] && sy > 0) { v -= (ULT[id] === 3 ? 6 : 2) * sy; if (ULT[id] === 3 && sy >= 0.3) notes.push("사일러스 주의"); }
+          return { id, v, lv: lvScore(pm[id]), notes };
+        }).sort((a, b) => b.v - a.v);
+        if (!cands.length) { slots[r] = { r, id: null, alts: [], notes: [], lost: lost[r] }; continue; }
+        const m = cands[0];
+        used.add(m.id); comfort += m.lv;
+        if (CH[m.id].st.includes("front")) hasFront = true;
+        slots[r] = { r, id: m.id, lv: m.lv, notes: m.notes, cands, lost: lost[r] };
+      }
+      // 대체 픽: 이 시나리오의 다른 칸 주 픽은 빼고 2개
+      const mains = new Set(ROLES.map((r) => slots[r] && slots[r].id).filter(Boolean));
+      ROLES.forEach((r) => { const x = slots[r]; if (x && x.cands) { x.alts = x.cands.slice(1).filter((y) => !mains.has(y.id)).slice(0, 2).map((y) => ({ id: y.id, notes: y.notes })); delete x.cands; } });
+      const ids = ROLES.map((r) => slots[r] && slots[r].id).filter(Boolean);
+      const sc = compScores(ids);
+      const fitScore = (sc.find((x) => x.key === key) || {}).score || 0;
+      if (sc[0].key !== key && fitScore < 9) continue;
+      const why = [];
+      let score = comfort * 3 + fitScore + mine.reduce((a, p) => a + fit(CH[p.champ], key), 0) * 1.5;
+      if (oppDir && COMPS[key].beats.includes(oppDir)) { score += 8; why.push(`상대 ${COMPS[oppDir].short} 조합을 잡는 방향`); }
+      if (oppDir && COMPS[oppDir].beats.includes(key)) { score -= 8; why.push(`상대 ${COMPS[oppDir].short} 조합에 약함 — 진입 순서 주의`); }
+      const thin = open.filter((r) => slots[r] && slots[r].id && !slots[r].alts.length);
+      const empty = open.filter((r) => slots[r] && !slots[r].id);
+      if (thin.length) why.push(`${thin.map((r) => ROLE_KO[r]).join("·")} 대체 픽 없음 → 먼저 확보`);
+      if (empty.length) { score -= 10 * empty.length; why.push(`${empty.map((r) => ROLE_KO[r]).join("·")} 남은 챔프폭 없음`); }
+      const sig = ids.slice().sort().join(",");
+      if (out.some((o) => o.sig === sig)) continue;
+      out.push({ key, sig, name: COMPS[key].name, short: COMPS[key].short, win: COMPS[key].win, slots, score, why, oppDir });
+    }
+    return out.sort((a, b) => b.score - a.score).slice(0, 3);
   }
 
   // ---- 요주의 인물: 상대에서 가장 위험한 선수와 그에 맞춘 라인별 움직임·조합 ----
@@ -1192,7 +1271,7 @@ window.Engine = (function () {
 
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
-    picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
+    picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
     recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo,
   };
 })();
