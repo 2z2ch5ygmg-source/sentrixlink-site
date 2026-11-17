@@ -107,7 +107,7 @@
   }
 
   function recCard(r, type, muted) {
-    const why = r.reasons.filter((x) => x.v > 0).slice(0, 2).map((x) => esc(x.d)).join("<br>");
+    const why = r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""}" data-act="pick" data-id="${r.id}">
       <span class="lab">${esc(r.label)}</span>${icon(r.id, "lg")}<span class="cn">${esc(CH[r.id].ko)}</span>
       ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span></button>`;
@@ -192,6 +192,23 @@
       <div class="sub" style="margin-top:12px">이득을 퍼뜨리는 방법</div><ul class="plain">${j.spread.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div></div></div>`;
   }
 
+  function renderPlan() {
+    const p = E.pickPlan(S, "our");
+    if (!p.plan.some((s) => s.items.some((x) => !x.done && x.role))) return "";
+    const st = curStep();
+    const cards = p.plan.map((s) => {
+      const items = s.items.map((x) => {
+        if (x.done) return `<div class="pp-item done">${icon(x.champ, "sm")}<span><b>${esc(CH[x.champ].ko)}</b> <span class="dim">${x.role ? ROLE_KO[x.role] : ""} · 완료</span></span></div>`;
+        if (!x.role) return "";
+        const cands = x.cands.length ? x.cands.map((c) => `<button class="chip pp-c" data-act="${st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our" && s.now ? "pick" : ""}" data-id="${c.id}" title="${esc(E.statText(c.e))}">${icon(c.id, "sm")}${esc(CH[c.id].ko)}${c.e.g ? `<span class="st">${c.e.g}판</span>` : ""}</button>`).join("") : `<span class="dim">남은 챔프폭 없음</span>`;
+        return `<div class="pp-item"><div class="pp-role">${ROLE_KO[x.role]}${x.duo ? ` <span class="pill blue">세트</span>` : ""}</div><div class="row-chips">${cands}</div>${x.why.length ? `<ul class="pp-why">${x.why.slice(0, 3).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}</div>`;
+      }).join("");
+      return `<div class="pp-slot ${s.now ? "now" : ""} ${s.items.every((x) => x.done) ? "past" : ""}"><div class="pp-h"><b>${s.label}</b>${s.now ? `<span class="pill gold">지금</span>` : ""}</div>${items}</div>`;
+    }).join("");
+    return `<section class="plan-box"><div class="now-h"><span class="what">픽 순서 전략</span><span class="step">밴·진영·상대 공개 라인에 따라 계속 바뀜</span></div>
+      <ul class="plain pp-sum">${p.summary.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><div class="pp-grid">${cards}</div></section>`;
+  }
+
   function renderLive() {
     const seg = (act, cur, items) => `<div class="seg">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
     return `<div class="draft-bar">
@@ -204,7 +221,7 @@
       <button class="btn sm primary" data-act="nextGame">세트 종료 → 다음 세트</button>
       ${S.series.locked.length ? `<button class="btn sm ghost" data-act="resetSeries">시리즈 초기화</button>` : ""}
     </div>
-    <div class="board">${renderSide("B")}${renderNow()}${renderSide("R")}${renderGrid()}</div>
+    <div class="board">${renderSide("B")}${renderNow()}${renderPlan()}${renderSide("R")}${renderGrid()}</div>
     ${renderFearless()}${renderStrategy()}`;
   }
 

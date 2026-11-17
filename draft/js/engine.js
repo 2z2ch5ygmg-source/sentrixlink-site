@@ -296,6 +296,8 @@ window.Engine = (function () {
     const mine = picks(state, who);
     const theirs = picks(state, opp);
     const dir = direction(state, who);
+    const pp = pickPlan(state, who);
+    const nowRoles = (pp.plan.find((p) => p.idxs.includes(state.draft.idx)) || { items: [] }).items.filter((x) => !x.done && x.role).map((x) => x.role);
     const hasFront = mine.some((p) => CH[p.champ].st.includes("front"));
     const ad = mine.filter((p) => CH[p.champ].dmg === "AD").length;
     const ap = mine.filter((p) => CH[p.champ].dmg === "AP").length;
@@ -332,6 +334,10 @@ window.Engine = (function () {
           const e2 = poolMap(oppTeam, rr)[c.id];
           if (e2 && (e2.lv >= 2 || e2.one)) { const v = e2.one ? 8 : 3 + e2.score * 4; s += v; reasons.push({ t: "상대 주력 뺏기", d: `${ROLE_KO[rr]} ${oppTeam.players[rr].riot.split("#")[0]} · ${statText(e2)}`, v }); break; }
         }
+        if (nowRoles.length) {
+          if (nowRoles.includes(r)) { s += 8; reasons.push({ t: "픽 순서", d: `지금은 ${nowRoles.map((x) => ROLE_KO[x]).join("+")} 차례`, v: 8, order: true }); }
+          else { s -= 18; reasons.push({ t: "나중에", d: `${j(ROLE_KO[r], "은", "는")} 뒤 순서에서`, v: -18 }); }
+        }
         if (!best || s > best.s) best = { r, s, reasons };
       }
       if (!best) continue;
@@ -345,6 +351,131 @@ window.Engine = (function () {
       });
     }
     return res.sort((a, b) => b.score - a.score).slice(0, 6);
+  }
+
+  // ---- 픽 순서 전략: 남은 우리 픽 차례에 어느 라인을 넣을지 ----
+  function pickSlots(side) {
+    const idx = ORDER.map((o, i) => (o[0] === side && o[1] === "pick" ? i : -1)).filter((i) => i >= 0);
+    const groups = [];
+    idx.forEach((i) => {
+      const g = groups[groups.length - 1];
+      if (g && g[g.length - 1] === i - 1) g.push(i); else groups.push([i]);
+    });
+    let n = 0;
+    return groups.map((g) => { const nums = g.map(() => ++n); return { idxs: g, label: `${side === "B" ? "B" : "R"}${nums.join("·")}`, nums }; });
+  }
+
+  function roleOutlook(state, who, r) {
+    const opp = who === "our" ? "enemy" : "our";
+    const team = teamOf(state, who), oppTeam = teamOf(state, opp);
+    const avail = new Set(available(state, who).map((c) => c.id));
+    const banned = new Set(bans(state));
+    const takenSet = taken(state);
+    const locked = lockedFor(state, who);
+    const pm = poolMap(team, r);
+    const all = Object.entries(pm).sort((a, b) => lvScore(b[1]) - lvScore(a[1]));
+    const mains = all.filter(([, e]) => lvScore(e) >= 2.9).map(([id, e]) => ({ id, e,
+      st: banned.has(id) ? "밴" : locked.has(id) ? "피어리스" : takenSet.has(id) ? "픽됨" : "가능" }));
+    const left = all.filter(([id]) => avail.has(id));
+    const good = left.filter(([, e]) => lvScore(e) >= 2.2);
+    const enemyLaner = picks(state, opp).find((p) => p.role === r);
+    // 상대 라이너가 공개됐으면 그 상대로 유리한 챔프를 앞으로
+    const cands = left.map(([id, e]) => {
+      let v = lvScore(e);
+      if (enemyLaner && lanesCounter(id, enemyLaner.champ)) v += 1.5;
+      if (enemyLaner && lanesCounter(enemyLaner.champ, id)) v -= 1.5;
+      return { id, e, v };
+    }).sort((a, b) => b.v - a.v);
+    const oppOpen = openRoles(state, opp);
+    const best = cands[0];
+    const contested = best && oppOpen.some((rr) => { const e2 = poolMap(oppTeam, rr)[best.id]; return e2 && (e2.one || e2.score >= 0.45); });
+    return { r, mains, cands: cands.slice(0, 3), depth: good.length, best, enemyLaner, contested };
+  }
+
+  function pickPlan(state, who) {
+    who = who || "our";
+    const side = sideOf(state, who);
+    const slots = pickSlots(side);
+    const open = openRoles(state, who);
+    const remainingIdx = slots.flatMap((s) => s.idxs).filter((i) => !state.draft.steps[i].champ);
+    const bansLeft = ORDER.some(([, t], i) => t === "ban" && i >= state.draft.idx);
+    const outlook = {};
+    ROLES.forEach((r) => (outlook[r] = roleOutlook(state, who, r)));
+    const scored = open.map((r) => {
+      const o = outlook[r];
+      const why = [];
+      let u = 0;
+      const bestName = o.best ? ko(o.best.id) : null;
+      if (o.contested) { u += 3; why.push(`${j(bestName, "은", "는")} 상대도 잘 다룸 → 먼저 가져가기`); }
+      if (o.best && o.depth <= 1) {
+        u += bansLeft ? 3 : 1.5;
+        why.push(bansLeft ? `쓸 만한 챔프가 ${bestName} 하나뿐 → 2차 밴 전에 확보` : `남은 주력이 ${bestName} 하나`);
+      }
+      const bannedMains = o.mains.filter((m) => m.st !== "가능").map((m) => `${ko(m.id)}(${m.st})`);
+      if (bannedMains.length) why.push(`주력 ${bannedMains.join("·")} 잘림`);
+      const solo = r === "T" ? 2.5 : r === "M" ? 1.2 : 0;
+      if (!o.enemyLaner && solo) {
+        u -= solo;
+        if (o.best && (COUNTERS[o.best.id] || []).length >= 3) u -= 1;
+        why.push(r === "T" ? "탑은 상대 탑을 보고 카운터로 뽑기" : "미드는 상대 미드 확인 후가 안전");
+      }
+      if (o.enemyLaner) {
+        const ctr = o.cands.find((c) => lanesCounter(c.id, o.enemyLaner.champ));
+        u += 0.5;
+        why.push(ctr ? `상대 ${ko(o.enemyLaner.champ)} 공개 → ${ko(ctr.id)}로 바로 카운터 가능` : `상대 ${ko(o.enemyLaner.champ)} 공개됨`);
+      }
+      if (r === "J" || r === "S") { u += 1; if (!why.length) why.push(r === "J" ? "정글은 초반 동선·조합 축이라 먼저" : "서폿은 조합 이니시 축이라 먼저"); }
+      if (o.best && CH[o.best.id].pos.length >= 2 && open.some((x) => x !== r && CH[o.best.id].pos.includes(x))) {
+        u += 1.5; why.push(`${j(bestName, "은", "는")} 여러 라인 가능 → 라인을 숨긴 채 먼저`);
+      }
+      if (!o.best) { u -= 1; why.push("챔프폭이 비어 있음 — 상대 픽을 보고 결정"); }
+      return { r, u, why };
+    }).sort((a, b) => b.u - a.u);
+
+    // 남은 픽 칸에 순서대로 배치 + 바텀은 연속 두 칸이 있으면 세트로
+    let order = scored.map((x) => x.r);
+    const freeSlots = slots.map((s) => ({ ...s, free: s.idxs.filter((i) => !state.draft.steps[i].champ) })).filter((s) => s.free.length);
+    let duo = false;
+    if (order.includes("A") && order.includes("S")) {
+      const pair = freeSlots.filter((s) => s.free.length === 2);
+      if (pair.length) {
+        const posOf = (s) => remainingIdx.indexOf(s.free[0]);
+        const first = Math.min(order.indexOf("A"), order.indexOf("S"));
+        const target = pair.sort((a, b) => Math.abs(posOf(a) - first) - Math.abs(posOf(b) - first))[0];
+        const p = posOf(target);
+        order = order.filter((x) => x !== "A" && x !== "S");
+        order.splice(Math.min(p, order.length), 0, "A", "S");
+        duo = true;
+      }
+    }
+    let k = 0;
+    const lastIdx = remainingIdx[remainingIdx.length - 1];
+    const plan = slots.map((s) => {
+      const items = s.idxs.map((i) => {
+        const st = state.draft.steps[i];
+        if (st.champ) return { i, done: true, champ: st.champ, role: st.role };
+        const r = order[k++];
+        if (!r) return { i, done: false };
+        const sc = scored.find((x) => x.r === r);
+        const why = sc.why.slice();
+        if (i === lastIdx && remainingIdx.length > 1) why.unshift("마지막 픽 — 상대 픽을 다 보고 결정");
+        if (side === "B" && i === 6) why.unshift("블루 1픽 — 밴에서 살아남은 가장 강한 챔프 선점");
+        const isDuo = duo && (r === "A" || r === "S");
+        if (isDuo) why.unshift("바텀 세트 — 원딜·서폿을 같은 차례에 함께");
+        return { i, done: false, role: r, cands: outlook[r].cands, why, duo: isDuo };
+      });
+      return { label: s.label, idxs: s.idxs, items, now: s.idxs.includes(state.draft.idx) };
+    });
+    const nextRoles = plan.flatMap((p) => p.items).filter((x) => !x.done && x.role);
+    const summary = [];
+    if (nextRoles.length) {
+      const seq = plan.filter((p) => p.items.some((x) => !x.done && x.role)).map((p) => `${p.label} ${p.items.filter((x) => !x.done && x.role).map((x) => ROLE_KO[x.role]).join("+")}`);
+      summary.push(`${side === "B" ? "블루" : "레드"} 진영 픽 순서: ${seq.join(" → ")}`);
+    }
+    if (duo) summary.push("원딜·서폿은 연속 두 칸에서 세트로 — 라인전 시너지를 맞추고 상대가 바텀 조합을 보고 대응하지 못하게");
+    const cut = ROLES.filter((r) => outlook[r].mains.some((m) => m.st !== "가능"));
+    if (cut.length) summary.push(`주력이 잘린 라인: ${cut.map((r) => `${ROLE_KO[r]}(${outlook[r].mains.filter((m) => m.st !== "가능").map((m) => ko(m.id)).join("·")})`).join(", ")}`);
+    return { side, plan, summary, outlook, nextRole: nextRoles[0] ? nextRoles[0].role : null, order };
   }
 
   // ---- 밴픽 완료 후 전략 ----
@@ -517,6 +648,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan,
   };
 })();
