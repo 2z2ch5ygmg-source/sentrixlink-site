@@ -320,34 +320,35 @@
   }
   function stacksHtml(t, mine) {
     const R = window.RECENT;
-    const head = `<div class="section-title"><h2>${mine ? "우리 팀 5인 경기" : "상대 5인 자랭 기록"}</h2><p>${mine ? "5명이 한 게임 같은 편에 모두 있었던 경기" : "상대 5명이 한 게임 같은 편에 모두 있었던 경기(대회 연습)"} · 11/10 이후</p></div>`;
+    const head = `<div class="section-title"><h2>${mine ? "우리 팀 함께 한 경기" : "상대 팀 함께 한 경기"}</h2><p>같은 팀 선수 2명 이상이 같은 편이었던 경기(자랭 등) · ${R && R.since ? esc(R.since) : "11/10"} 이후</p></div>`;
     if (!R || R.status !== "ok") return head + `<div class="note">미확보 — Riot 최근 경기 수집 전입니다.</div>`;
-    const st = E.stacksOf(t);
-    if (st === null) {
-      const miss = ROLES.filter((r) => { const x = R.players[t.id] && R.players[t.id][r]; return !x || x.error; }).map((r) => `${ROLE_KO[r]} ${esc(t.players[r].riot)}`);
-      return head + `<div class="note">미확보 — 계정을 찾지 못한 선수가 있어 5인 판정을 할 수 없습니다: ${miss.join(", ")}</div>`;
-    }
-    if (!st.length) return head + `<div class="card muted">0판 — ${esc(R.since)} 이후 5명이 한 게임에 같이 있던 경기가 없습니다. (수집 ${esc(R.at)})</div>`;
+    const st = E.groupsOf(t);
+    const miss = ROLES.filter((r) => { const x = R.players[t.id] && R.players[t.id][r]; return !x || x.error; }).map((r) => `${ROLE_KO[r]} ${esc(t.players[r].riot)}`);
+    const missNote = miss.length ? `<p class="help warn" style="margin:0 0 8px">계정을 찾지 못해 빠진 선수: ${miss.join(", ")}</p>` : "";
+    if (st === null) return head + `<div class="note">미확보 — 이 팀 자료가 없습니다.</div>`;
+    if (!st.length) return head + `<div class="card muted">${missNote}0판 — ${esc(R.since)} 이후 팀원 2명 이상이 같이 한 경기가 없습니다. (수집 ${esc(R.at)})</div>`;
     const wins = st.filter((g) => g.win).length;
     const banCount = {};
     st.forEach((g) => (g.bans || []).forEach((b) => b && (banCount[b] = (banCount[b] || 0) + 1)));
     const bans = Object.entries(banCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
-    const rows = st.map((g) => `<tr><td data-label="시각">${esc(g.date)}</td><td data-label="큐">${QUEUE[g.queue] || g.queue}</td><td data-label="결과"><span class="pill ${g.win ? "good" : "bad"}">${g.win ? "승" : "패"}</span></td>
+    const rows = st.map((g) => `<tr><td data-label="시각">${esc(g.date)}</td><td data-label="큐·인원">${QUEUE[g.queue] || g.queue} · ${g.n || 5}명</td><td data-label="결과"><span class="pill ${g.win ? "good" : "bad"}">${g.win ? "승" : "패"}</span></td>
       <td data-label="픽"><div class="row-chips">${ROLES.map((r) => g.picks[r] && CH[g.picks[r]] ? `<span class="chip" title="${ROLE_KO[r]}${g.playedRole && g.playedRole[r] && g.playedRole[r] !== r ? ` (실제 ${ROLE_KO[g.playedRole[r]] || "-"})` : ""}">${icon(g.picks[r], "sm")}${esc(CH[g.picks[r]].ko)}</span>` : "").join("")}</div></td>
       <td data-label="밴"><div class="row-chips">${(g.bans || []).filter((b) => CH[b]).map((b) => `<span class="chip">${icon(b, "sm")}</span>`).join("") || `<span class="dim">-</span>`}</div></td></tr>`).join("");
-    return head + `<div class="card"><p class="help" style="margin:0 0 8px">${st.length}판 ${wins}승 · 출처 ${esc(R.source)} · 수집 ${esc(R.at)}${bans.length ? ` · 자주 밴: ${bans.map(([b, n]) => `${esc(CH[b].ko)} ${n}`).join(", ")}` : ""}</p>
-      <div class="tbl-wrap"><table class="study cards-m"><thead><tr><th>시각</th><th>큐</th><th>결과</th><th>픽 (탑·정글·미드·원딜·서폿)</th><th>밴</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const five = st.filter((g) => g.n === 5).length;
+    return head + `<div class="card">${missNote}<p class="help" style="margin:0 0 8px">${st.length}판 ${wins}승 (5인 ${five}판) · 출처 ${esc(R.source)} · 수집 ${esc(R.at)}${bans.length ? ` · 자주 밴: ${bans.map(([b, n]) => `${esc(CH[b].ko)} ${n}`).join(", ")}` : ""}</p>
+      <div class="tbl-wrap"><table class="study cards-m"><thead><tr><th>시각</th><th>큐·인원</th><th>결과</th><th>함께 한 선수의 픽</th><th>밴</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
   function dataStatus() {
     const R = window.RECENT, M = window.META, P = window.PRO, SC = window.SCOUT;
     const okCount = (obj, pred) => { let ok = 0, all = 0; Object.values(obj || {}).forEach((t) => Object.values(t).forEach((x) => { all++; if (pred(x)) ok++; })); return `${ok}/${all}명`; };
     const ours = team(S.ourTeam);
     const selfN = ROLES.filter((r) => (ours.players[r].pool || []).length).length;
-    const stackTxt = R && R.status === "ok" ? S.teams.map((t) => { const st = R.stacks[t.id]; return `${esc(t.name)} ${st === null || st === undefined ? "미확보" : st.length + "판"}`; }).join(" · ") : "미확보";
+    const stackTxt = R && R.status === "ok" ? S.teams.map((t) => { const st = E.groupsOf(t); return `${esc(t.name)} ${st === null ? "미확보" : st.length + "판" + (st.some((g) => g.n === 5) ? `(5인 ${st.filter((g) => g.n === 5).length})` : "")}`; }).join(" · ") : "미확보";
+    const last = R && R.lastAttempt && !R.lastAttempt.ok ? ` · 마지막 시도 ${esc(R.lastAttempt.at)} 실패: ${esc(R.lastAttempt.reason)}` : "";
     const rows = [
       ["선수 시즌 전적", "op.gg 공개 프로필", SC ? SC.at : "미확보", SC ? okCount(SC.teams, (x) => !x.error) : "-"],
-      ["최근 랭크 (11/10~)", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", R && R.status === "ok" ? okCount(R.players, (x) => !x.error) + ` · 선수당 최대 ${R.cap}판` : (R ? esc(R.reason || "") : "-")],
-      ["5인 경기", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", stackTxt],
+      ["최근 랭크 (11/10~)", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", (R && R.status === "ok" ? okCount(R.players, (x) => !x.error) + ` · 선수당 최대 ${R.cap}판` : (R ? esc(R.reason || "") : "-")) + last],
+      ["함께 한 경기(2인 이상)", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", stackTxt],
       ["메타·라인 상성", "op.gg 솔랭 · gol.gg 시즌 통계", M ? M.at : "미확보", M ? `패치 ${esc(M.patch)} · 상성 ${Object.keys(M.mu || {}).length}챔프` : "-"],
       ["프로 밴픽 순서·바텀 조합", "gol.gg 경기별 페이지", P ? P.at : "미확보", P ? `${P.games}경기 (${P.tournaments.filter((t) => t.games).map((t) => esc(t.name) + " " + t.games).join(", ")})` : "-"],
       ["자기평가", window.SELF_EVAL.status === "ok" ? "팀 공유 시트(CSV)" : "팀원 직접 입력", window.SELF_EVAL.status === "ok" ? window.SELF_EVAL.at : selfN ? "입력됨" : "미입력",

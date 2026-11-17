@@ -63,11 +63,20 @@ window.Engine = (function () {
     const g = R.stacks[team.id];
     return g === undefined ? null : g;
   }
-  function stackChampRecord(team, role, id) {
+  // 함께 한 경기: 같은 팀 선수 2명 이상이 같은 편 (자랭 등). null = 미확보
+  function groupsOf(team) {
+    const R = window.RECENT;
+    if (!R || R.status !== "ok" || !team) return null;
+    if (R.groups) return R.groups[team.id] === undefined ? null : R.groups[team.id];
     const st = stacksOf(team);
-    if (!st) return null;
-    const games = st.filter((g) => g.picks && g.picks[role] === id);
-    return games.length ? { g: games.length, w: games.filter((g) => g.win).length, of: st.length } : null;
+    return st ? st.map((g) => ({ ...g, n: 5 })) : null;
+  }
+  function stackChampRecord(team, role, id) {
+    const gr = groupsOf(team);
+    if (!gr) return null;
+    const withRole = gr.filter((g) => g.picks && g.picks[role]);
+    const games = withRole.filter((g) => g.picks[role] === id);
+    return games.length ? { g: games.length, w: games.filter((g) => g.win).length, of: withRole.length } : null;
   }
   const MANUAL_SCORE = { 3: 0.75, 2: 0.45, 1: 0.2 };
   function poolMap(team, role) {
@@ -133,8 +142,8 @@ window.Engine = (function () {
     const out = [];
     A.forEach(([a, ea]) => Sx.forEach(([sp, es]) => {
       const d = proDuo(a, sp);
-      const team5 = stacksOf(team);
-      const tg = team5 ? team5.filter((g) => g.picks && g.picks.A === a && g.picks.S === sp) : [];
+      const gr = groupsOf(team);
+      const tg = gr ? gr.filter((g) => g.picks && g.picks.A === a && g.picks.S === sp) : [];
       let v = lvScore(ea) + lvScore(es);
       if (d) v += Math.min(3, d.g * 0.5) + (d.g >= 3 ? (d.w / d.g - 0.5) * 4 : 0);
       if (tg.length) v += Math.min(3, tg.length) + tg.filter((g) => g.win).length;
@@ -355,7 +364,7 @@ window.Engine = (function () {
       }
       for (const r of oppOpen) {
         const tr = stackChampRecord(oppTeam, r, c.id);
-        if (tr) { const v = Math.min(16, 6 * tr.g); s += v; reasons.push({ t: "자랭 5인 픽", d: `${ROLE_KO[r]} · 5인 자랭 ${tr.of}판 중 ${tr.g}판 (${tr.w}승)`, v }); tgt = tgt || r; break; }
+        if (tr) { const v = Math.min(16, 6 * tr.g); s += v; reasons.push({ t: "함께 한 경기 픽", d: `${ROLE_KO[r]} · 팀원과 함께 한 ${tr.of}판 중 ${tr.g}판 (${tr.w}승)`, v }); tgt = tgt || r; break; }
       }
       const onRole = c.pos.some((r) => oppOpen.includes(r));
       if (!onRole && !s) continue;
@@ -426,7 +435,7 @@ window.Engine = (function () {
         const mi = metaInfo(c.id, r);
         if (mi && mi.score >= 0.45) { const v = mi.score * 4; s += v; reasons.push({ t: "메타 강세", d: metaText(mi), v }); }
         const tr = stackChampRecord(team, r, c.id);
-        if (tr) { const v = Math.max(-6, Math.min(6, tr.w * 2 - (tr.g - tr.w))); s += v; if (v > 0) reasons.push({ t: "팀 경기 기록", d: `5인 경기 ${tr.g}판 ${tr.w}승`, v }); }
+        if (tr) { const v = Math.max(-6, Math.min(6, tr.w * 2 - (tr.g - tr.w))); s += v; if (v > 0) reasons.push({ t: "팀 경기 기록", d: `팀원과 함께 ${tr.g}판 ${tr.w}승`, v }); }
         if (dir) {
           const f = fit(c, dir);
           if (f >= 2) { s += f * 2.5; reasons.push({ t: `${COMPS[dir].short} 조합`, d: `${COMPS[dir].name}에 맞음`, v: f * 2.5, comp: true }); }
@@ -607,7 +616,7 @@ window.Engine = (function () {
         if (isDuo) {
           why.unshift("바텀 세트 — 원딜·서폿을 같은 차례에 함께");
           const ds = duoSuggest(state, who)[0];
-          if (ds && r === "A") why.push(`추천 세트 ${ko(ds.a)}+${ko(ds.s)}${ds.pro ? ` (대회 ${ds.pro.g}판 ${ds.pro.w}승)` : " (대회 기록 없음)"}${ds.team ? ` · 우리 5인 ${ds.team.g}판 ${ds.team.w}승` : ""}`);
+          if (ds && r === "A") why.push(`추천 세트 ${ko(ds.a)}+${ko(ds.s)}${ds.pro ? ` (대회 ${ds.pro.g}판 ${ds.pro.w}승)` : " (대회 기록 없음)"}${ds.team ? ` · 우리 원딜·서폿 함께 ${ds.team.g}판 ${ds.team.w}승` : ""}`);
         }
         return { i, done: false, role: r, cands: outlook[r].cands, why, duo: isDuo };
       });
@@ -752,8 +761,8 @@ window.Engine = (function () {
     return list.sort((a, b) => b.s - a.s).slice(0, 8).map((x) => {
       const answers = myPool.filter(([id]) => lanesCounter(id, x.id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([id]) => id);
       const counterTag = x.adj.find((a) => a.t === "카운터 픽");
-      if (x.tr) x.adj.unshift({ t: "", d: `5인 자랭 ${x.tr.of}판 중 ${x.tr.g}판 (${x.tr.w}승)` });
-      const label = counterTag ? "카운터 픽" : x.tr ? "자랭 5인 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
+      if (x.tr) x.adj.unshift({ t: "", d: `팀원과 함께 한 ${x.tr.of}판 중 ${x.tr.g}판 (${x.tr.w}승)` });
+      const label = counterTag ? "카운터 픽" : x.tr ? "함께 한 경기 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
       const d = x.e ? statText(x.e) : metaText(x.mi);
       return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers: ourLaner ? [] : answers, vsOurs: x.adj.map((a) => a.d) };
     });
@@ -929,6 +938,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, recentOf, actualRole, stacksOf, duoSuggest, proDuo,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo,
   };
 })();
