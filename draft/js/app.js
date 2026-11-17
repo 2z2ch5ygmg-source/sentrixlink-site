@@ -48,6 +48,55 @@
   // ---------- helpers ----------
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const IMG = (id) => `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/champion/${id}.png`;
+  // 선 아이콘(24 격자, currentColor): 글 대신 상태를 보여 주는 배지·태그용
+  const ICO = {
+    sword: "M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2",
+    link: "M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7",
+    shield: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+    trophy: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3",
+    alert: "M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01",
+    eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
+    users: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8",
+    layers: "M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5",
+    flag: "M4 22V4M4 4h12l-2 4 2 4H4",
+    cut: "M6 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12",
+    target: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+    down: "M12 5v14M19 12l-7 7-7-7",
+    map: "M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15",
+    swap: "M7 16V4M3 8l4-4 4 4M17 8v12M21 16l-4 4-4-4",
+  };
+  const ico = (n) => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICO[n] || ICO.alert}"/></svg>`;
+  // 픽 순서 이유 종류 → 아이콘·색
+  const KIND = { safe: ["shield", "good"], counter: ["sword", "good"], grab: ["flag", "good"], set: ["link", "good"], meta: ["trophy", "info"],
+    core: ["layers", "info"], flex: ["swap", "info"], wait: ["eye", "warn"], risk: ["alert", "bad"], thin: ["alert", "bad"], cut: ["cut", "bad"], sylas: ["alert", "bad"] };
+  // 배지: 짧은 말만 보이고, 누르면(PC는 마우스도) 전체 이유가 펼쳐짐
+  function badge(t) {
+    const [ic, tone] = KIND[t.k] || ["alert", "info"];
+    return `<details class="bdg t-${tone}"><summary title="${esc(t.d)}">${ico(ic)}<span>${esc(t.t)}</span></summary><p>${esc(t.d)}</p></details>`;
+  }
+  // 추천 카드 장단점 문장 → 아이콘 + 짧은 말
+  function shortTag(g, good) {
+    let m;
+    if (good) {
+      if ((m = g.match(/^(.+?) 상대 강함(.*)$/))) return ["sword", m[1] + m[2]];
+      if ((m = g.match(/^(.+) 조합에 맞음$/))) return ["layers", m[1]];
+      if (g === "갱 버팀") return ["shield", "갱 버팀"];
+      if (g === "앞라인 보강") return ["shield", "앞라인"];
+      if ((m = g.match(/^팀 경기 (.+)$/))) return ["users", "팀 " + m[1]];
+      if (g === "상대 주력 뺏기") return ["target", "주력 뺏기"];
+      if (g === "대회 메타 픽") return ["trophy", "메타"];
+      if (g === "상대 궁 뺏어 쓰기") return ["target", "궁 뺏기"];
+      if ((m = g.match(/^(.+?)[과와] 세트$/))) return ["link", m[1]];
+      if ((m = g.match(/^(\S+) 시나리오 \S+ (주 픽|대체 픽)$/))) return ["map", m[1] + " " + (m[2] === "주 픽" ? "주 픽" : "대체")];
+      return ["layers", g];
+    }
+    if (/사일러스 밴 필요/.test(g)) return ["alert", "사일러스 밴"];
+    if (/사일러스에 궁/.test(g)) return ["alert", "사일러스"];
+    if ((m = g.match(/^(.+) 조합에 약함$/))) return ["down", m[1]];   // 빨간 아래 화살표 = 약함
+    if ((m = g.match(/^(.+?) 상대 불리(.*)$/))) return ["alert", m[1] + " 불리" + m[2]];
+    return ["down", g];
+  }
+  const tagHtml = (g, good) => { const [i, t] = shortTag(g, good); return `<span class="tg ${good ? "good" : "bad"}" title="${esc(g)}">${ico(i)}${esc(t)}<span class="sr-only"> (${esc(g)})</span></span>`; };
   function icon(id, cls) {
     const c = CH[id];
     if (!c) return `<span class="ic ${cls || ""}"></span>`;
@@ -135,7 +184,9 @@
 
   function recCard(r, type, muted, rank) {
     // 우리 픽: 무엇에 좋고 무엇에 약한지만 짧게. 밴·상대 예상: 근거 두 줄
-    const why = r.good ? [...r.good.map((g) => `<span class="pc-good">+ ${esc(g)}</span>`), ...r.bad.map((b) => `<span class="pc-bad">− ${esc(b)}</span>`)].join("<br>")
+    // 이름표와 같은 말(예: '한타 조합' + '한타 조합에 맞음')은 한 번만
+    const goods = r.good ? r.good.filter((g) => !(r.label && / 조합$/.test(r.label) && g === r.label + "에 맞음")) : null;
+    const why = r.good ? `<span class="tgs">${goods.map((g) => tagHtml(g, true)).join("")}${r.bad.map((b) => tagHtml(b, false)).join("")}</span>`
       : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 ? "first" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
       ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg").replace(/ title="[^"]*"/, "")}<span class="cn">${esc(CH[r.id].ko)}</span>
@@ -252,7 +303,7 @@
     if (!k || !k.top) return "";
     const th = k.top, a = k.advice;
     const typeTxt = { gank: "갱킹형 정글", jungle: "정글", carry: "핵심 딜러", lane: "라이너" }[th.type];
-    const opts = a.opts.map((o) => `<div class="th-opt"><div class="th-ot"><b>${esc(o.t)}</b> <span class="help">${esc(o.d)}</span></div>
+    const opts = a.opts.map((o) => `<div class="th-opt"><div class="th-ot"><b title="${esc(o.d)}">${esc(o.t)}</b>${compact ? "" : ` <span class="help">${esc(o.d)}</span>`}</div>
       <div class="row-chips">${o.picks.map((id) => `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}</span>`).join("")}</div></div>`).join("");
     const lanes = ROLES.filter((r) => a.lanes[r]).map((r) => `<li><b>${ROLE_KO[r]}</b> ${esc(a.lanes[r])}</li>`).join("");
     const second = k.second && k.second.champ ? `<span class="help">다음: ${ROLE_KO[k.second.r]} ${esc(k.second.p.riot.split("#")[0])} · ${esc(CH[k.second.champ].ko)}</span>` : "";
@@ -273,6 +324,7 @@
     try { return renderThreat(false); } finally { Object.assign(S, keep); }
   }
 
+  const cutChips = (lost) => (lost || []).map((l) => `<span class="chip cut" title="${esc(CH[l.id].ko)} ${esc(l.st)}">${icon(l.id, "sm")}<s>${esc(CH[l.id].ko)}</s><span class="st">${esc(l.st)}</span></span>`).join("");
   // 큰 그림: 1차 밴 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 (픽마다 갱신, 칸마다 대체 픽)
   function renderScenarios() {
     const list = E.scenarios(S, "our");
@@ -286,34 +338,61 @@
       const x = cur.slots[r];
       if (!x) return "";
       if (x.done) return `<div class="sc-row done"><span class="pp-role">${ROLE_KO[r]}</span><span class="sc-pick">${icon(x.id, "sm")}<b>${esc(CH[x.id].ko)}</b><span class="dim">확정</span></span></div>`;
-      const lostTxt = x.lost && x.lost.length ? `<span class="sc-lost">잘림 ${x.lost.map((l) => `${esc(CH[l.id].ko)}(${esc(l.st)})`).join("·")}</span>` : "";
       const main = x.id ? chip(x.id, r, x.notes, true) : `<span class="dim">남은 챔프폭 없음</span>`;
       const alts = x.alts && x.alts.length ? `<span class="sc-alt-l">대체</span>${x.alts.map((a) => chip(a.id, r, a.notes)).join("")}` : x.id ? `<span class="sc-warn">대체 없음</span>` : "";
-      const notes = x.notes && x.notes.length ? `<span class="sc-note">${x.notes.map(esc).join(" · ")}</span>` : "";
-      return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells"><div class="row-chips">${main}${alts}</div>${notes}${lostTxt}</div></div>`;
+      const notes = (x.notes || []).map((n) => {
+        let m;
+        if ((m = n.match(/^(.+?) 상대 강함(\(라인 모름\))?$/))) return `<span class="tg good" title="${esc(n)}">${ico("sword")}${esc(m[1])}${m[2] ? "?" : ""}</span>`;
+        if ((m = n.match(/^(.+?) 상대 불리(\(라인 모름\))?$/))) return `<span class="tg bad" title="${esc(n)}">${ico("alert")}${esc(m[1])} 불리${m[2] ? "?" : ""}</span>`;
+        if ((m = n.match(/^(.+?)[과와] 세트$/))) return `<span class="tg good" title="${esc(n)}">${ico("link")}${esc(m[1])}</span>`;
+        if (n === "사일러스 주의") return `<span class="tg bad" title="사일러스가 남아 있어 궁을 뺏길 수 있음">${ico("alert")}사일러스</span>`;
+        return `<span class="tg" title="${esc(n)}">${esc(n)}</span>`;
+      }).join("");
+      return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells"><div class="row-chips">${main}${alts}${cutChips(x.lost)}</div>${notes ? `<span class="tgs">${notes}</span>` : ""}</div></div>`;
     }).join("");
     return `<section class="plan-box scen-box"><div class="now-h"><span class="what">큰 그림</span><span class="step">남은 챔프로 만들 수 있는 조합 · 픽마다 갱신</span><div class="seg" role="group" aria-label="시나리오">${tabs}</div></div>
-      <p class="sc-sum"><b>${esc(cur.name)}</b> — ${esc(cur.win)}${cur.why.length ? `<br><span class="help">${cur.why.map(esc).join(" · ")}</span>` : ""}</p>
+      <div class="sc-sum"><b title="${esc(cur.win)}">${esc(cur.name)}</b>${cur.why.length ? `<span class="tgs">${cur.why.map((w) => /잡는 방향/.test(w) ? `<span class="tg good" title="${esc(w)}">${ico("target")}${esc(w.replace(/^상대 (\S+) 조합을 잡는 방향$/, "$1 상대 유리"))}</span>` : `<span class="tg bad" title="${esc(w)}">${ico("alert")}${esc(w.replace(/ — .*$/, "").replace(/ → .*$/, ""))}</span>`).join("")}</span>` : ""}</div>
       <div class="sc-rows">${rows}</div>
-      <p class="help sc-foot">고른 시나리오의 챔프가 추천 순서에서 앞으로 옵니다${ourTurn ? " · 칩을 누르면 바로 픽" : ""}</p></section>`;
+      <p class="help sc-foot">${ourTurn ? "칩을 누르면 바로 픽 · " : ""}고른 조합이 추천 순서에 반영</p></section>`;
+  }
+
+  const ROLE_1 = { T: "탑", J: "정", M: "미", A: "원", S: "서" };
+  // 밴픽 20칸 타임라인: 옅은 칸 = 밴, 진한 칸 = 픽, 파랑 = 블루, 빨강 = 레드, 노란 테두리 = 지금, 점선 = 남은 차례(우리 예정 라인)
+  function timeline(planned) {
+    const cells = ORDER.map(([side, type], i) => {
+      const s = S.draft.steps[i];
+      const who = E.whoOfSide(S, side);
+      const pr = !s.champ && planned[i];
+      const cls = ["tl-c", side === "B" ? "b" : "r", type, i === S.draft.idx ? "now" : "", s.champ ? "filled" : s.skip ? "skip" : "open", [6, 12, 16].includes(i) ? "gap" : ""].join(" ");
+      const label = `${i + 1}. ${side === "B" ? "블루" : "레드"}(${who === "our" ? "우리" : "상대"}) ${type === "ban" ? "밴" : "픽"}${s.champ ? ` · ${CH[s.champ].ko}` : pr ? ` · ${ROLE_KO[pr]} 예정` : ""}`;
+      const inner = s.champ ? `<img src="${IMG(s.champ)}" alt="" loading="lazy" onerror="this.remove()">` : pr ? `<span>${ROLE_1[pr]}</span>` : "";
+      return `<li class="${cls}" title="${esc(label)}"><span class="sr-only">${esc(label)}</span>${inner}</li>`;
+    }).join("");
+    return `<ol class="tl" aria-label="밴픽 순서">${cells}</ol>
+      <p class="tl-key"><span><i class="k ban"></i>밴</span><span><i class="k pick"></i>픽</span><span><i class="k b"></i>블루</span><span><i class="k r"></i>레드</span><span><i class="k now"></i>지금</span><span><i class="k open"></i>우리 예정</span></p>`;
   }
 
   function renderPlan() {
     const p = E.pickPlan(S, "our");
     if (!p.plan.some((s) => s.items.some((x) => !x.done && x.role))) return "";
     const st = curStep();
+    const planned = {};
+    p.plan.forEach((sl) => sl.items.forEach((x) => !x.done && x.role && (planned[x.i] = x.role)));
     const cards = p.plan.map((s) => {
       const items = s.items.map((x) => {
         if (x.done) return `<div class="pp-item done">${icon(x.champ, "sm")}<span><b>${esc(CH[x.champ].ko)}</b> <span class="dim">${x.role ? ROLE_KO[x.role] : ""} · 완료</span></span></div>`;
         if (!x.role) return "";
-        const cands = x.cands.length ? x.cands.map((c) => `<button class="chip pp-c" data-act="${st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our" && s.now ? "pick" : ""}" data-id="${c.id}" title="${esc(E.statText(c.e))}">${icon(c.id, "sm")}${esc(CH[c.id].ko)}${c.e.g ? `<span class="st">${c.e.g}판</span>` : ""}</button>`).join("") : `<span class="dim">남은 챔프폭 없음</span>`;
-        return `<div class="pp-item"><div class="pp-role">${ROLE_KO[x.role]}${x.duo ? ` <span class="pill blue">세트</span>` : ""}</div><div class="row-chips">${cands}</div>${x.why.length ? `<ul class="pp-why">${x.why.slice(0, 3).map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}</div>`;
+        const cands = x.cands.length ? x.cands.map((c) => `<button class="chip pp-c" data-act="${st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our" && s.now ? "pick" : ""}" data-id="${c.id}" data-role="${x.role}" title="${esc(E.statText(c.e))}">${icon(c.id, "sm")}${esc(CH[c.id].ko)}${c.e.g ? `<span class="st">${c.e.g}판</span>` : ""}</button>`).join("") : `<span class="dim">남은 챔프폭 없음</span>`;
+        // 잘린 주력은 취소선 칩으로(글 대신)
+        const cut = (x.mains || []).filter((m) => m.st !== "가능").map((m) => `<span class="chip cut" title="${esc(CH[m.id].ko)} ${esc(m.st)}">${icon(m.id, "sm")}<s>${esc(CH[m.id].ko)}</s><span class="st">${esc(m.st)}</span></span>`).join("");
+        const tags = (x.tags || []).filter((t) => t.k !== "cut");
+        return `<div class="pp-item"><div class="pp-role">${ROLE_KO[x.role]}</div><div class="row-chips">${cands}${cut}</div>${tags.length ? `<div class="bdgs">${tags.slice(0, 4).map(badge).join("")}</div>` : ""}</div>`;
       }).join("");
       return `<div class="pp-slot ${s.now ? "now" : ""} ${s.items.every((x) => x.done) ? "past" : ""}"><div class="pp-h"><b>${s.label}</b>${s.now ? `<span class="pill gold">지금</span>` : ""}</div>${items}</div>`;
     }).join("");
-    const src = window.META ? `메타: op.gg 솔랭 ${esc(window.META.patch)} · gol.gg 2026 대회 · 라인 상대 전적 (${esc(window.META.at)})` : "밴·진영·상대 공개 라인에 따라 계속 바뀜";
-    return `<section class="plan-box"><div class="now-h"><span class="what">픽 순서 전략</span><span class="step">${src}</span></div>
-      <ul class="plain pp-sum">${p.summary.map((t) => `<li>${esc(t)}</li>`).join("")}</ul><div class="pp-grid">${cards}</div></section>`;
+    const src = window.META ? `메타: op.gg 솔랭 ${window.META.patch} · gol.gg 2026 대회 · 라인 상대 전적 (${window.META.at})` : "밴·진영·상대 공개 라인에 따라 계속 바뀜";
+    return `<section class="plan-box"><div class="now-h"><span class="what">픽 순서 전략</span><span class="step" title="${esc(src)}">${window.META ? `메타 ${esc(window.META.patch)}` : ""}</span></div>
+      ${timeline(planned)}<div class="pp-grid">${cards}</div></section>`;
   }
 
   function renderLive() {

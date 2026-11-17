@@ -729,16 +729,18 @@ window.Engine = (function () {
     const syP = sylasRisk(state, who);
     const scored = open.map((r) => {
       const o = outlook[r];
-      const why = [];
+      const why = [], tags = [];
+      // 배지: k = 종류(아이콘·색), t = 짧은 말, d = 전체 이유
+      const W = (k, t, d) => { why.push(d); tags.push({ k, t, d }); };
       let u = 0;
       const bestName = o.best ? ko(o.best.id) : null;
-      if (o.contested) { u += 3; why.push(`${j(bestName, "은", "는")} 상대도 잘 다룸 → 먼저 가져가기`); }
+      if (o.contested) { u += 3; W("grab", "선점", `${j(bestName, "은", "는")} 상대도 잘 다룸 → 먼저 가져가기`); }
       if (o.best && o.depth <= 1) {
         u += bansLeft ? 3 : 1.5;
-        why.push(bansLeft ? `쓸 만한 챔프가 ${bestName} 하나뿐 → 2차 밴 전에 확보` : `남은 주력이 ${bestName} 하나`);
+        W("thin", "주력 하나", bansLeft ? `쓸 만한 챔프가 ${bestName} 하나뿐 → 2차 밴 전에 확보` : `남은 주력이 ${bestName} 하나`);
       }
       const bannedMains = o.mains.filter((m) => m.st !== "가능").map((m) => `${ko(m.id)}(${m.st})`);
-      if (bannedMains.length) why.push(`주력 ${bannedMains.join("·")} 잘림`);
+      if (bannedMains.length) W("cut", `잘림 ${bannedMains.length}`, `주력 ${bannedMains.join("·")} 잘림`);
       const solo = r === "T" ? 2.5 : r === "M" ? 1.2 : 0;
       // 상대 같은 라인 선수가 실제로 꺼낼 수 있는 챔프 중 우리 1순위의 카운터가 있는지
       let safe = false;
@@ -747,34 +749,34 @@ window.Engine = (function () {
         const threats = theirs.filter((id) => lanesCounter(id, o.best.id));
         if (theirs.length >= 2 && !threats.length) {
           safe = true; u += 1.5;
-          why.push(`상대 ${ROLE_KO[r]} 챔프폭에 ${bestName} 카운터 없음 → 먼저 뽑아도 안전`);
+          W("safe", "선픽 안전", `상대 ${ROLE_KO[r]} 챔프폭에 ${bestName} 카운터 없음 → 먼저 뽑아도 안전`);
         } else if (threats.length) {
           u -= 1;
-          why.push(`상대가 ${j(threats.slice(0, 2).map(ko).join("·"), "으로", "로")} ${bestName} 카운터 가능 → 뒤에`);
+          W("risk", `카운터 ${threats.length}`, `상대가 ${j(threats.slice(0, 2).map(ko).join("·"), "으로", "로")} ${bestName} 카운터 가능 → 뒤에`);
         }
       }
       if (!o.enemyLaner && solo && !safe) {
         u -= solo;
         if (o.best && (COUNTERS[o.best.id] || []).length >= 3) u -= 1;
-        why.push(r === "T" ? "탑은 상대 탑을 보고 카운터로 뽑기" : "미드는 상대 미드 확인 후가 안전");
+        W("wait", "상대 보고", r === "T" ? "탑은 상대 탑을 보고 카운터로 뽑기" : "미드는 상대 미드 확인 후가 안전");
       }
       // 메타 선픽 가치: 대회에서 밴픽이 많고 일찍 뽑히는 챔프는 먼저 확보
       const mi = o.best ? metaInfo(o.best.id, r) : null;
       if (mi && (mi.prio >= 40 || (mi.rp && mi.rp <= 1.7 && mi.games >= 200))) {
-        u += 1.5; why.push(`${bestName} 대회 밴픽 우선도 ${Math.round(mi.prio)}%${mi.rp ? `·평균 ${mi.rp}라운드 픽` : ""} → 먼저 확보`);
+        u += 1.5; W("meta", `대회 ${Math.round(mi.prio)}%`, `${bestName} 대회 밴픽 우선도 ${Math.round(mi.prio)}%${mi.rp ? `·평균 ${mi.rp}라운드 픽` : ""} → 먼저 확보`);
       }
       if (o.enemyLaner) {
         const ctr = o.cands.find((c) => lanesCounter(c.id, o.enemyLaner.champ));
         u += 0.5;
-        why.push(ctr ? `상대 ${ko(o.enemyLaner.champ)} 공개 → ${j(ko(ctr.id), "으로", "로")} 바로 카운터 가능` : `상대 ${ko(o.enemyLaner.champ)} 공개됨`);
+        W("counter", ctr ? `${ko(o.enemyLaner.champ)} 카운터` : `${ko(o.enemyLaner.champ)} 공개`, ctr ? `상대 ${ko(o.enemyLaner.champ)} 공개 → ${j(ko(ctr.id), "으로", "로")} 바로 카운터 가능` : `상대 ${ko(o.enemyLaner.champ)} 공개됨`);
       }
-      if (r === "J" || r === "S") { u += 1; if (!why.length) why.push(r === "J" ? "정글은 초반 동선·조합 축이라 먼저" : "서폿은 조합 이니시 축이라 먼저"); }
+      if (r === "J" || r === "S") { u += 1; if (!why.length) W("core", "조합 축", r === "J" ? "정글은 초반 동선·조합 축이라 먼저" : "서폿은 조합 이니시 축이라 먼저"); }
       if (o.best && CH[o.best.id].pos.length >= 2 && open.some((x) => x !== r && CH[o.best.id].pos.includes(x))) {
-        u += 1.5; why.push(`${j(bestName, "은", "는")} 여러 라인 가능 → 라인을 숨긴 채 먼저`);
+        u += 1.5; W("flex", "라인 숨김", `${j(bestName, "은", "는")} 여러 라인 가능 → 라인을 숨긴 채 먼저`);
       }
-      if (o.best && ULT[o.best.id] === 3 && syP >= 0.35) { u -= 1; why.push(`${bestName} 궁은 사일러스가 빠진 뒤 꺼내기`); }
-      if (!o.best) { u -= 1; why.push("챔프폭이 비어 있음 — 상대 픽을 보고 결정"); }
-      return { r, u, why };
+      if (o.best && ULT[o.best.id] === 3 && syP >= 0.35) { u -= 1; W("sylas", "사일러스 뒤", `${bestName} 궁은 사일러스가 빠진 뒤 꺼내기`); }
+      if (!o.best) { u -= 1; W("thin", "챔프폭 없음", "챔프폭이 비어 있음 — 상대 픽을 보고 결정"); }
+      return { r, u, why, tags };
     }).sort((a, b) => b.u - a.u);
 
     // 남은 픽 칸에 순서대로 배치 + 바텀은 연속 두 칸이 있으면 세트로
@@ -802,21 +804,22 @@ window.Engine = (function () {
         const r = order[k++];
         if (!r) return { i, done: false };
         const sc = scored.find((x) => x.r === r);
-        const why = sc.why.slice();
-        if (i === lastIdx && remainingIdx.length > 1) why.unshift("마지막 픽 — 상대 픽을 다 보고 결정");
+        const why = sc.why.slice(), tags = sc.tags.slice();
+        const U = (k, t, d) => { why.unshift(d); tags.unshift({ k, t, d }); };
+        if (i === lastIdx && remainingIdx.length > 1) U("wait", "마지막 픽", "마지막 픽 — 상대 픽을 다 보고 결정");
         if (side === "B" && i === 6) {
-          why.unshift("블루 1픽 — 밴에서 살아남은 가장 강한 챔프 선점");
+          U("grab", "블루 1픽", "블루 1픽 — 밴에서 살아남은 가장 강한 챔프 선점");
           const best = outlook[r].best;
           const pf = best && proFirst(best.id);
-          if (pf) why.push(`${ko(best.id)} 대회 블루 1픽 ${pf.n}회 / ${pf.of}경기`);
+          if (pf) { const d = `${ko(best.id)} 대회 블루 1픽 ${pf.n}회 / ${pf.of}경기`; why.push(d); tags.push({ k: "meta", t: `1픽 ${pf.n}회`, d }); }
         }
         const isDuo = duo && (r === "A" || r === "S");
         if (isDuo) {
-          why.unshift("바텀 세트 — 원딜·서폿을 같은 차례에 함께");
+          U("set", "바텀 세트", "바텀 세트 — 원딜·서폿을 같은 차례에 함께");
           const ds = duoSuggest(state, who)[0];
-          if (ds && r === "A") why.push(`추천 세트 ${ko(ds.a)}+${ko(ds.s)}${ds.pro ? ` (대회 ${ds.pro.g}판 ${ds.pro.w}승)` : " (대회 기록 없음)"}${ds.team ? ` · 우리 원딜·서폿 함께 ${ds.team.g}판 ${ds.team.w}승` : ""}`);
+          if (ds && r === "A") { const d = `추천 세트 ${ko(ds.a)}+${ko(ds.s)}${ds.pro ? ` (대회 ${ds.pro.g}판 ${ds.pro.w}승)` : " (대회 기록 없음)"}${ds.team ? ` · 우리 원딜·서폿 함께 ${ds.team.g}판 ${ds.team.w}승` : ""}`; why.push(d); tags.push({ k: "set", t: `${ko(ds.a)}+${ko(ds.s)}`, d }); }
         }
-        return { i, done: false, role: r, cands: outlook[r].cands, why, duo: isDuo };
+        return { i, done: false, role: r, cands: outlook[r].cands, mains: outlook[r].mains, why, tags, duo: isDuo };
       });
       return { label: s.label, idxs: s.idxs, items, now: s.idxs.includes(state.draft.idx) };
     });
