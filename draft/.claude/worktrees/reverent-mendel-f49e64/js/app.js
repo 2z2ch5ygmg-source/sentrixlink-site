@@ -502,37 +502,65 @@
     return `<div class="help">11/10~ 랭크 ${x.n}판${x.n ? ` ${Math.round((x.w / x.n) * 100)}%` : ""}${top ? ` · ${esc(top)}` : ""}</div>`
       + (ar && ar.differs ? `<div class="warn">등록 ${ROLE_KO[r]}인데 최근 ${ar.tot}판 중 ${ROLE_KO[ar.role]} ${ar.n}판</div>` : "");
   }
-  // 갱신하기: 맥의 자동 수집이 Riot에서 모아 올린 최신 js/recent.js를 바로 다시 읽는다(키는 페이지에 없음)
+  // 갱신하기: Cloudflare Worker(js/config.js RECENT_LIVE_URL)가 Riot에서 바로 「함께 한 경기」를 가져온다(키는 Worker에만 있음).
+  // Worker가 없거나 실패하면 예전처럼 매일 0시 자동 수집한 최신 js/recent.js를 다시 읽는다.
   let refreshing = false;
+  const liveOf = (t) => { const R = window.RECENT; return R && R.live && t && R.live[t.id]; };
+  const champId = (name) => { if (!name) return null; if (CH[name]) return name; const lo = String(name).toLowerCase(); return Object.keys(CH).find((k) => k.toLowerCase() === lo) || null; };
   function refreshRecent() {
     if (refreshing) return;
     const before = window.RECENT, ourT = team(S.ourTeam);
     const count = () => { const g = window.RECENT && window.RECENT.status === "ok" ? E.groupsOf(ourT) : null; return g ? g.length : 0; };
     const n0 = count(), at0 = before && before.at;
     refreshing = true; S.ui.rState = {}; render();
-    const s = document.createElement("script");
-    s.src = `js/recent.js?t=${Date.now()}`;
-    const done = (msg) => { refreshing = false; S.ui.rState = { msg }; s.remove(); render(); };
-    s.onload = () => {
-      const R = window.RECENT;
-      if (!R || R.status !== "ok") { window.RECENT = before; done("새 자료를 읽지 못했습니다 — 이전 자료를 그대로 보여 줍니다"); return; }
-      const add = count() - n0;
-      done(R.at === at0 ? `이미 최신 · 수집 ${R.at} (맥이 켜져 있을 때 자동 수집)` : `갱신됨 · 수집 ${R.at}${add > 0 ? ` · 새 경기 ${add}판` : " · 새 경기 없음"}`);
+    const done = (msg) => { refreshing = false; S.ui.rState = { msg }; render(); };
+    const reload = (why) => {
+      const s = document.createElement("script");
+      s.src = `js/recent.js?t=${Date.now()}`;
+      const end = (msg) => { s.remove(); done((why ? why + " — " : "") + msg); };
+      s.onload = () => {
+        const R = window.RECENT;
+        if (!R || R.status !== "ok") { window.RECENT = before; end("이전 자료를 그대로 보여 줍니다"); return; }
+        if (before && before.live && R.at === at0) R.live = before.live; // 같은 날 자료면 실시간 결과 유지
+        const add = count() - n0;
+        end(R.at === at0 ? `매일 0시 자동 수집 자료 그대로 · 수집 ${R.at}` : `자동 수집 자료로 갱신 · 수집 ${R.at}${add > 0 ? ` · 새 경기 ${add}판` : " · 새 경기 없음"}`);
+      };
+      s.onerror = () => { window.RECENT = before; end("불러오기 실패 — 인터넷 연결을 확인해 주세요"); };
+      document.head.appendChild(s);
     };
-    s.onerror = () => { window.RECENT = before; done("불러오기 실패 — 인터넷 연결을 확인해 주세요"); };
-    document.head.appendChild(s);
+    const url = window.RECENT_LIVE_URL;
+    if (!url || !ourT || ourT.solo || !before || before.status !== "ok") { reload(""); return; }
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = setTimeout(() => ctl && ctl.abort(), 25000);
+    fetch(`${url.replace(/\/$/, "")}/groups?team=${encodeURIComponent(ourT.id)}`, { signal: ctl ? ctl.signal : undefined, cache: "no-store", credentials: "omit" })
+      .then((r) => r.json().catch(() => ({})).then((j) => ({ ok: r.ok, status: r.status, j })))
+      .then(({ ok, status, j }) => {
+        clearTimeout(timer);
+        if (status === 404 && j && j.reason === "조회할 수 없는 팀") { reload("실시간 갱신은 등록된 우리 팀만"); return; }
+        if (!ok || !j || j.status !== "ok" || !Array.isArray(j.groups)) { reload(`실시간 조회 실패(${(j && j.reason) || "응답 " + status})`); return; }
+        const R = window.RECENT;
+        const groups = j.groups.map((g) => {
+          const picks = {}, playedRole = {};
+          ROLES.forEach((r) => { if (g.picks && g.picks[r]) { picks[r] = champId(g.picks[r]); playedRole[r] = (g.playedRole && g.playedRole[r]) || ""; } });
+          return { date: g.date, queue: g.queue, n: g.n, win: !!g.win, picks, playedRole };
+        });
+        window.RECENT = { ...R, groups: { ...(R.groups || {}), [ourT.id]: groups }, live: { ...(R.live || {}), [ourT.id]: { at: j.at, pending: j.pending || 0 } } };
+        const add = count() - n0;
+        done(`Riot에서 바로 가져옴 · ${j.at}${add > 0 ? ` · 새 경기 ${add}판` : " · 새 경기 없음"}${j.pending ? ` · 아직 ${j.pending}경기 못 읽음 — 2분 뒤 다시 눌러 주세요` : ""}${j.cached ? " (2분 안에 받은 결과)" : ""}`);
+      })
+      .catch(() => { clearTimeout(timer); reload("실시간 조회 실패(연결 안 됨)"); });
   }
   function stacksHtml(t, mine) {
     const R = window.RECENT;
     const rs = S.ui.rState || {};
-    const refresh = mine ? `<div class="g-refresh"><button class="btn sm" data-act="grefresh" ${refreshing ? "disabled" : ""}>${refreshing ? "갱신 중…" : "갱신하기"}</button><span class="help" role="status">${esc(rs.msg || (R && R.at ? `수집 ${R.at} · 맥이 켜져 있을 때 자동 수집` : ""))}</span></div>` : "";
+    const refresh = mine ? `<div class="g-refresh"><button class="btn sm" data-act="grefresh" ${refreshing ? "disabled" : ""}>${refreshing ? "갱신 중…" : "갱신하기"}</button><span class="help" role="status">${esc(rs.msg || (liveOf(t) ? `Riot에서 바로 가져옴 · ${liveOf(t).at}` : R && R.at ? `매일 0시 자동 수집 ${R.at} · 누르면 Riot에서 바로 가져옵니다` : ""))}</span></div>` : "";
     const head = `<div class="section-title"><h2>${mine ? "우리 팀 함께 한 경기" : "상대 팀 함께 한 경기"}</h2><p>같은 팀 선수 2명 이상이 같은 편이었던 경기(자랭 등) · ${R && R.since ? esc(R.since) : "11/10"} 이후</p>${refresh}</div>`;
     if (!R || R.status !== "ok") return head + `<div class="note">미확보 — Riot 최근 경기 수집 전입니다.</div>`;
     const st = E.groupsOf(t);
     const miss = ROLES.filter((r) => { const x = R.players[t.id] && R.players[t.id][r]; return !x || x.error; }).map((r) => `${ROLE_KO[r]} ${esc(t.players[r].riot)}`);
     const missNote = miss.length ? `<p class="help warn" style="margin:0 0 8px">계정을 찾지 못해 빠진 선수: ${miss.join(", ")}</p>` : "";
     if (st === null) return head + `<div class="note">미확보 — 이 팀 자료가 없습니다.</div>`;
-    if (!st.length) return head + `<div class="card muted">${missNote}0판 — ${esc(R.since)} 이후 팀원 2명 이상이 같이 한 경기가 없습니다. (수집 ${esc(R.at)})</div>`;
+    if (!st.length) return head + `<div class="card muted">${missNote}0판 — ${esc(R.since)} 이후 팀원 2명 이상이 같이 한 경기가 없습니다. (${liveOf(t) ? `실시간 ${esc(liveOf(t).at)}` : `수집 ${esc(R.at)}`})</div>`;
     const wins = st.filter((g) => g.win).length;
     const banCount = {};
     st.forEach((g) => (g.bans || []).forEach((b) => b && (banCount[b] = (banCount[b] || 0) + 1)));
@@ -553,7 +581,7 @@
       <td data-label="픽"><div class="row-chips">${ROLES.map((r) => g.picks[r] && CH[g.picks[r]] ? `<span class="chip" title="${ROLE_KO[r]}${g.playedRole && g.playedRole[r] && g.playedRole[r] !== r ? ` (실제 ${ROLE_KO[g.playedRole[r]] || "-"})` : ""}">${icon(g.picks[r], "sm")}${esc(CH[g.picks[r]].ko)}</span>` : "").join("")}</div></td>
       <td data-label="밴"><div class="row-chips">${(g.bans || []).filter((b) => CH[b]).map((b) => `<span class="chip">${icon(b, "sm")}</span>`).join("") || `<span class="dim">-</span>`}</div></td></tr>`).join("");
     const five = st.filter((g) => g.n === 5).length;
-    return head + `<div class="card">${missNote}<p class="help" style="margin:0 0 8px">${st.length}판 ${wins}승 (5인 ${five}판) · 출처 ${esc(R.source)} · 수집 ${esc(R.at)}${bans.length ? ` · 자주 밴: ${bans.map(([b, n]) => `${esc(CH[b].ko)} ${n}`).join(", ")}` : ""}</p>
+    return head + `<div class="card">${missNote}<p class="help" style="margin:0 0 8px">${st.length}판 ${wins}승 (5인 ${five}판) · 출처 ${esc(R.source)}${liveOf(t) ? ` · 실시간 ${esc(liveOf(t).at)}` : ` · 수집 ${esc(R.at)}`}${bans.length ? ` · 자주 밴: ${bans.map(([b, n]) => `${esc(CH[b].ko)} ${n}`).join(", ")}` : ""}</p>
       <div class="tbl-wrap"><table class="study cards-m"><thead><tr><th>시각</th><th>큐·인원</th><th>결과</th><th>함께 한 선수의 픽</th><th>밴</th></tr></thead><tbody>${rows}</tbody></table></div>${pager}</div>`;
   }
   function dataStatus() {

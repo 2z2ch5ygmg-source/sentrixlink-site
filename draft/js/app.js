@@ -746,7 +746,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=47" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=48" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -789,7 +789,7 @@
     Object.values(sc.a || {}).forEach((t) => { if (t.at) pts.push(t.at); (t.via || []).forEach((q) => pts.push(q)); });
     Object.values(sc.w || {}).forEach((w) => pts.push(w.at));
     (sc.p || []).forEach((p) => p.pts.forEach((q) => pts.push(q)));
-    (sc.hit || []).forEach((h) => pts.push(h.at)); (sc.l || []).forEach((l) => pts.push(l.at));
+    (sc.hit || []).forEach((h) => pts.push(h.at)); (sc.l || []).forEach((l) => pts.push(l.at)); (sc.fitPts || []).forEach((q) => pts.push(q));
     const [cx, cy, s] = sc.cam;
     if (!pts.length) return sc.cam;
     const m = 3;   // 가장자리 여유(맵 %)
@@ -823,13 +823,19 @@
         : `<span class="sc-vis ${cls}" style="${pct(w.at)};width:${(w.r || 6) * 2}%"${isNew ? dataA({ k: "grow", d: (w.d || 0) + 0.25 }) : ""}${w.x ? dataA({ k: "fade", d: w.d || 0 }) : ""}></span>`;
       return vis + `<span class="sc-ward ${cls}" style="${pct(w.at)}"${inA}><i></i>${w.x ? `<b class="sc-x"${dataA({ k: "in", d: w.d || 0 })}>✕</b>` : ""}</span>`;
     }).join("");
+    // 안개: 우리 챔프(시야 1350)·우리 와드(900)가 못 보는 곳을 어둡게 — 상대는 여기서만 숨을 수 있다
+    const fogSrc = sc.fog === false ? null : [...Object.values(sc.a || {}).filter((t) => t.s === "us" && t.at).map((t) => [t.at[0], t.at[1], 1350]),
+      ...Object.values(sc.w || {}).filter((w) => w.s === "us" && !w.ghost && !w.x).map((w) => [w.at[0], w.at[1], 900]), ...(sc.vis || []).map((v) => [v[0], v[1], v[2]])];
+    // 다른 시야 출처(우리 라인 미니언 등): 작은 표시 + 이름
+    const vsrc = (sc.vis || []).map((v) => `<span class="sc-vsrc" style="${pct(v)}" title="${esc(v[3] || "우리 시야")}"></span><span class="sc-lab vsrc" style="left:${v[0]}%;top:${v[1] + 2.2}%">${esc(v[3] || "우리 시야")}</span>`).join("");
+    const fog = fogSrc && fogSrc.length && vgrid() ? `<canvas class="sc-fog" width="${vgrid().w}" height="${vgrid().h}" data-fog='${JSON.stringify(fogSrc)}' aria-hidden="true"></canvas>` : "";
     const pa = (prev && prev.a) || {};
     const toks = Object.entries(sc.a || {}).map(([id, t]) => {
       const from = pa[id] ? pa[id].at : null;
       const pts = from ? [from, ...(t.via || []), t.at] : [...(t.via || []), t.at];
       const moves = pts.length > 1 && pts.some((q) => q[0] !== t.at[0] || q[1] !== t.at[1]);
       const anim = moves ? dataA({ k: "move", pts, d: t.d || 0 }) : !pa[id] ? dataA({ k: "in", d: t.d || 0 }) : "";
-      return `<span class="sc-tok ${t.s} s-${side(t.s)} ${t.me ? "me" : ""}" style="${pct(t.at)}"${anim} title="${t.s === "us" ? "우리" : "상대"} ${esc(CH[t.c] ? CH[t.c].ko : t.c)}">${icon(t.c, "sm")}</span>`;
+      return `<span class="sc-tok ${t.s} s-${side(t.s)} ${t.me ? "me" : ""} ${t.fog ? "fogged" : ""}" style="${pct(t.at)}"${anim} title="${t.s === "us" ? "우리" : "상대"} ${esc(CH[t.c] ? CH[t.c].ko : t.c)}${t.fog ? " — 안 보임(예상 위치)" : ""}">${icon(t.c, "sm")}${t.fog ? `<b class="fog-q">?</b>` : ""}</span>`;
     }).join("");
     const hits = (sc.hit || []).map((h) => `<span class="sc-hit" style="${pct(h.at)};width:${(h.r || 1.6) * 2}%"${dataA({ k: "pop", d: h.d || 0 })}></span>`).join("");
     const labs = (sc.l || []).map((l) => `<span class="sc-lab ${l.k || ""}" style="${pct(l.at)}"${dataA({ k: "in", d: l.d || 0 })}>${esc(l.t)}</span>`).join("");
@@ -837,7 +843,7 @@
     // 보기 핀(버튼)이 들어 있으면 그림(role=img)이 아니라 묶음(group)이어야 버튼을 누를 수 있다
     const role = extra && extra.pins ? `role="group" aria-label="${esc(sc.cap || "맵에서 보기 고르기")}"` : `role="img" aria-label="${esc(sc.cap || "맵 그림")}"`;
     return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""}" ${role}>
-      <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
+      <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
       ${base}${sc.approx ? `<span class="sc-approx">대략 자리 · 정확한 자리는 영상</span>` : ""}</div>`;
   }
   // ----- 실제 시야: 게임 이동·시야 격자(js/visiongrid.js)로 와드가 밝히는 칸을 계산 -----
@@ -867,8 +873,22 @@
   }
   // 시야 캔버스: data-vis에 와드 자리·색, 그린 뒤 drawVision이 칸을 칠한다
   const visCanvas = (cls, style, v, anim) => { const g = vgrid(); return g ? `<canvas class="${cls}" width="${g.w}" height="${g.h}" style="${style}" data-vis='${JSON.stringify(v)}'${anim || ""} aria-hidden="true"></canvas>` : ""; };
+  // 우리 팀 시야(챔프 1350 · 와드 900)를 합친 칸 — 이 밖은 안개(상대가 안 보이는 곳)
+  function teamVision(sources) {
+    const g = vgrid(); if (!g) return null;
+    const seen = new Uint8Array(g.w * g.h);
+    sources.forEach(([x, y, r]) => { const c = visionCells(x, y, r); for (let k = 0; k < c.length; k += 2) seen[c[k + 1] * g.w + c[k]] = 1; });
+    return seen;
+  }
   function drawVision(root) {
     if (!root) return;
+    root.querySelectorAll("canvas[data-fog]").forEach((cv) => {
+      let src; try { src = JSON.parse(cv.dataset.fog); } catch (e) { return; }
+      const g = vgrid(), seen = teamVision(src); if (!seen) return;
+      const x = cv.getContext("2d"), img = x.createImageData(g.w, g.h);
+      for (let k = 0; k < seen.length; k++) if (!seen[k] && g.a[k] !== 1) { img.data[k * 4 + 3] = 150; }
+      x.putImageData(img, 0, 0);
+    });
     root.querySelectorAll("canvas[data-vis]").forEach((cv) => {
       let o; try { o = JSON.parse(cv.dataset.vis); } catch (e) { return; }
       const cells = visionCells(o.x, o.y, o.r); if (!cells) return;
@@ -985,7 +1005,7 @@
     let body;
     if (d.scene) {
       // 상황 그림(실제 맵·실제 거리): 고르기 전 = 상황, 고른 뒤 = 그 선택으로 벌어지는 일을 애니메이션으로
-      const base = { ...d.scene, a: { ...(d.scene.a || {}) }, w: { ...(d.scene.w || {}) } };
+      const base = { ...d.scene, a: { ...(d.scene.a || {}) }, w: { ...(d.scene.w || {}) }, fitPts: d.opts.filter((o) => o.x != null).map((o) => [o.x, o.y]) };
       const pinned = d.opts.every((o) => o.x != null);
       if (done && d.kind === "pos" && d.scene.me) base.a.me = { c: d.scene.me, s: "us", at: [d.opts[ans].x, d.opts[ans].y], me: 1 };
       let sc = base, prev = null;

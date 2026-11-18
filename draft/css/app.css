@@ -728,3 +728,10 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .dmap > .dmk.k-ctrl i { background: #ff6fa5; border-color: #2a0614; }
 .dmk-l { position: absolute; transform: translate(-50%, -30px); z-index: 3; font-size: 12px; font-weight: 800; white-space: nowrap; padding: 1px 7px; border-radius: 6px; pointer-events: none; }
 .dmk-l.r { background: rgba(120, 25, 30, 0.92); color: #ffd0d3; } .dmk-l.b { background: rgba(20, 50, 110, 0.92); color: #cfe0ff; }
+.sc-world > .sc-fog { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.sc-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.sc-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.sc-tok.fogged { opacity: 0.5; border-style: dashed; filter: grayscale(0.6); }
+.sc-tok .fog-q { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; color: #fff; text-shadow: 0 0 3px #000; }
+.sc-world > .sc-vsrc { position: absolute; transform: translate(-50%, -50%); width: 12px; height: 12px; border-radius: 50%; background: #79a9ff; border: 2px solid #0b0e14; z-index: 2; }
+.sc-lab.vsrc { background: rgba(20, 50, 110, 0.9); color: #cfe0ff; font-size: 11px; }
