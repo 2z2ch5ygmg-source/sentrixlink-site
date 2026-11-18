@@ -602,10 +602,10 @@
     const canLive = !!window.RECENT_LIVE_URL && !!window.Practice && R && R.status === "ok";
     const btn = canLive ? `<div class="g-refresh"><button class="btn sm primary g-btn${prefreshing ? " busy" : ""}" data-act="prefresh" ${prefreshing ? "disabled" : ""}>${REFRESH_ICO}${prefreshing ? "갱신 중…" : "갱신하기"}</button>
       <span class="help" role="status">${esc(ps.msg || (P && P.live ? `Riot에서 바로 가져옴 · ${P.live.at}` : "누르면 상대 경기를 Riot에서 바로 가져와 다시 분석합니다"))}</span></div>` : "";
-    const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>`;
+    const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>${prepHtml(R)}`;
     if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p>${btn}</section>`;
     const tg = P.teamGames || {};
-    const since = R.since ? R.since.slice(5).replace("-", "/") : "11/10";
+    const since = md((P.live && P.live.since) || R.since) || "11/10";
     const sub = `${esc(t.name)} · 연습 기간(${since}~) 팀원끼리 한 판 ${tg.n || 0}${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · ${P.live ? `실시간 ${esc(P.live.at)}` : `수집 ${esc(R.at)}`}`;
     const days = (R.practiceRule && R.practiceRule.recentDays) || 3;
     const help = `<details class="prac-help"><summary>기준·한계</summary><ul class="plain">
@@ -748,6 +748,34 @@
   // 상대 연습 픽 갱신: Worker(/games)가 상대 5명 경기를 Riot에서 바로 읽고, 페이지가 js/practice.js로 다시 분석한다.
   // 기준선(이전 랭크·숙련도)은 매일 0시 수집 자료(RECENT.practiceBase). 경기를 다 못 읽었으면 바꾸지 않고 다시 누르라고 안내.
   let prefreshing = false;
+  // 대회 준비 시작일(연습 기간 시작): 팀 전체 하나(Worker /config). 바꾸면 「갱신하기」는 바로, 매일 0시 수집은 다음 수집부터 그 날짜를 따른다
+  const PREP = { since: "", def: "", edit: false, msg: "" };
+  const md = (d) => (d ? d.slice(5).replace("-", "/").replace(/^0/, "") : "");
+  async function loadPrep() {
+    if (!window.RECENT_LIVE_URL) return;
+    try { const d = await (await fetch(`${window.RECENT_LIVE_URL.replace(/\/$/, "")}/config`, { cache: "no-store" })).json(); if (d.status === "ok") { PREP.since = d.since; PREP.def = d.default; if (S.tab === "live" || S.tab === "enemy") render(); } } catch (e) { /* 그대로 */ }
+  }
+  async function savePrep(v) {
+    PREP.msg = "저장 중…"; render();
+    try {
+      const res = await fetch(`${window.RECENT_LIVE_URL.replace(/\/$/, "")}/config`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ since: v }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
+      PREP.since = d.since; PREP.edit = false;
+      PREP.msg = `연습 기간을 ${md(d.since)}~로 바꿨습니다(팀 전체). 「갱신하기」를 누르면 이 상대는 바로, 다른 기록은 매일 0시 수집 때 바뀝니다.`;
+    } catch (e) { PREP.msg = "저장 실패: " + (e.message || e); }
+    render();
+  }
+  function prepHtml(R) {
+    const cur = PREP.since || (R && R.since) || "2026-11-10";
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    const stale = PREP.since && R && R.since && PREP.since !== R.since;
+    if (PREP.edit) return `<div class="prep"><label class="help" for="prepDate">대회 준비 시작일</label><input class="input" type="date" id="prepDate" min="2025-01-01" max="${today}" value="${esc(cur)}">
+      <button class="btn sm primary" data-act="prepsave">저장</button>${PREP.def && PREP.def !== cur ? `<button class="btn sm ghost" data-act="prepdef">${md(PREP.def)}로</button>` : ""}<button class="btn sm ghost" data-act="prepcancel">취소</button>
+      <span class="help">이 날짜부터 한 판을 「연습」으로 셉니다 · 팀 전체 적용</span></div>`;
+    return `<div class="prep"><span class="help">연습 기간 <b>${md(cur)}~</b>${stale ? ` · 지금 보이는 자료는 ${md(R.since)}~ 기준(갱신하기·0시 수집 때 바뀜)` : ""}</span>
+      ${PREP.since ? `<button class="btn sm ghost" data-act="prepedit">대회 준비 시작일 바꾸기</button>` : ""}${PREP.msg ? `<span class="help" role="status">${esc(PREP.msg)}</span>` : ""}</div>`;
+  }
   function refreshPractice() {
     const t = E.teamOf(S, "enemy"), R = window.RECENT;
     if (prefreshing || !t || t.solo || !R || R.status !== "ok" || !window.Practice) return;
@@ -765,7 +793,7 @@
         const RR = window.RECENT, sinceMs = Date.parse(`${j.since || RR.since || "2026-11-10"}T00:00:00+09:00`);
         const P = window.Practice.compute(j.games, roles, RR.practiceBase && RR.practiceBase[t.id], sinceMs, Date.now());
         const before = RR.practice && RR.practice[t.id];
-        P.live = { at: j.at, acct: j.players };
+        P.live = { at: j.at, acct: j.players, since: j.since };
         window.RECENT = { ...RR, practice: { ...(RR.practice || {}), [t.id]: P } };
         const add = (P.teamGames.n || 0) - ((before && before.teamGames && before.teamGames.n) || 0);
         done(`Riot에서 바로 가져옴 · ${j.at} · 상대 경기 ${j.games.length}개${add > 0 ? ` · 팀원끼리 한 판 ${add}판 늘어남` : ""}${j.cached ? " (2분 안에 받은 결과)" : ""}`);
@@ -1491,6 +1519,10 @@
       case "dock": S.ui.dock = el.dataset.k; S.ui.dockAt = S.draft.idx; render(); break;
       case "grefresh": refreshRecent(); break;
       case "prefresh": refreshPractice(); break;
+      case "prepedit": PREP.edit = true; PREP.msg = ""; render(); { const d = document.getElementById("prepDate"); if (d) d.focus(); } break;
+      case "prepcancel": PREP.edit = false; render(); break;
+      case "prepdef": savePrep(PREP.def); break;
+      case "prepsave": { const d = document.getElementById("prepDate"); if (d && d.value) savePrep(d.value); break; }
       case "gpage": { S.ui.gPage = { ...(S.ui.gPage || {}), [el.dataset.k]: Number(el.dataset.p) }; save(); render();
         // 새 페이지 첫 줄부터 보이게 표 머리로 올림(상단바·휴대폰 하단 탭에 가리지 않게)
         const pg = [...document.querySelectorAll(".pager")].find((n) => n.querySelector(`[data-k="${el.dataset.k}"]`));
@@ -1873,4 +1905,5 @@
   loadSelfEval();
   pullShared();
   loadNotes();
+  loadPrep();
 })();

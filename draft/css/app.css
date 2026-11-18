@@ -903,3 +903,6 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .nf-full textarea { resize: vertical; min-height: 90px; font: inherit; }
 @media (max-width: 1180px) { .nboard { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .nboard { grid-template-columns: minmax(0, 1fr); } .nf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.prep { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 6px 0 8px; }
+.prep b { color: var(--gold); }
+.prep input[type="date"] { min-height: 32px; color-scheme: dark; }
