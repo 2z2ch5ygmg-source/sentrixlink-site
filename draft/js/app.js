@@ -225,7 +225,8 @@
         ? `<option value="?" ${s.role === "?" ? "selected" : ""}>${ep && ep.role ? `모름→${ROLE_KO[ep.role]}` : "모름"}</option>` : "";
       const sel = `<select data-act="role" data-i="${i}" aria-label="라인">${unk}${ROLES.map((r) => `<option value="${r}" ${r === s.role ? "selected" : ""}>${ROLE_KO[r]}</option>`).join("")}</select>`;
       const pn = ep && !ep.role ? `<span class="unk">${ep.cands.map((r) => ROLE_KO[r]).join("·")} 중</span>` : p ? esc(nick(p.riot)) + (ep && ep.guessed ? " (추정)" : "") : "";
-      return `<div class="slot-pick ${now}">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${pn}</div></div>${sel}</div>`;
+      // 마우스를 올리면: 상대 픽 → 우리 대응 픽, 우리 픽 → 상대가 꺼낼 대응 픽(남은 라인·챔프폭 기준)
+      return `<div class="slot-pick ${now}" data-hov="${s.champ}" data-hwho="${who}" data-hrole="${eff || ""}" tabindex="0">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${pn}</div></div>${sel}</div>`;
     }).join("");
     return `<section class="side ${side}"><div class="side-h"><span class="nm">${esc(t.name)}</span><span class="tag">${side === "B" ? "블루" : "레드"} · ${who === "our" ? "우리" : "상대"}</span></div><div class="bans">${bans}</div><div class="picks">${picks}</div></section>`;
   }
@@ -792,7 +793,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=58" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=59" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -1377,17 +1378,27 @@
   document.addEventListener("mouseout", (ev) => { const b = ev.target.closest && ev.target.closest(".bdg"); if (b && b.dataset.hov && !b.contains(ev.relatedTarget)) { b.open = false; delete b.dataset.hov; } });
   function hcAllowed() { return pcPointer.matches && S.tab === "live" && !!curStep(); }
   function showHover(el) {
-    if (!hcAllowed() || !CH[el.dataset.id]) return;
-    const id = el.dataset.id;
-    // 누구의 챔프로 볼지: 우리 픽 차례이거나 우리 챔프폭에 있으면 우리 관점, 아니면 상대 관점
-    const st = curStep();
-    const ourTurnPick = st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
-    const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
-    const who = ourTurnPick || inOurPool ? "our" : "enemy";
-    const role = (who === "our" && el.dataset.role) || E.guessRole(S, who, id);
+    const slot = !!el.dataset.hov;
+    if (slot ? !(pcPointer.matches && S.tab === "live") : !hcAllowed()) return;
+    const id = slot ? el.dataset.hov : el.dataset.id;
+    if (!CH[id]) return;
+    let who, role;
+    if (slot) { who = el.dataset.hwho; role = el.dataset.hrole || E.guessRole(S, who, id); }
+    else {
+      // 누구의 챔프로 볼지: 우리 픽 차례이거나 우리 챔프폭에 있으면 우리 관점, 아니면 상대 관점
+      const st = curStep();
+      const ourTurnPick = st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
+      const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
+      who = ourTurnPick || inOurPool ? "our" : "enemy";
+      role = (who === "our" && el.dataset.role) || E.guessRole(S, who, id);
+    }
     if (!role) return;
     const h = E.hoverInfo(S, who, id, role);
-    const labels = who === "our"
+    const labels = slot
+      ? (who === "our"
+        ? { bad: h.laner ? "상대 같은 라인(이미 픽)" : "상대 대응 픽 예상 · " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리 픽" }
+        : { bad: h.laner ? "우리 같은 라인(이미 픽)" : "우리 대응 픽 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대 픽" })
+      : who === "our"
       ? { bad: h.laner ? "상대 같은 라인" : "카운터 위험 · 상대 " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리" }
       : { bad: h.laner ? "우리 같은 라인" : "우리 카운터 후보 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대" };
     const row = (x) => `<li>${icon(x.id, "sm")}<span><b>${esc(CH[x.id].ko)}</b><small>${esc(x.d)}</small></span></li>`;
@@ -1404,11 +1415,11 @@
   }
   function hideHover() { if (hcFor) hcFor.removeAttribute("aria-describedby"); hc.hidden = true; hcFor = null; }
   document.addEventListener("mouseover", (ev) => {
-    const el = ev.target.closest("[data-act='pick'][data-id]");
+    const el = ev.target.closest("[data-act='pick'][data-id], .slot-pick[data-hov]");
     if (el === hcFor) return;
     if (el) showHover(el); else if (hcFor && !ev.target.closest(".hovercard")) hideHover();
   });
-  document.addEventListener("focusin", (ev) => { const el = ev.target.closest("[data-act='pick'][data-id]"); if (el) showHover(el); else hideHover(); });
+  document.addEventListener("focusin", (ev) => { const el = ev.target.closest("[data-act='pick'][data-id], .slot-pick[data-hov]"); if (el) showHover(el); else hideHover(); });
   window.addEventListener("scroll", () => hcFor && hideHover(), { passive: true });
 
   document.getElementById("champList").innerHTML = window.CHAMPIONS.map((c) => `<option value="${esc(c.ko)}">`).join("");
