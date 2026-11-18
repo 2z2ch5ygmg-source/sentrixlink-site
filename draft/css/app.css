@@ -765,3 +765,8 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sc-world > .sc-tok.ctx { width: 26px; height: 26px; border-width: 2px; z-index: 2; }
 .sc-world > .sc-vsrc.wave { width: 9px; height: 9px; }
 @media (max-width: 760px) { .sc-world > .sc-tok.ctx { width: 22px; height: 22px; } .sc-world > .sc-tower { width: 9px; height: 9px; } }
+/* 라인 웨이브: 진영 색 작은 묶음 + 남은 미니언 수(상대 묶음은 시야 안일 때만 수, 밖이면 ?) */
+.sc-world > .sc-wv { position: absolute; transform: translate(-50%, -50%); display: flex; height: 18px; border-radius: 9px; overflow: hidden; z-index: 2; border: 2px solid #0b0e14; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); font-size: 11px; font-weight: 900; color: #fff; line-height: 14px; }
+.sc-world > .sc-wv b { min-width: 15px; padding: 0 3px; display: grid; place-items: center; }
+.sc-world > .sc-wv .s-b { background: var(--blue); } .sc-world > .sc-wv .s-r { background: var(--red); }
+.sc-world > .sc-wv .unk { background: #3a3f4b; color: #c9ced8; }

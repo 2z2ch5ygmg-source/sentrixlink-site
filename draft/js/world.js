@@ -27,8 +27,26 @@
     lane: { us: { T: [8.3, 14.7], J: [27.6, 43.4], M: [46, 54], A: [80, 92], S: [82, 90.5] },
             them: { T: [9.5, 9.6], M: [53, 47], A: [88.3, 89.7], S: [90.7, 88.7] } },
   };
-  // 라인전 중 우리 라인 미니언 시야(1100): 탑·미드·바텀 웨이브 자리
-  const WAVES = { lane: { T: [8.4, 11.6, "우리 탑 라인 미니언"], M: [49.6, 50.4, "우리 미드 라인 미니언"], A: [86.6, 91, "우리 바텀 라인 미니언"] } };
+  // 라인 가운데 선(게임 이동 격자에서 읽음). p = 0 우리(블루) 1차 포탑 앞 → 1 상대 1차 포탑 앞
+  const LANES = { T: [[8.5, 29.5], [8.5, 14], [7, 11.2], [8.2, 8.6], [11, 7.4], [18.5, 7.2], [29, 7.2]], M: [[39.6, 56.8], [60.7, 42.5]], B: [[71.2, 90.6], [86, 90.6], [89.5, 86], [91.5, 80], [91.8, 70]] };
+  function lanePt(l, p) {
+    const L = LANES[l], seg = []; let tot = 0;
+    for (let i = 1; i < L.length; i++) { const d = Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); seg.push(d); tot += d; }
+    let rest = Math.max(0, Math.min(1, p)) * tot;
+    for (let i = 0; i < seg.length; i++) { if (rest <= seg[i] || i === seg.length - 1) { const t = seg[i] ? Math.min(1, rest / seg[i]) : 0; return [Math.round((L[i][0] + (L[i + 1][0] - L[i][0]) * t) * 10) / 10, Math.round((L[i][1] + (L[i + 1][1] - L[i][1]) * t) * 10) / 10]; } rest -= seg[i]; }
+    return L[L.length - 1];
+  }
+  // 웨이브: { 라인: { p, us, them } } — us·them = 남은 미니언 수. 라인전 기본 = 라인 가운데 6:6
+  const WAVE_DEFAULT = { lane: { T: { p: 0.5, us: 6, them: 6 }, M: { p: 0.5, us: 6, them: 6 }, B: { p: 0.5, us: 6, them: 6 } } };
+  const LANE_KO = { T: "탑", M: "미드", B: "바텀" };
+  // 장면의 웨이브 → 그릴 점(우리 묶음·상대 묶음 자리)과 우리 미니언 시야(1100)
+  function waves(sc) {
+    const W = { ...(WAVE_DEFAULT[sc.ph] || {}), ...(sc.waves || {}) }; if (!Object.keys(W).length) return [];
+    return Object.entries(W).map(([l, w]) => {
+      const gap = 0.022, flip = sc.red ? (q) => [Math.round((100 - q[0]) * 10) / 10, Math.round((100 - q[1]) * 10) / 10] : (q) => q;
+      return { l, ko: LANE_KO[l], us: w.us, them: w.them, note: w.t || "", usAt: flip(lanePt(l, w.p)), themAt: flip(lanePt(l, w.p + (w.them && w.us ? gap : 0))) };
+    });
+  }
   const RED = (p) => [Math.round((100 - p[0]) * 10) / 10, Math.round((100 - p[1]) * 10) / 10];
   // sc 를 받아, 비어 있는 역할을 채운 토큰 목록과 미니언 시야를 돌려준다. 이미 있는 역할(같은 쪽)은 건드리지 않는다.
   function fill(sc, ph) {
@@ -41,8 +59,7 @@
       if (have[side].has(r)) return;
       add[`ctx-${side}-${r}`] = { c: CAST[side][r], s: side, at: flip(at), ctx: 1, role: r };
     }));
-    const vis = Object.entries((WAVES[ph] || {})).filter(([r]) => !(sc.noWave || []).includes(r)).map(([, v]) => { const p = flip(v); return [p[0], p[1], 1100, v[2]]; });
-    return { add, vis };
+    return { add, vis: [] };
   }
   // 문제의 시점 글 → 시점 키
   function phaseOf(time) {
@@ -51,5 +68,5 @@
     if (/라인전 중|첫 귀환|라인전$/.test(t)) return "lane";
     return "";
   }
-  window.WORLD = { towers, fill, phaseOf, CAST, ROLE };
+  window.WORLD = { towers, fill, phaseOf, CAST, ROLE, LANES, lanePt, waves };
 })();

@@ -1,0 +1,214 @@
+// 벤픽·전략 판단 기준 (참고용 — 팀 상황에 맞게 고쳐 쓰는 값)
+window.KB = (function () {
+  const ROLES = ["T", "J", "M", "A", "S"];
+  const ROLE_KO = { T: "탑", J: "정글", M: "미드", A: "원딜", S: "서폿" };
+
+  const STYLE_KO = {
+    eng: "이니시", poke: "포킹", pick: "캐치", prot: "보호", dive: "돌진", split: "스플릿",
+    scale: "후반", skirm: "교전", front: "앞라인", cc: "CC", carry: "핵심딜", burst: "순간딜",
+  };
+
+  // 조합 유형: 핵심 성향(가중치), 이기는 상대, 운영 문구
+  const COMPS = {
+    eng: {
+      name: "이니시 한타 조합", short: "한타", w: { eng: 3, cc: 1.5, front: 1, burst: 1 },
+      beats: ["poke", "scale", "pick"],
+      win: "앞라인이 먼저 들어가고 광역 CC를 겹쳐 5:5 정면 한타에서 이깁니다.",
+      early: "바텀·정글 2:2 주도권을 잡고 첫 용 싸움을 강제합니다. 정글은 이니시가 강한 라인 쪽으로 동선을 짭니다.",
+      mid: "오브젝트 생성 40초 전 시야를 먼저 장악하고, 상대 원딜이 앞에 서는 순간 들어갑니다. 따로 끊어서 들어가지 않습니다.",
+      late: "바론·장로 앞에서 상대가 진입로를 지키게 만들고 정면 이니시. 한타 각이 없으면 억지로 싸우지 않고 웨이브를 먼저 밀어 둡니다.",
+      risk: "체력이 빠진 상태에서 이니시하면 그대로 집니다. 포킹을 맞았으면 회복 후 다시 들어갑니다.",
+    },
+    poke: {
+      name: "포킹 조합", short: "포킹", w: { poke: 3, prot: 1, scale: 0.5 },
+      beats: ["prot", "scale", "split"],
+      win: "오브젝트 앞에서 체력을 먼저 깎아 상대가 싸움을 못 걸게 만든 뒤 공짜로 가져갑니다.",
+      early: "라인전에서 체력 우위를 만들고 포탑 체력을 먼저 깎습니다. 정글은 침투보다 시야·스커틀 위주.",
+      mid: "포탑 공성 → 용·전령을 한 방향으로 묶어서 압박. 상대 진입 챔피언 위치가 안 보이면 앞으로 가지 않습니다.",
+      late: "바론 앞 시야를 두 겹으로 깔고 2~3번 포킹 후 싸움. 상대 이니시 스킬이 빠지면 바로 반격합니다.",
+      risk: "돌진·이니시 챔프에게 덮이면 약합니다. 진입 챔피언이 보이지 않으면 수풀 확인 전 포킹 금지.",
+    },
+    pick: {
+      name: "캐치(끊기) 조합", short: "캐치", w: { pick: 3, cc: 1, burst: 1.5 },
+      beats: ["split", "poke", "scale"],
+      win: "시야 싸움에서 혼자 있는 상대를 끊고 숫자 우위로 오브젝트를 가져갑니다.",
+      early: "정글·서폿이 함께 움직이며 미드·사이드에 와드 깔러 오는 상대를 노립니다.",
+      mid: "적 정글 입구 시야 장악 → 끊기 → 바로 오브젝트. 끊은 뒤 귀환하지 말고 이어서 이득을 챙깁니다.",
+      late: "바론 근처 시야를 걷고 상대가 와드 박으러 오는 순간을 노립니다. 정면 5:5는 피합니다.",
+      risk: "정면 한타가 나면 불리합니다. 캐치 실패 시 바로 빠지는 약속을 미리 정합니다.",
+    },
+    prot: {
+      name: "보호(원딜 지키기) 조합", short: "보호", w: { prot: 3, carry: 2, cc: 0.5 },
+      beats: ["dive", "eng"],
+      win: "핵심 딜러를 끝까지 살려 두고 진입하는 상대를 받아쳐서 이깁니다.",
+      early: "원딜 성장 우선. 바텀에 정글 동선을 투자하고 무리한 교전은 피합니다.",
+      mid: "용 위주로 천천히. 원딜 아이템 2코어 전엔 싸움을 미룹니다.",
+      late: "원딜 앞에 서폿·앞라인이 서서 받아치기. 상대가 먼저 들어오게 만듭니다.",
+      risk: "포킹·스플릿에 시간이 끌리면 손해. 상대가 안 들어오면 사이드를 함께 밀어 줘야 합니다.",
+    },
+    dive: {
+      name: "돌진 조합", short: "돌진", w: { dive: 3, burst: 1, skirm: 1 },
+      beats: ["poke", "scale"],
+      win: "앞라인을 무시하고 상대 딜러를 먼저 지워서 이깁니다.",
+      early: "정글이 라인 갱킹을 자주 가고 초반 킬로 성장합니다.",
+      mid: "사이드에서 시야 없는 딜러를 덮칩니다. 집결해서도 뒷라인부터 노립니다.",
+      late: "진입 순서를 정해 두기(첫 진입 → 둘째 진입 → 딜러). 보호 스킬이 빠진 뒤 들어갑니다.",
+      risk: "보호·디스인게이지(밀어내기) 조합에 막히면 끝납니다. 상대 CC가 빠진 뒤 진입.",
+    },
+    split: {
+      name: "스플릿 조합", short: "스플릿", w: { split: 3, scale: 0.5, prot: 0.5 },
+      beats: ["prot", "eng"],
+      win: "강한 사이드 1명이 라인을 밀고 나머지 4명이 시간을 버티며 오브젝트를 나눠 가집니다.",
+      early: "사이드 라이너 성장 최우선, 텔레포트로 합류해 숫자 우위를 만듭니다.",
+      mid: "1-3-1 / 1-4 운영. 사이드가 상대 2명을 끌면 반대편 오브젝트를 가져갑니다.",
+      late: "사이드는 상대 포탑, 본대는 바론 시야만 지키고 정면 싸움은 피합니다.",
+      risk: "캐치 조합에 사이드가 잘리면 끝납니다. 사이드는 시야 없이 깊게 들어가지 않습니다.",
+    },
+    skirm: {
+      name: "초중반 교전 조합", short: "교전", w: { skirm: 3, dive: 1, front: 0.5 },
+      beats: ["scale", "prot"],
+      win: "15~25분 사이 작은 싸움을 계속 걸어서 크게 벌리고 빨리 끝냅니다.",
+      early: "첫 3분부터 정글 교전·라인 다이브. 유충·첫 용 싸움을 모두 받아칩니다.",
+      mid: "골드 차이가 날 때 상대 정글에 들어가 시야를 지우고 계속 싸움을 겁니다.",
+      late: "25분 이후엔 힘이 빠지니 바론·포탑으로 빨리 마무리합니다.",
+      risk: "초반에 못 벌리면 후반 조합에 밀립니다. 무리한 다이브로 역전당하지 않게 조심.",
+    },
+    scale: {
+      name: "후반 캐리 조합", short: "후반", w: { scale: 3, carry: 2, prot: 0.5 },
+      beats: ["split"],
+      win: "초반을 버티고 아이템이 갖춰지는 30분 이후 한타로 이깁니다.",
+      early: "킬보다 CS. 상대 정글 동선을 확인하고 위험한 라인은 포탑 근처에서 받습니다.",
+      mid: "용은 교환해 줘도 됩니다. 포탑 1차는 지키고, 성장 차이가 날 때까지 싸움을 피합니다.",
+      late: "핵심 딜러 3코어 이후 정면 한타. 장로·바론 싸움에서 확실한 우위를 가집니다.",
+      risk: "초반 교전·돌진 조합이 일찍 벌리면 버티지 못합니다. 초반 시야를 넉넉히.",
+    },
+  };
+
+  // 라인 상대 카운터(참고용): KEY 챔프를 상대로 라인전이 편한 챔프들
+  const COUNTERS = {
+    Darius: ["Vayne", "Quinn", "Teemo", "Gnar", "Kennen", "Jayce"],
+    Malphite: ["Mordekaiser", "Gwen", "Vladimir", "Cassiopeia"],
+    Kennen: ["Irelia", "Renekton", "Pantheon", "Malphite"],
+    Mordekaiser: ["Vayne", "Fiora", "Gwen", "Olaf", "Quinn"],
+    Pantheon: ["Malphite", "Poppy", "Garen", "KSante"],
+    Aatrox: ["Fiora", "Irelia", "Riven", "Kled"],
+    Jax: ["Malphite", "Poppy", "Teemo", "Pantheon"],
+    Fiora: ["Malphite", "Poppy", "Pantheon", "Kennen"],
+    Gnar: ["Irelia", "Jayce", "Aatrox", "Renekton"],
+    KSante: ["Vayne", "Fiora", "Gwen"],
+    Renekton: ["Teemo", "Quinn", "Vayne", "Gnar"],
+    Camille: ["Renekton", "Jax", "Poppy", "Pantheon"],
+    Garen: ["Vayne", "Teemo", "Kayle", "Quinn"],
+    Irelia: ["Malphite", "Volibear", "Mordekaiser", "Poppy"],
+    Riven: ["Renekton", "Poppy", "Pantheon", "Malphite"],
+    Sett: ["Vayne", "Quinn", "Teemo", "Kennen"],
+    Gwen: ["Pantheon", "Jayce", "Gnar"],
+    Jayce: ["Malphite", "Irelia", "Pantheon"],
+    Ornn: ["Fiora", "Vayne", "Gwen"],
+    Yone: ["Renekton", "Malphite", "Pantheon", "Lissandra"],
+    Yasuo: ["Renekton", "Malphite", "Pantheon", "Annie"],
+    Kled: ["Teemo", "Quinn", "Kennen"],
+    Qiyana: ["Lissandra", "Galio", "Anivia"],
+    Briar: ["Poppy", "JarvanIV", "Rammus", "Lillia"],
+    Nunu: ["Kindred", "Graves", "Belveth"],
+    Zac: ["Graves", "Kindred", "Olaf"],
+    Vi: ["Poppy", "JarvanIV", "Rammus", "Sejuani"],
+    LeeSin: ["Rammus", "Poppy", "Sejuani"],
+    Graves: ["Rammus", "Poppy"],
+    Kayn: ["Rammus", "Poppy", "Vi"],
+    Hecarim: ["Rammus", "Poppy"],
+    Khazix: ["Rammus", "Rengar", "Vi"],
+    Viego: ["Rammus", "Poppy", "Sejuani"],
+    XinZhao: ["Poppy", "Rammus"],
+    Belveth: ["Rammus", "Poppy", "Vi"],
+    MasterYi: ["Rammus", "Poppy", "JarvanIV"],
+    JarvanIV: ["Kindred", "Graves"],
+    Sejuani: ["Kindred", "Graves", "Olaf"],
+    Azir: ["Fizz", "Zed", "Talon", "Kassadin"],
+    Orianna: ["Fizz", "Zed", "Kassadin", "Talon"],
+    Lissandra: ["Xerath", "Viktor", "Kassadin", "Cassiopeia"],
+    Malzahar: ["Kassadin", "Fizz", "Yasuo"],
+    Galio: ["Cassiopeia", "Viktor", "Vladimir"],
+    Ahri: ["Galio", "Kassadin", "Lissandra"],
+    Syndra: ["Fizz", "Kassadin", "Yasuo"],
+    Hwei: ["Fizz", "Zed", "Talon", "Katarina"],
+    Viktor: ["Fizz", "Zed", "Talon"],
+    Zed: ["Lissandra", "Malzahar", "Galio", "Annie"],
+    Katarina: ["Lissandra", "Galio", "Malzahar", "Annie"],
+    Sylas: ["Galio", "Lissandra", "Orianna"],
+    Leblanc: ["Galio", "Lissandra", "Malzahar"],
+    Akali: ["Galio", "Lissandra", "Malzahar"],
+    Xerath: ["Fizz", "Zed", "Kassadin", "Katarina"],
+    Ezreal: ["Draven", "Caitlyn"],
+    Kaisa: ["Caitlyn", "Draven", "Varus"],
+    Lucian: ["Varus", "Ashe"],
+    Caitlyn: ["Lucian", "Samira", "Kalista"],
+    Yunara: ["Draven", "Caitlyn", "Lucian"],
+    Jinx: ["Draven", "Lucian", "Samira", "Kalista"],
+    Aphelios: ["Draven", "Lucian"],
+    Vayne: ["Caitlyn", "Draven"],
+    Samira: ["Ashe", "Caitlyn", "Varus"],
+    Nautilus: ["Morgana", "Braum", "Janna", "TahmKench"],
+    Blitzcrank: ["Morgana", "Alistar", "Braum", "TahmKench"],
+    Leona: ["Morgana", "Braum", "Zyra"],
+    Alistar: ["Janna", "Zyra", "Lulu"],
+    Lulu: ["Blitzcrank", "Nautilus", "Leona", "Pyke"],
+    Thresh: ["Morgana", "Alistar", "Braum"],
+    Braum: ["Zyra", "Brand", "Velkoz"],
+    Pyke: ["Braum", "Morgana", "Leona"],
+    Rell: ["Janna", "Morgana", "Zyra"],
+    Rakan: ["Janna", "Thresh"],
+  };
+
+  const LEVEL_KO = { 3: "상", 2: "중", 1: "하" };
+
+  // 드래프트 순서(대회 표준): 밴 6 → 픽 6 → 밴 4 → 픽 4
+  const ORDER = [
+    ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"], ["R", "ban"],
+    ["B", "pick"], ["R", "pick"], ["R", "pick"], ["B", "pick"], ["B", "pick"], ["R", "pick"],
+    ["R", "ban"], ["B", "ban"], ["R", "ban"], ["B", "ban"],
+    ["R", "pick"], ["B", "pick"], ["B", "pick"], ["R", "pick"],
+  ];
+
+  // 이동기·생존기가 좋아 갱킹이 잘 안 먹히는 챔프
+  const SLIPPERY = ["Ezreal", "Fizz", "Kassadin", "Ahri", "Zed", "Leblanc", "Akali", "Yasuo", "Yone", "Irelia", "Fiora",
+    "Camille", "Riven", "Lucian", "Vayne", "Tristana", "Kalista", "Samira", "Zeri", "Katarina", "Talon", "Qiyana",
+    "Aurora", "Naafiri", "Gnar", "Corki", "Sylas", "Ekko", "Kayle", "Nilah", "Shaco", "Smolder", "Locke"];
+  // 초반 갱킹 압박이 강한 정글
+  const GANK = ["LeeSin", "JarvanIV", "Elise", "XinZhao", "Vi", "RekSai", "Nocturne", "Pantheon", "Briar", "Olaf", "Hecarim",
+    "Rammus", "Nunu", "Zac", "Sejuani", "Qiyana", "Evelynn", "Shaco", "Rengar", "Khazix", "Kayn", "Warwick", "Volibear",
+    "MonkeyKing", "Nidalee", "Talon", "Ekko", "Diana", "Skarner", "Amumu", "Naafiri"];
+  // 사일러스가 뺏으면 위험한 궁극기: 3 = 한타를 뒤집는 광역 궁, 2 = 강한 궁
+  const ULT_STEAL = {
+    Malphite: 3, Kennen: 3, Amumu: 3, Orianna: 3, MonkeyKing: 3, Sejuani: 3, Rell: 3, Seraphine: 3, JarvanIV: 3,
+    Fiddlesticks: 3, MissFortune: 3, Karthus: 3, Rumble: 3, Cassiopeia: 3, Nunu: 3, Sona: 3, Galio: 3, Neeko: 3,
+    Diana: 3, Annie: 3,
+    Leona: 2, Ashe: 2, Nautilus: 2, Maokai: 2, Vi: 2, Morgana: 2, Taric: 2, Kayle: 2, Swain: 2, Gragas: 2, Brand: 2,
+    Veigar: 2, Syndra: 2, Darius: 2, Garen: 2, Zyra: 2, Ornn: 2, Skarner: 2, Viktor: 2, Azir: 2, Mordekaiser: 2,
+    Lissandra: 2, Zac: 2, Varus: 2, Jinx: 2,
+  };
+  // 자주 함께 쓰는 원딜|서폿 세트(솔로랭크·커뮤니티 정석): 3 = 정석 세트, 2 = 자주 쓰는 세트. 대회 기록은 pro.js
+  const DUO_PAIRS = {
+    "Ashe|Seraphine": 3, "Kaisa|Nautilus": 3, "Caitlyn|Lux": 3, "Ezreal|Karma": 3, "Xayah|Rakan": 3, "Lucian|Nami": 3,
+    "Lucian|Braum": 2, "Jinx|Lulu": 2, "Twitch|Lulu": 2, "KogMaw|Lulu": 2, "Zeri|Milio": 2, "Jinx|Milio": 2,
+    "Kalista|Renata": 2, "Kalista|Thresh": 2, "Samira|Leona": 2, "Samira|Nautilus": 2, "Draven|Pyke": 2,
+    "MissFortune|Leona": 2, "Ashe|Zyra": 2, "Varus|Xerath": 2, "Caitlyn|Morgana": 2, "Caitlyn|Neeko": 2,
+    "Kaisa|Rell": 2, "Ezreal|Yuumi": 2, "Kaisa|Alistar": 2, "Jhin|Nautilus": 2, "Ashe|Brand": 2,
+  };
+  // 밴픽 순서: 대회(토너먼트 드래프트) / 솔랭·자랭(랭크 드래프트: 밴 10개 뒤 픽 1-2-2-2-2-1).
+  // 솔랭·자랭 밴은 번갈아가 아니라 우리 쪽 5개를 먼저 다 넣고 상대 쪽 5개(사용자 요청 11-17).
+  // 모든 화면이 같은 ORDER 배열을 쓰므로 바꿀 때는 배열 내용만 바꾼다(useOrder).
+  const ORDER_TOURNAMENT = ORDER.map((x) => x.slice());
+  const rankedOrder = (ourSide) => {
+    const us = ourSide === "R" ? "R" : "B", them = us === "B" ? "R" : "B";
+    return [...Array(5).fill(us), ...Array(5).fill(them)].map((sd) => [sd, "ban"])
+      .concat(["B", "R", "R", "B", "B", "R", "R", "B", "B", "R"].map((sd) => [sd, "pick"]));
+  };
+  ORDER.kind = "tournament";
+  function useOrder(kind, ourSide) {
+    const src = kind === "ranked" ? rankedOrder(ourSide) : ORDER_TOURNAMENT;
+    ORDER.splice(0, ORDER.length, ...src.map((x) => x.slice()));
+    ORDER.kind = kind === "ranked" ? "ranked" : "tournament";
+  }
+  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS, useOrder };
+})();

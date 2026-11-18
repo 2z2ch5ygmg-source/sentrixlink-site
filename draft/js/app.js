@@ -694,13 +694,30 @@
 
   // ---------- pool editor ----------
   let editing = null;
+  // 티어는 고르기: 티어 + (아이언~다이아) 단계 1~4 / (마스터 이상) LP. 저장 글자는 「골드 4」·「마스터 700LP」 그대로
+  const TIERS = ["아이언", "브론즈", "실버", "골드", "플래티넘", "에메랄드", "다이아", "마스터", "그랜드마스터", "챌린저"];
+  const HIGH = (t) => /마스터|챌린저/.test(t);
+  function parseTier(v) { const m = String(v || "").trim().match(/^(그랜드마스터|챌린저|마스터|다이아|에메랄드|플래티넘|골드|실버|브론즈|아이언)\s*(\d+)?\s*(LP)?/i); if (!m) return { t: "", d: "", lp: "" }; return HIGH(m[1]) ? { t: m[1], d: "", lp: m[2] || "" } : { t: m[1], d: m[2] || "", lp: "" }; }
+  function tierPicker(r, v) {
+    const x = parseTier(v);
+    const opt = (val, lab, on) => `<option value="${val}" ${on ? "selected" : ""}>${lab}</option>`;
+    return `<select class="input" style="flex:1" data-tf="t" data-role="${r}" aria-label="${ROLE_KO[r]} 티어">${opt("", "티어 고르기", !x.t)}${TIERS.map((t) => opt(t, t, x.t === t)).join("")}</select>`
+      + (x.t && !HIGH(x.t) ? `<select class="input" style="width:76px" data-tf="d" data-role="${r}" aria-label="${ROLE_KO[r]} 단계">${opt("", "단계", !x.d)}${[4, 3, 2, 1].map((n) => opt(n, n, String(n) === x.d)).join("")}</select>` : "")
+      + (x.t && HIGH(x.t) ? `<input class="input" style="width:84px" type="number" min="0" step="1" inputmode="numeric" data-tf="lp" data-role="${r}" value="${esc(x.lp)}" placeholder="LP" aria-label="${ROLE_KO[r]} LP">` : "");
+  }
+  function setTierFrom(el) {
+    const r = el.dataset.role, row = el.closest(".ed-row"), p = team(editing).players[r];
+    const t = row.querySelector('[data-tf="t"]').value, d = row.querySelector('[data-tf="d"]'), lp = row.querySelector('[data-tf="lp"]');
+    p.tier = !t ? "" : HIGH(t) ? (lp && lp.value !== "" && el.dataset.tf !== "t" ? `${t} ${Math.max(0, parseInt(lp.value, 10) || 0)}LP` : t) : (d && d.value && el.dataset.tf !== "t" ? `${t} ${d.value}` : t);
+    save();
+  }
   function renderEditor() {
     const root = document.getElementById("modal");
     if (!editing) { root.innerHTML = ""; return; }
     const t = team(editing);
     const roles = ROLES.map((r) => { const p = t.players[r]; return `<div class="ed-role"><div class="ed-row"><b style="width:40px">${ROLE_KO[r]}</b>
       <input class="input" style="flex:2" data-f="riot" data-role="${r}" value="${esc(p.riot)}" aria-label="${ROLE_KO[r]} 라이엇 ID">
-      <input class="input" style="flex:1" data-f="tier" data-role="${r}" value="${esc(p.tier)}" aria-label="티어">
+      ${tierPicker(r, p.tier)}
       <input class="input" style="width:70px" type="number" data-f="pts" data-role="${r}" value="${p.pts}" aria-label="점수"></div>
       <div class="row-chips">${poolChips(t, r, { edit: true })}</div>
       <div class="ed-row"><input class="input" style="flex:1" list="champList" data-add="${r}" placeholder="챔피언 추가 (이름 입력 후 Enter)">
@@ -775,7 +792,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=48" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=52" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -857,7 +874,9 @@
     }).join("");
     // 전체 맥락(js/world.js): 장면에 없는 우리 팀원을 시점 자리에 채우고, 우리 포탑·라인 미니언 시야를 더한다
     const W = window.WORLD, ctxW = W && sc.ph && !sc.noCtx ? W.fill(sc, sc.ph) : { add: {}, vis: [] };
-    const waves = ctxW.vis.filter((v) => !(sc.vis || []).some((q) => Math.hypot(q[0] - v[0], q[1] - v[1]) < 15));
+    // 라인 웨이브(js/world.js): 우리 미니언 묶음은 늘 보이고 시야 1100을 준다. 상대 묶음은 우리 시야 안일 때만
+    const wv = W ? W.waves(sc) : [];
+    const waves = wv.filter((q) => q.us > 0).map((q) => [q.usAt[0], q.usAt[1], 1100, `우리 ${q.ko} 미니언`]);
     const ourSide = red ? "r" : "b";
     const towers = W ? W.towers.filter((t, i) => !(sc.down || []).includes(i)) : [];
     const ctxUs = Object.fromEntries(Object.entries(ctxW.add).filter(([, t]) => t.s === "us"));
@@ -869,10 +888,14 @@
     const inSight = (p) => !seen || !gv || !!seen[Math.min(gv.h - 1, Math.floor((p[1] / 100) * gv.h)) * gv.w + Math.min(gv.w - 1, Math.floor((p[0] / 100) * gv.w))];
     // 맞라인 상대는 우리 시야 안일 때만 그린다(밖이면 모름)
     const ctxThem = Object.fromEntries(Object.entries(ctxW.add).filter(([, t]) => t.s === "them" && inSight(t.at)));
+    // 한 라인에 묶음 하나: 부딪히는 자리에 「우리 수 : 상대 수」(상대는 우리 시야 안일 때만 수, 밖이면 ?)
+    const waveHtml = wv.map((q) => { const seeThem = q.them > 0 && inSight(q.themAt), at0 = q.us > 0 ? q.usAt : q.themAt;
+      const tip = `${q.ko} 웨이브 — 우리 ${q.us}마리 · 상대 ${q.them > 0 ? (seeThem ? q.them + "마리" : "시야 밖") : "없음"}${q.note ? " · " + q.note : ""}`;
+      return `<span class="sc-wv" style="${pct(at0)}" title="${esc(tip)}" aria-label="${esc(tip)}"><b class="s-${side("us")}">${q.us}</b><b class="${q.them > 0 && !seeThem ? "unk" : "s-" + side("them")}">${q.them > 0 ? (seeThem ? q.them : "?") : 0}</b></span>`; }).join("");
     const towerHtml = towers.map((t) => `<span class="sc-tower s-${t.side} ${t.side === ourSide ? "us" : "them"}" style="${pct(t.at)}" title="${t.side === ourSide ? "우리" : "상대"} 포탑 · ${esc(t.kind)}"></span>`).join("");
     // 다른 시야 출처(우리 라인 미니언 등): 작은 표시 + 이름
     const vsrc = (sc.vis || []).map((v) => `<span class="sc-vsrc" style="${pct(v)}" title="${esc(v[3] || "우리 시야")}"></span><span class="sc-lab vsrc" style="left:${v[0]}%;top:${v[1] + 2.2}%">${esc(v[3] || "우리 시야")}</span>`).join("")
-      + waves.map((v) => `<span class="sc-vsrc wave" style="${pct(v)}" title="${esc(v[3])}"></span>`).join("");
+      ;
     const fog = fogSrc && fogSrc.length && vgrid() ? `<canvas class="sc-fog" width="${vgrid().w}" height="${vgrid().h}" data-fog='${JSON.stringify(fogSrc)}' aria-hidden="true"></canvas>` : "";
     const pa = (prev && prev.a) || {};
     const toks = Object.entries({ ...ctxUs, ...ctxThem, ...(sc.a || {}) }).map(([id, t0]) => {
@@ -892,7 +915,7 @@
     const role = extra && extra.pins ? `role="group" aria-label="${esc(sc.cap || "맵에서 보기 고르기")}"` : `role="img" aria-label="${esc(sc.cap || "맵 그림")}"`;
     const zoomBar = `<div class="sc-zoom" role="group" aria-label="미니맵 확대·축소"><button type="button" data-act="mzoom" data-v="in" aria-label="확대">＋</button><button type="button" data-act="mzoom" data-v="out" aria-label="축소">−</button><button type="button" data-act="mapmode" data-v="full" aria-pressed="${!focusMode}">전체</button><button type="button" data-act="mapmode" data-v="focus" aria-pressed="${focusMode}">장면 확대</button></div>`;
     return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""} ${viewCam[2] < 99.9 ? "zoomed" : ""}" ${role} data-cam='${JSON.stringify(viewCam)}' data-focus='${JSON.stringify(sc.cam)}'>${zoomBar}
-      <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${towerHtml}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
+      <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${towerHtml}${waveHtml}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
       ${base}${sc.approx ? `<span class="sc-approx">대략 자리 · 정확한 자리는 영상</span>` : ""}</div>`;
   }
   // ----- 실제 시야: 게임 이동·시야 격자(js/visiongrid.js)로 와드가 밝히는 칸을 계산 -----
@@ -915,7 +938,7 @@
       const dx = i + 0.5 - cx, dy = j + 0.5 - cy; if (dx * dx + dy * dy > R * R) continue;
       const v = at(i, j); if (v === 1 || (v >= 2 && v !== myBush)) continue;
       const steps = Math.ceil(Math.hypot(dx, dy) * 3); let ok = true;
-      for (let st = 1; st < steps; st++) if (at(Math.floor(cx + (dx * st) / steps), Math.floor(cy + (dy * st) / steps)) === 1) { ok = false; break; }
+      for (let st = 1; st < steps; st++) { const q = at(Math.floor(cx + (dx * st) / steps), Math.floor(cy + (dy * st) / steps)); if (q === 1 || (q >= 2 && q !== myBush)) { ok = false; break; } }   // 벽과 다른 부쉬는 그 뒤를 가린다
       if (ok) out.push(i, j);
     }
     return out;
@@ -1122,7 +1145,7 @@
       const okO = d.opts.find((o) => o.ok);
       if (done) w.ans = { at: [okO.x, okO.y], k: "ward", s: "us", d: 0.2 };
       const labs = (d.wards || []).map((q) => ({ at: [q.at[0], q.at[1] - 1.6], t: q.t, k: q.s === "them" ? "bad" : "" }));
-      const sc = { cam: focus, a, w, l: labs, fitPts: d.opts.map((o) => [o.x, o.y]), cap: d.q, ph: phaseOf(d), autoFog: 1 };
+      const sc = { cam: focus, a, w, l: labs, fitPts: d.opts.map((o) => [o.x, o.y]), cap: d.q, ph: phaseOf(d), autoFog: 1, waves: d.waves };
       const pins = d.opts.map((o, i) => `<button class="dpin sc-pin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button><span class="dpin-l" style="left:${o.x}%;top:${o.y}%" aria-hidden="true">${esc(o.t)}</span>`).join("");
       body = `<div class="dgrid">${stageHtml(sc, done ? { ...sc, w: Object.fromEntries(Object.entries(w).filter(([k]) => k !== "ans")) } : null, { pins, cls: "dmap-pos" })}${optList(false)}</div>
         <p class="help sc-note">기본은 전체 미니맵 · 「장면 확대」나 ＋로 가까이 · 어두운 곳 = 우리 시야 밖${d.wards && d.wards.length ? " · 빨간 영역 = 이미 박힌 상대 와드가 보는 곳" : ""}</p>`;
@@ -1255,6 +1278,7 @@
   document.addEventListener("input", (ev) => {
     const t = ev.target;
     if (t.id === "q") { S.ui.q = t.value; const box = document.getElementById("champs"); if (box) box.innerHTML = champButtons(); else render(); return; }
+    if (t.dataset && t.dataset.tf === "lp" && editing) { setTierFrom(t); return; }
     if (t.dataset && t.dataset.f && editing) {
       const p = team(editing).players[t.dataset.role];
       p[t.dataset.f] = t.dataset.f === "pts" ? Number(t.value) || 0 : t.value; save();
@@ -1266,6 +1290,8 @@
     else if (t.id === "enemySel" || t.id === "enemyPick") { S.enemyTeam = t.value; syncQueue(true); save(); render(); }
     else if (t.dataset && t.dataset.act === "role") setRole(Number(t.dataset.i), t.value);
     else if (t.id === "file" && t.files[0]) { importData(t.files[0]); t.value = ""; }
+    else if (t.dataset && t.dataset.tf && editing) { const r = t.dataset.role, k = t.dataset.tf; setTierFrom(t); renderEditor(); render();
+      const next = document.querySelector(`#modal [data-role="${r}"][data-tf="${k === "t" ? "d" : k}"]`) || document.querySelector(`#modal [data-role="${r}"][data-tf="${k === "t" ? "lp" : k}"]`) || document.querySelector(`#modal [data-role="${r}"][data-tf="t"]`); if (next) next.focus(); }
     else if (t.dataset && t.dataset.f && editing) render();
   });
   document.addEventListener("keydown", (ev) => {
