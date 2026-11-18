@@ -21,14 +21,13 @@
     Rumble: "T", MonkeyKing: "J", Hwei: "M", Xayah: "A", Zeri: "A", Lulu: "S" };
   // 블루(우리) 기준 시점별 자리. 상대 정글은 넣지 않는다(위치를 모른다).
   // start = 게임 시작 직후(라인으로 걸어가는 중), lane = 라인전 중(웨이브는 라인 가운데쯤)
-  const SPOT = {
-    start: { us: { T: [7, 27], J: [26.5, 47.5], M: [41.5, 57.5], A: [72, 91.5], S: [74, 90] },
-             them: { T: [28, 6.5], M: [58, 42.5], A: [92.5, 73], S: [91, 74.5] } },
-    lane: { us: { T: [8.3, 14.7], J: [27.6, 43.4], M: [46, 54], A: [80, 92], S: [82, 90.5] },
-            them: { T: [9.5, 9.6], M: [53, 47], A: [88.3, 89.7], S: [90.7, 88.7] } },
-  };
+  // 라이너 자리는 라인 선 위(lanePt)에서 정한다. 정글은 고정 자리. 상대 정글은 넣지 않는다(위치를 모른다).
+  // start = 게임 시작 직후(자기 1차 포탑 쪽으로 걸어가는 중), lane = 라인전 중(자기 웨이브 바로 뒤)
+  const LANE_OF = { T: "T", M: "M", A: "B", S: "B" };
+  const BEHIND = { T: 0.1, M: 0.14, A: 0.12, S: 0.08 };
+  const JG = { start: [26.5, 47.5], lane: [27.6, 43.4] };
   // 라인 가운데 선(게임 이동 격자에서 읽음). p = 0 우리(블루) 1차 포탑 앞 → 1 상대 1차 포탑 앞
-  const LANES = { T: [[8.5, 29.5], [8.5, 14], [7, 11.2], [8.2, 8.6], [11, 7.4], [18.5, 7.2], [29, 7.2]], M: [[39.6, 56.8], [60.7, 42.5]], B: [[71.2, 90.6], [86, 90.6], [89.5, 86], [91.5, 80], [91.8, 70]] };
+  const LANES = { T: [[8.5, 29.5], [9.5, 20], [13, 13.5], [18, 9.5], [23, 7.6], [29, 7.2]], M: [[39.6, 56.8], [60.7, 42.5]], B: [[71.2, 90.6], [80.5, 90.5], [86.6, 86.6], [90.5, 82], [91.8, 70]] };
   function lanePt(l, p) {
     const L = LANES[l], seg = []; let tot = 0;
     for (let i = 1; i < L.length; i++) { const d = Math.hypot(L[i][0] - L[i - 1][0], L[i][1] - L[i - 1][1]); seg.push(d); tot += d; }
@@ -50,13 +49,22 @@
   const RED = (p) => [Math.round((100 - p[0]) * 10) / 10, Math.round((100 - p[1]) * 10) / 10];
   // sc 를 받아, 비어 있는 역할을 채운 토큰 목록과 미니언 시야를 돌려준다. 이미 있는 역할(같은 쪽)은 건드리지 않는다.
   function fill(sc, ph) {
-    const P = SPOT[ph]; if (!P) return { add: {}, vis: [] };
+    if (ph !== "start" && ph !== "lane") return { add: {}, vis: [] };
     const have = { us: new Set(), them: new Set() };
     Object.values(sc.a || {}).forEach((t) => { const r = ROLE[t.c]; if (r && have[t.s]) have[t.s].add(r); });
     const flip = sc.red ? RED : (p) => p;
+    const W = { ...(WAVE_DEFAULT.lane), ...(sc.waves || {}) };
+    const spot = (side, r) => {
+      if (r === "J") return side === "us" ? JG[ph] : null;
+      const l = LANE_OF[r];
+      if (ph === "start") return lanePt(l, side === "us" ? 0.04 + (r === "S" ? 0.03 : 0) : 0.96 - (r === "S" ? 0.03 : 0));
+      const p = W[l] ? W[l].p : 0.5;
+      return lanePt(l, side === "us" ? p - BEHIND[r] : p + BEHIND[r]);
+    };
     const add = {};
-    ["us", "them"].forEach((side) => Object.entries(P[side]).forEach(([r, at]) => {
+    ["us", "them"].forEach((side) => ["T", "J", "M", "A", "S"].forEach((r) => {
       if (have[side].has(r) || (sc.gone || []).includes(`${side}:${r}`)) return;   // gone = 귀환·사망 등으로 맵에 없음
+      const at = spot(side, r); if (!at) return;
       add[`ctx-${side}-${r}`] = { c: CAST[side][r], s: side, at: flip(at), ctx: 1, role: r };
     }));
     return { add, vis: [] };

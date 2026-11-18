@@ -792,7 +792,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=53" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=54" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -1059,7 +1059,7 @@
       const n = un.scenes.length, k = Math.min(Math.max(0, T.k || 0), n - 1);
       const sc = un.scenes[k], prev = T.pk != null && T.pk >= 0 && T.pk < n ? un.scenes[T.pk] : null;
       const dots = un.scenes.map((_, i) => `<button class="sc-dot ${i === k ? "on" : i < k ? "seen" : ""}" data-act="tscene" data-k="${i}" aria-label="장면 ${i + 1}" ${i === k ? 'aria-current="step"' : ""}></button>`).join("");
-      body = `<div class="sc-wrap">${stageHtml({ ...sc, ph: sc.ph != null ? sc.ph : un.ph }, prev ? { ...prev, ph: prev.ph != null ? prev.ph : un.ph } : prev)}
+      body = `<div class="sc-wrap">${stageHtml({ ...sc, ph: sc.ph != null ? sc.ph : un.ph, waves: sc.waves || un.waves }, prev ? { ...prev, ph: prev.ph != null ? prev.ph : un.ph, waves: prev.waves || un.waves } : prev)}
         <div class="sc-cap"><div class="sc-cap-h"><span class="sc-n">${k + 1} / ${n}</span><b>${esc(sc.cap)}</b></div><p>${esc(sc.say)}</p>
           <div class="sc-meta">${sc.t != null ? vlink(V, sc.t) : `<span class="dim">영상 밖 기본 원칙</span>`}${sc.approx ? `<span class="dim">그림 자리는 대략 — 정확한 자리는 영상에서</span>` : ""}</div>
           <div class="sc-dots" role="group" aria-label="장면">${dots}</div>
