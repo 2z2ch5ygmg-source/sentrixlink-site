@@ -539,6 +539,40 @@ window.Engine = (function () {
     return out;
   }
 
+  // 솔로랭크 픽률로 본 챔프의 라인 비율(합 1). 자료가 없으면 기본 라인 1.
+  function roleShare(id) {
+    const sq = window.META && window.META.soloq && window.META.soloq[id];
+    const out = {};
+    let sum = 0;
+    if (sq) Object.entries(sq).forEach(([r, x]) => { if (x.pr > 0) { out[r] = x.pr; sum += x.pr; } });
+    if (!sum) return CH[id] ? { [CH[id].pos[0]]: 1 } : {};
+    Object.keys(out).forEach((r) => (out[r] /= sum));
+    return out;
+  }
+  // 상대가 보기에 우리 픽이 그 라인일 가능성(0~1): 정한 라인이면 최소 0.5에 픽률 비율을 더해 높이고,
+  // 라인 '모름'(후보)이면 후보 안 픽률 비율로 나눈다. 여러 라인이 되는 챔프는 상대도 라인을 확신하기 어렵다.
+  function revealedIn(state, who, r) {
+    let best = null;
+    picks(state, who).forEach((p) => {
+      const sh = roleShare(p.champ);
+      let w = 0;
+      if (p.role) w = p.role === r ? Math.max(0.5, sh[r] || 0) : 0;
+      else if (p.cands && p.cands.includes(r)) { const tot = p.cands.reduce((a, x) => a + (sh[x] || 0), 0); w = tot ? (sh[r] || 0) / tot : 1 / p.cands.length; }
+      if (w > 0 && (!best || w > best.w)) best = { w, champ: p.champ };
+    });
+    return best;
+  }
+  // 우리 라이너가 공개된 라인은 상대가 맞대응(카운터) 픽을 꺼내기 좋은 차례. 정글·미드는 초반 주도권이 걸려 더 크게.
+  const COUNTER_TIMING = { J: 12, M: 9, T: 7, A: 4, S: 4 };
+  // 우리 대응: 그 라인 우리 선수 챔프폭 중 이 상대 챔프를 라인전에서 잡는 챔프(우리 라이너가 이미 나왔으면 없음)
+  function ourAnswers(state, who, role, id) {
+    const me = who === "our" ? "enemy" : "our";
+    if (picks(state, me).some((p) => p.role === role)) return [];
+    const myAvail = new Set(available(state, me).map((c) => c.id));
+    return Object.entries(poolMap(teamOf(state, me), role)).filter(([x]) => myAvail.has(x) && lanesCounter(x, id))
+      .sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([x]) => x);
+  }
+
   function recommendPick(state, who) {
     const opp = who === "our" ? "enemy" : "our";
     const team = teamOf(state, who);
@@ -561,6 +595,10 @@ window.Engine = (function () {
     const scen = who === "our" && state.ui && state.ui.scen ? (scenarios(state, who) || []).find((x) => x.key === state.ui.scen) : null;
     const myBanLeft = ORDER.some(([sd, t], i) => i >= state.draft.idx && t === "ban" && sd === sideOf(state, who));
     const theirUlt = theirs.filter((t) => ULT[t.champ]);
+    // 상대 예상: 상대 픽 순서는 추정이라 '나중에' 감점을 약하게 하고, 우리 라이너가 공개된 라인(맞대응 차례)에 가중치를 준다
+    const guess = who === "enemy";
+    const revealed = {};
+    if (guess) open.forEach((r) => (revealed[r] = revealedIn(state, opp, r)));
     const res = [];
     for (const c of available(state, who)) {
       let best = null;
@@ -621,9 +659,12 @@ window.Engine = (function () {
           if ((th.type === "gank") && "TMAS".includes(r) && holdable(c)) { s += 4; reasons.push({ t: "갱 대비", d: `상대 정글 ${ko(th.champ)} 갱 버팀`, v: 4 }); }
           if (th.type !== "gank" && th.type !== "jungle" && th.r === r && th.champ && lanesCounter(c.id, th.champ)) { s += 6; reasons.push({ t: "요주의 대비", d: `상대 ${th.p.riot.split("#")[0]} ${ko(th.champ)} 상대로 유리`, v: 6 }); }
         }
+        const rv = guess && revealed[r];
+        if (rv && rv.w >= 0.3) { const v = rv.w * COUNTER_TIMING[r]; s += v; reasons.push({ t: "맞대응 차례", d: `우리 ${ko(rv.champ)} ${ROLE_KO[r]} 공개 → 맞대응`, v }); }
         if (nowRoles.length) {
-          if (nowRoles.includes(r)) { s += 8; reasons.push({ t: "픽 순서", d: `지금은 ${nowRoles.map((x) => ROLE_KO[x]).join("+")} 차례`, v: 8, order: true }); }
-          else { s -= 18; reasons.push({ t: "나중에", d: `${j(ROLE_KO[r], "은", "는")} 뒤 순서에서`, v: -18 }); }
+          const on = guess ? 4 : 8, off = guess ? 6 : 18;
+          if (nowRoles.includes(r)) { s += on; reasons.push({ t: "픽 순서", d: `지금은 ${nowRoles.map((x) => ROLE_KO[x]).join("+")} 차례`, v: on, order: true }); }
+          else { s -= off; reasons.push({ t: "나중에", d: `${j(ROLE_KO[r], "은", "는")} 뒤 순서에서`, v: -off }); }
         }
         if (!best || s > best.s) best = { r, s, reasons };
       }
@@ -637,9 +678,20 @@ window.Engine = (function () {
         label: compR ? compR.t : pos[0] ? pos[0].t : "추천",
         reasons: best.reasons.sort((a, b) => b.v - a.v),
         good: pp2.good, bad: pp2.bad,
+        answers: guess ? ourAnswers(state, who, best.r, c.id) : undefined,
       });
     }
-    return res.sort((a, b) => b.score - a.score).slice(0, 6);
+    res.sort((a, b) => b.score - a.score);
+    if (!guess) return res.slice(0, 6);
+    // 상대 예상(전체): 한 라인이 여섯 칸을 다 차지하지 않게 라인당 최대 수를 두고(지금 차례로 본 라인은 한 칸 더),
+    // 다른 라인은 같은 라인 두 번째부터 조금씩 낮춰 라인을 섞는다
+    const cap0 = Math.max(2, Math.ceil(6 / open.length));
+    const seen = {};
+    const ranked = res.map((x) => { const now = nowRoles.includes(x.role); const k = seen[x.role] = (seen[x.role] || 0) + 1;
+      return { x, k, cap: cap0 + (now ? 1 : 0), key: x.score - (now ? 0 : (k - 1) * 5) }; });
+    const pickd = ranked.filter((y) => y.k <= y.cap).sort((a, b) => b.key - a.key).slice(0, 6);
+    if (pickd.length < 6) ranked.filter((y) => y.k > cap).slice(0, 6 - pickd.length).forEach((y) => pickd.push(y));
+    return pickd.map((y) => y.x);
   }
 
   // 추천 카드용 짧은 장단점: 무엇에 좋고 무엇에 약한지
@@ -659,6 +711,7 @@ window.Engine = (function () {
       else if (x.t === "상대 주력 뺏기") good.push("상대 주력 뺏기");
       else if (x.t === "팀 경기 기록") good.push(x.d.replace("팀원과 함께 ", "팀 경기 "));
       else if (x.t === "메타 강세") good.push("대회 메타 픽");
+      else if (x.t === "맞대응 차례") good.push(x.d.replace(/ \S+ 공개 → 맞대응$/, " 맞대응"));
     });
     best.reasons.forEach((x) => { if (x.t === "주의") bad.push(x.d.replace(" 상대로 불리", " 상대 불리")); });
     const sy = best.reasons.find((x) => x.t === "사일러스 주의" && x.v <= -3);
@@ -767,6 +820,8 @@ window.Engine = (function () {
       if (mi && (mi.prio >= 40 || (mi.rp && mi.rp <= 1.7 && mi.games >= 200))) {
         u += 1.5; W("meta", `대회 ${Math.round(mi.prio)}%`, `${bestName} 대회 밴픽 우선도 ${Math.round(mi.prio)}%${mi.rp ? `·평균 ${mi.rp}라운드 픽` : ""} → 먼저 확보`, [o.best.id], `대회 밴픽 ${Math.round(mi.prio)}%${mi.rp ? ` · 평균 ${mi.rp}라운드` : ""}`);
       }
+      // 상대 픽 순서 예상: 우리 라이너가 공개된 라인은 맞대응 차례라 앞으로(정글·미드 더 크게, 여러 라인 챔프는 픽률 비율만큼)
+      if (who === "enemy") { const rv = revealedIn(state, oppWho, r); if (rv) u += rv.w * COUNTER_TIMING[r] / 6; }
       if (o.enemyLaner) {
         const ctr = o.cands.find((c) => lanesCounter(c.id, o.enemyLaner.champ));
         u += 0.5;

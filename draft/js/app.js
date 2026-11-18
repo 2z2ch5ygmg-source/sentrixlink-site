@@ -236,7 +236,8 @@
       : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 ? "first" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
       ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg").replace(/ title="[^"]*"/, "")}<span class="cn">${esc(CH[r.id].ko)}</span>
-      ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span></button>`;
+      ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span>
+      ${r.answers && r.answers.length ? `<span class="ans">우리 대응 ${r.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`;
   }
 
   function renderNow() {
@@ -743,7 +744,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=45" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=46" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -799,7 +800,9 @@
       const isNew = !pw[id] || (!!pw[id].ghost !== !!w.ghost);
       const cls = `${w.k === "ctrl" ? "k-ctrl" : "k-ward"} s-${side(w.s)} ${w.ghost ? "ghost" : ""} ${w.x ? "dead" : ""}`;
       const inA = isNew ? dataA({ k: "in", d: w.d || 0 }) : "";
-      const vis = `<span class="sc-vis ${cls}" style="${pct(w.at)};width:${(w.r || 6) * 2}%"${isNew ? dataA({ k: "grow", d: (w.d || 0) + 0.25 }) : ""}${w.x ? dataA({ k: "fade", d: w.d || 0 }) : ""}></span>`;
+      const vanim = isNew ? dataA({ k: "show", d: (w.d || 0) + 0.25 }) : w.x ? dataA({ k: "fade", d: w.d || 0 }) : "";
+      const vis = vgrid() ? visCanvas(`sc-vcan ${cls}`, "", { x: w.at[0], y: w.at[1], r: 900, s: side(w.s) }, vanim)
+        : `<span class="sc-vis ${cls}" style="${pct(w.at)};width:${(w.r || 6) * 2}%"${isNew ? dataA({ k: "grow", d: (w.d || 0) + 0.25 }) : ""}${w.x ? dataA({ k: "fade", d: w.d || 0 }) : ""}></span>`;
       return vis + `<span class="sc-ward ${cls}" style="${pct(w.at)}"${inA}><i></i>${w.x ? `<b class="sc-x"${dataA({ k: "in", d: w.d || 0 })}>✕</b>` : ""}</span>`;
     }).join("");
     const pa = (prev && prev.a) || {};
@@ -813,9 +816,48 @@
     const hits = (sc.hit || []).map((h) => `<span class="sc-hit" style="${pct(h.at)};width:${(h.r || 1.6) * 2}%"${dataA({ k: "pop", d: h.d || 0 })}></span>`).join("");
     const labs = (sc.l || []).map((l) => `<span class="sc-lab ${l.k || ""}" style="${pct(l.at)}"${dataA({ k: "in", d: l.d || 0 })}>${esc(l.t)}</span>`).join("");
     const base = red ? `<span class="sc-base r" style="right:8px;bottom:8px">우리 = 레드</span>` : "";
-    return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""}" role="img" aria-label="${esc(sc.cap || "맵 그림")}">
+    // 보기 핀(버튼)이 들어 있으면 그림(role=img)이 아니라 묶음(group)이어야 버튼을 누를 수 있다
+    const role = extra && extra.pins ? `role="group" aria-label="${esc(sc.cap || "맵에서 보기 고르기")}"` : `role="img" aria-label="${esc(sc.cap || "맵 그림")}"`;
+    return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""}" ${role}>
       <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
       ${base}${sc.approx ? `<span class="sc-approx">대략 자리 · 정확한 자리는 영상</span>` : ""}</div>`;
+  }
+  // ----- 실제 시야: 게임 이동·시야 격자(js/visiongrid.js)로 와드가 밝히는 칸을 계산 -----
+  // 벽은 시야를 막고, 부쉬 칸은 와드가 같은 부쉬 안에 있을 때만 보인다. 와드·제어 와드 시야 900 = 18칸.
+  let _vg = null;
+  function vgrid() {
+    if (_vg) return _vg;
+    const G = window.VGRID; if (!G) return null;
+    const a = new Uint8Array(G.w * G.h); let k = 0;
+    for (const t of G.rle.split(",")) { const [v, n] = t.split("*"); const cnt = n ? parseInt(n, 16) : 1; a.fill(parseInt(v, 16), k, k + cnt); k += cnt; }
+    return (_vg = { w: G.w, h: G.h, a });
+  }
+  function visionCells(x, y, range) {
+    const g = vgrid(); if (!g) return null;
+    const cx = (x / 100) * g.w, cy = (y / 100) * g.h, R = (range || 900) / 50;
+    const at = (i, j) => g.a[Math.min(g.h - 1, Math.max(0, j)) * g.w + Math.min(g.w - 1, Math.max(0, i))];
+    const mine = at(Math.floor(cx), Math.floor(cy)), myBush = mine >= 2 ? mine : 0, out = [];
+    for (let j = Math.floor(cy - R); j <= Math.ceil(cy + R); j++) for (let i = Math.floor(cx - R); i <= Math.ceil(cx + R); i++) {
+      if (i < 0 || j < 0 || i >= g.w || j >= g.h) continue;
+      const dx = i + 0.5 - cx, dy = j + 0.5 - cy; if (dx * dx + dy * dy > R * R) continue;
+      const v = at(i, j); if (v === 1 || (v >= 2 && v !== myBush)) continue;
+      const steps = Math.ceil(Math.hypot(dx, dy) * 3); let ok = true;
+      for (let st = 1; st < steps; st++) if (at(Math.floor(cx + (dx * st) / steps), Math.floor(cy + (dy * st) / steps)) === 1) { ok = false; break; }
+      if (ok) out.push(i, j);
+    }
+    return out;
+  }
+  // 시야 캔버스: data-vis에 와드 자리·색, 그린 뒤 drawVision이 칸을 칠한다
+  const visCanvas = (cls, style, v, anim) => { const g = vgrid(); return g ? `<canvas class="${cls}" width="${g.w}" height="${g.h}" style="${style}" data-vis='${JSON.stringify(v)}'${anim || ""} aria-hidden="true"></canvas>` : ""; };
+  function drawVision(root) {
+    if (!root) return;
+    root.querySelectorAll("canvas[data-vis]").forEach((cv) => {
+      let o; try { o = JSON.parse(cv.dataset.vis); } catch (e) { return; }
+      const cells = visionCells(o.x, o.y, o.r); if (!cells) return;
+      const x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
+      x.fillStyle = o.s === "r" ? "rgba(255, 96, 104, 0.42)" : "rgba(255, 228, 120, 0.42)";
+      for (let k = 0; k < cells.length; k += 2) x.fillRect(cells[k], cells[k + 1], 1, 1);
+    });
   }
   // 그린 뒤 애니메이션 실행(움직임 줄이기 설정이면 바로 마지막 모습)
   const reduceMotion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
@@ -904,7 +946,7 @@
     return `<section class="card vbox">
       <div class="now-h"><span class="what">한눈에 보기</span><span class="step">게임 흐름 순서 · 번호를 누르면 지도에서 표시 · 「장면 보기」는 애니메이션으로</span></div>
       <div class="vctl">${vseg("vside", side, [["B", "블루"], ["R", "레드"]], "진영")}<span class="dim">출처 <a href="${V.source.url}" target="_blank" rel="noopener">${esc(V.source.author)} · ${esc(V.source.title)}</a></span></div>
-      <div class="vgrid"><div class="vmap"><img src="${MAP_IMG()}" alt="소환사의 협곡 미니맵" loading="lazy">${base}${marks}</div><ol class="sm-groups">${rows}</ol></div>
+      <div class="vgrid"><div class="vmap"><img src="${MAP_IMG()}" alt="소환사의 협곡 미니맵" loading="lazy">${(() => { const sp = used.find((q) => q.id === u.vSpot); if (!sp) return ""; const p = pos(sp); return visCanvas("sm-vcan", "", { x: p.x, y: p.y, r: 900, s: "b" }); })()}${base}${marks}</div><ol class="sm-groups">${rows}</ol></div>
       <p class="vkey"><span><i class="vm"></i>와드</span><span><i class="vm t-ctrl"></i>분홍 테두리 = 제어 와드</span><span><i class="vm approx"></i>점선 = 대략 자리(정확한 자리는 영상)</span></p>
     </section>`;
   }
@@ -917,26 +959,29 @@
     const optCls = (o, i) => !done ? "" : o.ok ? "ok" : i === ans ? "no" : "";
     const optList = (wide) => `<ol class="dopts ${wide ? "wide" : ""}">${d.opts.map((o, i) => `<li><button class="dopt ${optCls(o, i)}" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""}><b>${"ABCD"[i]}</b><span>${esc(o.t)}${done ? `<small>${esc(o.why)}</small>` : ""}</span></button></li>`).join("")}</ol>`;
     let body;
-    if (d.kind === "pos" && d.scene) {
-      // 실제 거리 한타 그림: 고르기 전 = 그림 + 보기 핀, 고른 뒤 = 그 자리에서 벌어지는 일을 애니메이션으로
-      const base = { ...d.scene, a: { ...d.scene.a } };
-      const at = (i) => [d.opts[i].x, d.opts[i].y];
-      if (done) base.a.me = { c: d.scene.me, s: "us", at: at(ans), me: 1 };
+    if (d.scene) {
+      // 상황 그림(실제 맵·실제 거리): 고르기 전 = 상황, 고른 뒤 = 그 선택으로 벌어지는 일을 애니메이션으로
+      const base = { ...d.scene, a: { ...(d.scene.a || {}) }, w: { ...(d.scene.w || {}) } };
+      const pinned = d.opts.every((o) => o.x != null);
+      if (done && d.kind === "pos" && d.scene.me) base.a.me = { c: d.scene.me, s: "us", at: [d.opts[ans].x, d.opts[ans].y], me: 1 };
       let sc = base, prev = null;
       if (done && d.opts[ans].after) {
         const af = d.opts[ans].after; const a = { ...base.a };
         Object.entries(af.a || {}).forEach(([id, t]) => { a[id] = { ...(a[id] || {}), ...t }; });
-        sc = { ...base, a, p: af.p, hit: af.hit, l: af.l, z: [...(base.z || []), ...(af.z || [])] };
+        const w = { ...base.w }; Object.entries(af.w || {}).forEach(([id, t]) => { w[id] = t; });
+        sc = { ...base, a, w, p: af.p, hit: af.hit, l: af.l || base.l, z: [...(base.z || []), ...(af.z || [])] };
         prev = base;
       }
-      const pins = d.opts.map((o, i) => `<button class="dpin sc-pin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>`).join("");
-      body = `<div class="dgrid">${stageHtml(sc, prev, { pins, cls: "dmap-pos" })}${optList(false)}</div><p class="help sc-note">그림의 거리는 게임 거리 비율 그대로 · 빨간 원 = 말파이트 궁이 닿는 범위(사거리 1,000 + 충격 325)</p>`;
+      const pins = pinned ? d.opts.map((o, i) => `<button class="dpin sc-pin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>`).join("") : "";
+      const note = d.scene.note || (d.kind === "pos" ? "그림의 거리는 게임 거리 비율 그대로 · 빨간 원 = 말파이트 궁이 닿는 범위(사거리 1,000 + 충격 325)" : "");
+      body = `<div class="dgrid">${stageHtml(sc, prev, { pins, cls: "dmap-pos" })}${optList(false)}</div>${note ? `<p class="help sc-note">${esc(note)}</p>` : ""}${done ? "" : `<p class="help sc-note">고르면 그 선택으로 벌어지는 일이 그림에서 움직입니다</p>`}`;
     } else if (d.kind === "map") {
       // 맵 문제: 보기들이 있는 구역만 확대(옆 구역과 헷갈리지 않게) + 모서리에 전체 맵·확대 위치
       const xs = d.opts.map((o) => o.x), ys = d.opts.map((o) => o.y);
-      const vs = Math.min(100, Math.max(40, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 22));
-      const vx = Math.max(0, Math.min(100 - vs, (Math.max(...xs) + Math.min(...xs)) / 2 - vs / 2));
-      const vy = Math.max(0, Math.min(100 - vs, (Math.max(...ys) + Math.min(...ys)) / 2 - vs / 2));
+      // 보이는 범위: 문제에 view [가운데 x, y, 폭]가 있으면 그대로(가까운 보기끼리 겹치지 않게), 없으면 보기들을 감싸게
+      const vs = d.view ? d.view[2] : Math.min(100, Math.max(40, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 22));
+      const vx = Math.max(0, Math.min(100 - vs, (d.view ? d.view[0] : (Math.max(...xs) + Math.min(...xs)) / 2) - vs / 2));
+      const vy = Math.max(0, Math.min(100 - vs, (d.view ? d.view[1] : (Math.max(...ys) + Math.min(...ys)) / 2) - vs / 2));
       const px = (v, o) => ((v - o) / vs) * 100;
       const red = d.side === "R";
       const zoomBg = `<img class="dzoom" src="${MAP_IMG()}" alt="소환사의 협곡 미니맵 확대" style="width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%">
@@ -952,7 +997,8 @@
         : `<span class="dbase us b" style="left:8px;bottom:8px">↙ 우리(블루) 기지</span><span class="dbase them r" style="right:8px;top:8px">상대(레드) 기지 ↗</span>`;
       // 맞힌 뒤: 정답 자리에 와드 시야(900 ≈ 맵 6%)를 펼쳐 보여 준다
       const okO = d.opts.find((o) => o.ok);
-      const vis = done ? `<span class="dvis" style="left:${px(okO.x, vx)}%;top:${px(okO.y, vy)}%;width:${(6 / vs) * 200}%"></span>` : "";
+      const vis = !done ? "" : vgrid() ? visCanvas("dvcan", `width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%`, { x: okO.x, y: okO.y, r: 900, s: "b" })
+        : `<span class="dvis" style="left:${px(okO.x, vx)}%;top:${px(okO.y, vy)}%;width:${(6 / vs) * 200}%"></span>`;
       const pins = d.opts.map((o, i) => { const l = px(o.x, vx), t = px(o.y, vy); return `<button class="dpin ${optCls(o, i)}" style="left:${l}%;top:${t}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button><span class="dpin-l" style="left:${l}%;top:${t}%" aria-hidden="true">${esc(o.t)}</span>`; }).join("");
       body = `<div class="dgrid"><div class="vmap dmap map">${zoomBg}${baseTag}${vis}${champs}${pins}</div>${optList(false)}</div>`;
     } else {
@@ -991,7 +1037,7 @@
     const keepFocus = document.activeElement && document.activeElement.id === "q";
     const pos = keepFocus ? document.activeElement.selectionStart : 0;
     v.innerHTML = S.tab === "live" ? renderLive() : S.tab === "our" ? renderOur() : S.tab === "vision" ? renderVision() : renderEnemy();
-    if (S.tab === "vision") runAnims(v);
+    if (S.tab === "vision") { drawVision(v); runAnims(v); }
     if (keepFocus) { const q = document.getElementById("q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
   }
 
