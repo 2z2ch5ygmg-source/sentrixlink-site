@@ -41,9 +41,9 @@ window.SEED_TEAMS = [
       ["Qiyana", 3], ["Nunu", 3], ["Zac", 2], ["Chogath", 2], ["Vi", 1]] },
     M: { riot: "예전같지않아#노인의공격", tier: "에메랄드 2 79LP", pts: 45, pool: [
       ["Azir", 3], ["Orianna", 3], ["Lissandra", 2], ["Malzahar", 2], ["Galio", 1]] },
-    A: { riot: "한다면 하는 남자#참회하기", tier: "다이아 4 66LP", pts: 60, pool: [
+    A: { riot: "한다면 하는 남자#참회하기", alts: ["버거boy#kr1"], tier: "다이아 4 66LP", pts: 60, pool: [
       ["Ezreal", 3], ["Kaisa", 3], ["Lucian", 2], ["Caitlyn", 2], ["Yunara", 1]] },
-    S: { riot: "평가원국어담당#kr1", tier: "에메랄드 4 21LP (자유랭)", pts: 45, pool: [
+    S: { riot: "평가원국어담당#kr1", alts: ["나를존경하고받들어라나약한실골들#kr1"], tier: "에메랄드 4 21LP (자유랭)", pts: 45, pool: [
       ["Nautilus", 3], ["Blitzcrank", 3], ["Leona", 2], ["Alistar", 2], ["Lulu", 1], ["Braum", 1], ["Thresh", 1]] } } },
   { id: "1seung", name: "1승쫑", players: {
     T: { riot: "원제대#kr00", tier: "다이아 3 63LP", pts: 60, pool: [] },

@@ -740,7 +740,7 @@
 
   function renderOur() {
     const t = team(S.ourTeam);
-    const roster = ROLES.map((r) => { const p = t.players[r]; return `<div class="pl"><div class="role">${ROLE_KO[r]}</div><div class="id" title="${esc(p.riot)}">${esc(nick(p.riot))}</div><div class="tier">${esc(p.tier)} · ${p.pts}점${totalTxt(t, r)}</div>${recentLine(t, r)}<div class="chips">${poolChips(t, r)}</div></div>`; }).join("");
+    const roster = ROLES.map((r) => { const p = t.players[r]; return `<div class="pl"><div class="role">${ROLE_KO[r]}</div><div class="id" title="${esc(p.riot)}">${esc(nick(p.riot))}</div>${altsOf(t.id, r).length ? `<div class="help" title="${esc(altsOf(t.id, r).join(", "))}">부계정 ${esc(altsOf(t.id, r).map(nick).join("·"))} · ${ROLE_KO[r]} 판만 기록에 합침</div>` : ""}<div class="tier">${esc(p.tier)} · ${p.pts}점${totalTxt(t, r)}</div>${recentLine(t, r)}<div class="chips">${poolChips(t, r)}</div></div>`; }).join("");
     const has = E.teamHasPools(t);
     const comps = has ? E.teamComps(t).slice(0, 4) : [];
     const plan = has ? E.fearlessPlan(t, 3) : [];
@@ -871,6 +871,9 @@
     save(); shareChanged(editing, r); renderEditor(); render();
     const again = document.querySelector(`[data-add="${r}"]`); if (again) again.focus();
   }
+
+  // 부계정(js/teams.js players[라인].alts): 기록 수집이 그 라인으로 한 판만 본계정 기록에 합친다
+  const altsOf = (tid, r) => { const t = window.SEED_TEAMS.find((x) => x.id === tid); return (t && t.players[r] && t.players[r].alts) || []; };
 
   // ---------- data menu ----------
   function exportData() {
