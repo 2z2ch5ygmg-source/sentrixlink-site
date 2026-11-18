@@ -937,3 +937,12 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .lc-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .lc-alt .pp-role { min-width: 34px; font-size: 12px; font-weight: 800; color: var(--gold); }
 .live-comps .card .dnav { margin: 0 0 10px; }
+/* 노트 내용: 5줄까지, 넘치면 눌러서 펼침 · 연결 경기는 눌러서 그 기록으로 */
+.ncard .nbody { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; }
+.ncard .nbody.clamped { cursor: pointer; position: relative; }
+.ncard .nbody.clamped:not(.open)::after { content: "더 보기"; position: absolute; right: 0; bottom: 0; padding-left: 18px; background: linear-gradient(90deg, rgba(18, 23, 34, 0), var(--bg2) 40%); color: var(--blue); font-weight: 700; }
+.ncard .nbody.open { display: block; -webkit-line-clamp: unset; line-clamp: unset; overflow: visible; }
+.ncard-f .ng { border: 0; background: transparent; color: var(--blue); font: inherit; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.ncard-f .ng:hover { color: var(--text); }
+.sv-g.focus, tr.focus td { background: var(--gold-bg); }
+.sv-g.focus { border-radius: 8px; padding: 6px; outline: 1px solid rgba(232, 182, 76, 0.5); }
