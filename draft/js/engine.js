@@ -369,6 +369,18 @@ window.Engine = (function () {
     return { key, slots, total, comfort, identity: sc[0].key, fitScore: (sc.find((x) => x.key === key) || {}).score || 0 };
   }
 
+  // 실시간 벤픽 추천 조합: 우리가 이미 뽑은 챔프는 그 라인에 고정, 밴·양쪽 픽·피어리스 잠금은 빼고 조합 유형별로 다시 짠다
+  function liveComps(state) {
+    const team = teamOf(state, "our");
+    if (!team) return [];
+    const exclude = new Set([...taken(state), ...lockedFor(state, "our")]);
+    const fixed = {};
+    picks(state, "our").forEach((p) => { if (p.role && !fixed[p.role]) fixed[p.role] = p.champ; });
+    const all = COMP_KEYS.map((k) => buildComp(team, k, exclude, fixed));
+    const rank = (c) => c.comfort * 3 + c.fitScore;
+    const ok = all.filter((c) => c.identity === c.key || c.fitScore >= 9).sort((a, b) => rank(b) - rank(a));
+    return ok.length ? ok : all.sort((a, b) => rank(b) - rank(a)).slice(0, 1);
+  }
   function teamComps(team, exclude) {
     return COMP_KEYS.map((k) => buildComp(team, k, exclude))
       .filter((c) => c.identity === c.key || c.fitScore >= 9)
@@ -1279,10 +1291,8 @@ window.Engine = (function () {
     const ec = compScores(en.map((p) => p.champ));
     const ok = oc[0].key, ek = ec[0].key;
     const O = COMPS[ok], E = COMPS[ek];
-    let matchup;
-    if (O.beats.includes(ek)) matchup = { tone: "good", t: `조합 상성 유리 — 우리 ${j(O.short, "이", "가")} 상대 ${j(E.short, "을", "를")} 잡는 구도입니다.` };
-    else if (E.beats.includes(ok)) matchup = { tone: "bad", t: `조합 상성 불리 — 상대 ${j(E.short, "이", "가")} 우리 ${j(O.short, "을", "를")} 잡는 구도입니다. 아래 대처를 먼저 공유하세요.` };
-    else matchup = { tone: "even", t: `조합 상성 비슷 — 라인전과 오브젝트 운영에서 차이가 납니다.` };
+    // 조합 유형 상성(가위바위보)만으로 정하지 않고 아래 라인별 구도 합계와 함께 판정한다
+    const compTone = O.beats.includes(ek) ? "good" : E.beats.includes(ok) ? "bad" : "even";
 
     const byRole = (arr) => { const m = {}; arr.forEach((p) => (m[p.role] = p.champ)); return m; };
     const om = byRole(our), em = byRole(en);
@@ -1305,6 +1315,24 @@ window.Engine = (function () {
     });
     const strong = lanes.filter((l) => l.tone === "good").map((l) => ROLE_KO[l.r]);
     const weak = lanes.filter((l) => l.tone === "bad").map((l) => ROLE_KO[l.r]);
+    const known = lanes.filter((l) => l.sc != null);
+    const laneSum = known.reduce((a, l) => a + l.sc, 0);
+    const laneTone = !known.length ? "even" : laneSum >= 2 || strong.length - weak.length >= 2 ? "good" : laneSum <= -2 || weak.length - strong.length >= 2 ? "bad" : "even";
+    const compTxt = compTone === "good" ? `조합 상성 유리(우리 ${j(O.short, "이", "가")} 상대 ${j(E.short, "을", "를")} 잡는 유형)`
+      : compTone === "bad" ? `조합 상성 불리(상대 ${j(E.short, "이", "가")} 우리 ${j(O.short, "을", "를")} 잡는 유형)` : "조합 상성 비슷";
+    const laneTxt = !known.length ? "" : laneTone === "good" ? `라인전 유리(${strong.join("·") || "합계 우위"})` : laneTone === "bad" ? `라인전 불리(${weak.join("·") || "합계 열세"})` : "라인전 비슷";
+    const VERDICT = {
+      "good|good": ["good", "한타·라인전 모두 앞섭니다."],
+      "good|even": ["good", "라인전은 비슷하고 한타 구도에서 앞섭니다."],
+      "good|bad": ["even", "초반 라인전을 버티면 한타 구도는 우리가 앞섭니다. 불리한 라인 커버가 먼저입니다."],
+      "even|good": ["good", "라인전 주도권으로 굴리는 판입니다."],
+      "even|even": ["even", "라인전과 오브젝트 운영에서 차이가 납니다."],
+      "even|bad": ["bad", "라인전이 불리합니다. 버티는 라인 커버가 먼저입니다."],
+      "bad|good": ["even", "라인전이 유리할 때 일찍 끝내야 합니다. 늦을수록 상대 한타 구도입니다."],
+      "bad|even": ["bad", "상대 한타 구도입니다. 아래 대처를 먼저 공유하세요."],
+      "bad|bad": ["bad", "한타·라인전 모두 상대가 앞섭니다. 아래 대처를 먼저 공유하세요."],
+    }[`${compTone}|${laneTone}`];
+    const matchup = { tone: VERDICT[0], comp: compTone, lane: laneTone, t: `${compTxt}${laneTxt ? " · " + laneTxt : ""} — ${VERDICT[1]}` };
     const botSide = lanes.find((l) => l.r === "A").tone === "good" || lanes.find((l) => l.r === "S").tone === "good";
     const jg = strong.includes("탑") && !botSide
       ? "탑 쪽에서 시작해 탑 갱 → 전령·유충 우선, 용은 교환"
@@ -1439,6 +1467,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
-    facts, nowFacts, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
+    facts, nowFacts, liveComps, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };
 })();

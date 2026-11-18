@@ -471,6 +471,16 @@
 
   const cutChips = (lost) => (lost || []).map((l) => `<span class="chip cut" title="${esc(CH[l.id].ko)} ${esc(l.st)}">${icon(l.id, "sm")}<s>${esc(CH[l.id].ko)}</s><span class="st">${esc(l.st)}</span></span>`).join("");
   // 큰 그림: 1차 밴 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 (픽마다 갱신, 칸마다 대체 픽)
+  // 실시간 추천 조합: 「우리팀 전략」에 있던 조합 카드와 같은 모양, 밴픽마다 남은 챔프·확정 픽으로 다시 짠다
+  function renderLiveComps() {
+    const t = team(S.ourTeam);
+    if (!t || !E.teamHasPools(t)) return "";
+    const list = E.liveComps(S).slice(0, 4);
+    if (!list.length) return "";
+    const n = E.picks(S, "our").length;
+    return `<section class="live-comps"><div class="section-title"><h2>추천 조합</h2><p>${n ? `우리 픽 ${n}개 고정 · ` : ""}밴·픽·피어리스 잠금을 뺀 남은 챔프로 다시 짠 조합 · 픽마다 갱신</p></div>
+      <div class="comps">${list.map((c, i) => compCard(c, null, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>`)).join("")}</div></section>`;
+  }
   function renderScenarios() {
     const list = E.scenarios(S, "our");
     if (!list || !list.length) return "";
@@ -609,7 +619,7 @@
     ${renderStatus("dstat-m")}
     <div class="board">
       <div class="dh">${renderSide("B", planned)}${renderStatus()}${renderSide("R", planned)}</div>
-      <div class="col-main">${renderNow()}${renderScenarios()}${renderThreat(true)}${renderPlan()}${renderPractice()}</div>
+      <div class="col-main">${renderNow()}${renderScenarios()}${renderLiveComps()}${renderThreat(true)}${renderPlan()}${renderPractice()}</div>
       <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
     </div>
     ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
@@ -620,7 +630,7 @@
   function compCard(c, title, sub, compact, enemy) {
     const C = COMPS[c.key];
     const five = ROLES.map((r) => { const s = c.slots[r]; if (!s) return `<div class="s"><span class="ic"></span></div>`;
-      return `<div class="s ${s.suggest ? "suggest" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.suggest ? `<span class="lv lv1">새로</span>` : lvTag({ lv: Math.min(3, Math.round(s.lv)), one: s.lv > 3 })}</div>`; }).join("");
+      return `<div class="s ${s.suggest ? "suggest" : ""} ${s.fixed ? "fixed" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.fixed ? `<span class="lv lvone">픽 완료</span>` : s.suggest ? `<span class="lv lv1">새로</span>` : lvTag({ lv: Math.min(3, Math.round(s.lv)), one: s.lv > 3 })}</div>`; }).join("");
     const filled = ROLES.map((r) => c.slots[r]).filter(Boolean);
     const first = filled.filter((s) => !s.suggest).sort((a, b) => b.lv - a.lv || CH[b.id].pos.length - CH[a.id].pos.length)[0];
     const last = filled.filter((s) => (window.KB.COUNTERS[s.id] || []).length && s !== first).sort((a, b) => (window.KB.COUNTERS[b.id] || []).length - (window.KB.COUNTERS[a.id] || []).length)[0];
@@ -782,7 +792,7 @@
     const t = team(S.ourTeam);
     const roster = ROLES.map((r) => { const p = t.players[r]; return `<div class="pl"><div class="role">${ROLE_KO[r]}</div><div class="id" title="${esc(p.riot)}">${esc(nick(p.riot))}</div>${altsOf(t.id, r).length ? `<div class="help" title="${esc(altsOf(t.id, r).join(", "))}">부계정 ${esc(altsOf(t.id, r).map(nick).join("·"))} · ${ROLE_KO[r]} 판만 기록에 합침</div>` : ""}<div class="tier">${esc(p.tier)} · ${p.pts}점${totalTxt(t, r)}</div>${recentLine(t, r)}<div class="chips">${poolChips(t, r)}</div></div>`; }).join("");
     const has = E.teamHasPools(t);
-    const comps = has ? E.teamComps(t).slice(0, 4) : [];
+    const comps = has ? E.teamComps(t).slice(0, 4) : [];   // 챔프폭 보강 추천에 씀(조합 카드는 실시간 벤픽)
     const plan = has ? E.fearlessPlan(t, 3) : [];
     // 챔프폭 보강
     const topKeys = comps.slice(0, 2).map((c) => c.key);
@@ -797,8 +807,7 @@
       <div class="roster">${roster}</div>
       ${stacksHtml(t, true)}
       ${has ? "" : `<div class="note" style="margin-top:12px">챔프폭이 비어 있습니다. 「챔프폭 편집」으로 선수별 챔피언을 넣으면 조합이 계산됩니다.</div>`}
-      ${has ? `<div class="section-title"><h2>숙련도 기준 추천 조합</h2><p>잘하는 챔프로 만들 수 있는 조합 순서</p></div>
-      <div class="comps">${comps.map((c, i) => compCard(c, null, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>`)).join("")}</div>
+      ${has ? `<div class="note" style="margin-top:12px">숙련도 기준 추천 조합은 「실시간 벤픽」으로 옮겼습니다 — 밴픽이 진행될 때마다 남은 챔프로 다시 짭니다.</div>
       <div class="section-title"><h2>피어리스 세트별 조합 배분</h2><p>앞 세트에서 쓴 챔프를 빼고 다시 짠 조합 — 1세트에 주력을 다 쓰면 3세트가 비는지 확인</p></div>
       <div class="series">${plan.map((c, i) => compCard(c, `${i + 1}세트 · ${COMPS[c.key].name}`, `<span class="pill">숙련도 합 ${c.comfort.toFixed(0)}</span>`, true)).join("")}</div>
       <div class="section-title"><h2>챔프폭 보강</h2><p>숙련도 중 이상 챔프가 3개 미만인 라인은 피어리스 후반 세트에서 막힙니다</p></div>
