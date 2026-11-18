@@ -207,6 +207,19 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .dir b { color: var(--gold); }
 .recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
 .rec { background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; min-width: 0; }
+/* 챔프 카드: 초상화를 카드 폭에 맞춰 위쪽에 꽉 채우고, 이름표·순위는 초상화 위에 얹는다(빈 여백 없이) */
+.rec { padding: 0 0 9px; overflow: hidden; align-items: stretch; }
+.rec .hero { position: relative; display: block; height: 92px; background: var(--panel2); }
+.rec .hero .ic.hero { width: 100%; height: 100%; border-radius: 0; }
+.rec .hero .ic.hero img { transform: none; object-position: 50% 28%; }
+.rec .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 14, 20, 0) 45%, rgba(11, 14, 20, 0.75) 100%); pointer-events: none; }
+.rec .hero .lab { position: absolute; left: 6px; bottom: 6px; z-index: 1; max-width: calc(100% - 12px); background: rgba(11, 14, 20, 0.82); }
+.rec.first .hero .lab { background: rgba(40, 30, 8, 0.9); }
+.rec.ban.first .hero .lab { background: rgba(48, 12, 16, 0.9); }
+.rec .hero .rk { z-index: 1; top: 6px; left: 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+.rec .nm { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; flex-wrap: wrap; }
+.rec .nm .cn { font-size: 14px; }
+.rec .why, .rec .ans, .rec .vs-ours { padding: 0 9px; }
 .rec:hover { border-color: var(--gold); }
 .rec .lab { font-size: 12px; font-weight: 700; color: #cfd6e4; background: var(--panel2); border-radius: 6px; padding: 2px 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rec.first .lab { color: var(--gold); background: var(--gold-bg); }
@@ -410,11 +423,11 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
   .slot-pick .pn { font-size: 12px; min-height: 13px; }
   .slot-pick select { font-size: 12px; min-height: 22px; max-width: 58px; }
   .recs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-  .rec { padding: 8px 4px; }
-  .rec .ic.lg { width: 48px; height: 48px; }
+  .rec { padding: 0 0 8px; }
+  .rec .hero { height: 70px; }
   .rec .lab { font-size: 12px; padding: 2px 5px; }
   .rec .rk { width: 20px; height: 20px; font-size: 12px; top: 4px; left: 4px; }
-  .rec { padding-top: 26px; }
+  .rec .why, .rec .ans, .rec .vs-ours { padding: 0 6px; }
   .pred-seg { order: 5; width: 100%; margin-left: 0; overflow-x: auto; }
   .pred-seg button { flex: 1; padding: 6px 4px; }
   .pp-grid { grid-template-columns: minmax(0, 1fr); }
@@ -825,3 +838,60 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .prac-sw { font-size: 12px; color: var(--muted); }
 .prac-sw b { color: var(--text); }
 @media (max-width: 760px) { .prac-help summary { min-height: 44px; } .prac-foot { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- 실시간 벤픽 아래 탭(시안 A) ---------- */
+.dock { margin-top: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.dock-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: thin; }
+.dock-tabs button { position: relative; flex: none; border: 1px solid transparent; background: transparent; color: var(--muted); font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 8px; min-height: 34px; }
+.dock-tabs button:hover { color: var(--text); background: var(--panel2); }
+.dock-tabs button[aria-selected="true"] { color: var(--gold); background: var(--gold-bg); border-color: rgba(232, 182, 76, 0.45); }
+.dock-tabs .dk-dot { position: absolute; top: 5px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+.dock-body { padding: 10px 12px 12px; }
+.dock-body > .plan-box, .dock-body > section.plan-box { margin-top: 0; border: 0; background: transparent; padding: 0; }
+.dock-body > .live-comps > .section-title:first-child, .dock-body > .section-title:first-child { margin-top: 0; }
+.dock-body > .card:first-child { margin-top: 0 !important; }
+.dock-empty { margin: 4px 2px; }
+@media (max-width: 760px) { .dock-tabs { padding: 6px; } .dock-tabs button { padding: 6px 10px; } .dock-body { padding: 8px; } }
+
+/* ---------- 상대팀 분석: 왼쪽 목차 + 오른쪽 한 섹션(시안 A) ---------- */
+.ensec { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 12px; margin-top: 12px; align-items: start; }
+.ensec-nav { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px; }
+.ensec-nav button { text-align: left; border: 0; background: transparent; color: var(--muted); font-weight: 700; font-size: 13px; padding: 8px 10px; border-radius: 8px; min-height: 36px; }
+.ensec-nav button:hover { color: var(--text); background: var(--panel2); }
+.ensec-nav button[aria-selected="true"] { color: var(--gold); background: var(--gold-bg); }
+.ensec-body { min-width: 0; }
+.ensec-body > .section-title:first-child { margin-top: 0; }
+@media (max-width: 760px) {
+  .ensec { grid-template-columns: minmax(0, 1fr); }
+  .ensec-nav { position: static; flex-direction: row; overflow-x: auto; padding: 6px; }
+  .ensec-nav button { flex: none; padding: 6px 10px; }
+}
+
+/* ---------- 피드백 노트(시안 B: 주제별 보드) ---------- */
+.nfilters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.nfilters select { min-height: 34px; }
+.nboard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.ncol { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ncol h3 { margin: 0; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.ncol h3 .btn { margin-left: auto; min-width: 34px; }
+.ncard { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ncard-h { display: flex; align-items: center; gap: 6px; }
+.ncard-h b { font-size: 14px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ncard-h .nst { flex: none; border: 0; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.ncard-h span.nst { cursor: default; }
+.ncard p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ncard-f { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 12px; color: var(--dim); }
+.ncard-f .ng { color: var(--blue); }
+.ncard-f .nby { margin-right: auto; }
+.ncard-f .btn { min-height: 26px; padding: 2px 8px; }
+.pill.info { background: var(--blue-bg); color: var(--blue); }
+.nbtns { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.nmodal { width: min(640px, 100%); }
+.nf-game { display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
+.nf-game .chip small { color: var(--dim); margin-left: 3px; }
+.nf-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.nf-grid label, .nf-full { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
+.nf-full { margin-top: 10px; }
+.nf-full textarea { resize: vertical; min-height: 90px; font: inherit; }
+@media (max-width: 1180px) { .nboard { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .nboard { grid-template-columns: minmax(0, 1fr); } .nf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

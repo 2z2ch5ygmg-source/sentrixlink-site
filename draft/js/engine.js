@@ -315,7 +315,7 @@ window.Engine = (function () {
   const RECORD_T = /^(숙련도|상대 챔프폭|원챔 차단|고승률 차단|연습 중|함께 한 경기 픽|메타 강세|팀 경기 기록|상대 주력 뺏기|챔프폭|원챔|고승률|메타 픽|.+ 기본 픽|픽 순서|나중에)/;
   function nowFacts(reasons) {
     const rs = reasons || [];
-    const pos = rs.filter((x) => x.v > 0 && !x.order && !RECORD_T.test(x.t)).slice(0, 2).map((x) => ({ k: "now", l: "지금", t: x.d }));
+    const pos = rs.filter((x) => x.v > 0 && !x.order && !RECORD_T.test(x.t)).slice(0, 1).map((x) => ({ k: "now", l: "지금", t: x.d }));
     const neg = rs.filter((x) => x.v < 0 && (x.t === "주의" || x.t === "사일러스 주의")).slice(0, 1).map((x) => ({ k: "warn", l: "주의", t: x.d }));
     return pos.concat(neg);
   }
