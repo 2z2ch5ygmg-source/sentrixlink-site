@@ -1,4 +1,4 @@
-// 상대 연습 픽 계산 — tools/recent.py practice()와 같은 규칙(tools/test-practice.cjs가 두 결과가 같은지 확인).
+// 상대 연습 픽 계산 — tools/recent.py practice()와 같은 규칙. 연습 픽·판수는 등록 라인으로 한 판만(라인 바꿈 통계는 모든 판)(tools/test-practice.cjs가 두 결과가 같은지 확인).
 // 「갱신하기」로 Worker(/games)에서 받은 상대 팀 경기와, 매일 0시 수집의 기준선(RECENT.practiceBase: 이전 랭크·숙련도)으로 다시 계산한다.
 // games: [{ id, q, t, map, p:{라인:[팀ID, 승(1/0), 챔프ID, 실제 라인, 킬, 데스, 어시]}, b:{팀ID:[밴 챔프ID]} }]
 (function (root) {
@@ -55,16 +55,18 @@
         for (const r of keys) {
           const [, win, c, pos, k, d, a] = mem[r];
           if (!c) continue;
+          if (pos) {   // 라인 바꿈 통계는 모든 판으로
+            inc(posN[r], pos);
+            (posCh[r][pos] = posCh[r][pos] || {}); inc(posCh[r][pos], c);
+            if (n >= 2) inc(posTg[r], pos);
+          }
+          if (pos !== r) continue;   // 연습 픽은 등록 라인으로 한 판만
           const x = pc[r][c] || (pc[r][c] = { g: 0, w: 0, k: 0, d: 0, a: 0, r3: 0, tg: 0, cu: 0, s: 0, pos: {}, posOrder: [] });
           x.g += 1; x.w += win ? 1 : 0; x.k += k || 0; x.d += d || 0; x.a += a || 0;
           x.r3 += fresh ? 1 : 0; x.s += wt;
           if (n >= 2) { x.tg += 1; if (m.q === 0) x.cu += 1; }
-          if (pos) {
-            if (!(pos in x.pos)) x.posOrder.push(pos);
-            inc(x.pos, pos); inc(posN[r], pos);
-            (posCh[r][pos] = posCh[r][pos] || {}); inc(posCh[r][pos], c);
-            if (n >= 2) inc(posTg[r], pos);
-          }
+          if (!(pos in x.pos)) x.posOrder.push(pos);
+          inc(x.pos, pos);
           gamesN[r] += 1;
         }
         if (n < 2) continue;
