@@ -1836,7 +1836,7 @@
   }
   function renderNotes() {
     const t = team(S.ourTeam);
-    const head = `<div class="section-title"><h2>피드백 노트</h2><p>${t ? esc(t.name) : ""} · 링크를 받은 팀원 모두에게 공유 · 주제별로 쌓고 고칠 점은 고침 확인까지</p>
+    const head = `<div class="section-title"><h2>피드백 노트</h2><p>${t ? esc(t.name) : ""} · 링크를 받은 팀원 모두에게 공유</p>
       ${noteUrl() ? `<button class="btn sm primary" data-act="nnew">+ 노트 쓰기</button><button class="btn sm ghost" data-act="nrefresh">새로고침</button>` : ""}</div>`;
     if (!noteUrl()) return head + `<div class="note">${t && t.solo ? "솔랭·자랭 우리팀에는 노트를 쓸 수 없습니다. 위에서 우리 팀을 고르세요." : "팀 공유 저장소가 설정되지 않았습니다."}</div>`;
     if (NT.status === "error" && !NT.list) return head + `<div class="note">노트를 불러오지 못했습니다: ${esc(NT.err)} <button class="btn sm" data-act="nrefresh">다시 시도</button></div>`;
@@ -1845,17 +1845,16 @@
     const seg = (k, cur, items) => `<div class="seg" role="group">${items.map(([v, n]) => `<button data-act="nf" data-k="${k}" data-v="${v}" aria-pressed="${(cur || "") === v}">${n}</button>`).join("")}</div>`;
     const champs = [...new Set(NT.list.map((n) => n.champ).filter((c) => c && CH[c]))].sort((a, b) => CH[a].ko.localeCompare(CH[b].ko, "ko"));
     const gsel = f.game ? GAMEREF[f.game] : null;
-    const filters = `<div class="nfilters">${seg("st", f.st, [["", "전체"], ["todo", "고칠 점"], ["practice", "연습 중"], ["done", "고침 확인"], ["good", "잘한 점"]])}
+    const filters = `<div class="nfilters">${seg("st", f.st, [["", "전체"], ["fix", "고칠 점"], ["good", "잘한 점"]])}
       ${seg("who", f.who, [["", "모두"]].concat(NOTE_WHO))}
       <select class="input" data-act="nfc" aria-label="챔프로 거르기"><option value="">챔프: 전체</option>${champs.map((c) => `<option value="${c}" ${f.champ === c ? "selected" : ""}>${esc(CH[c].ko)}</option>`).join("")}</select>
       ${f.game ? `<button class="btn sm" data-act="nf" data-k="game" data-v="">게임: ${esc(gsel ? gameText(gsel) : "선택한 게임")} ×</button>` : ""}</div>`;
-    const ok = (n) => (!f.st || (f.st === "good" ? n.kind === "good" : n.kind === "fix" && n.status === f.st)) && (!f.who || n.who === f.who) && (!f.champ || n.champ === f.champ)
+    const ok = (n) => (!f.st || n.kind === (f.st === "good" ? "good" : "fix")) && (!f.who || n.who === f.who) && (!f.champ || n.champ === f.champ)
       && (!f.game || (gsel ? notesOfGame(gsel).includes(n) : true));
     const list = NT.list.filter(ok).sort((a, b) => String(b.upd || b.at).localeCompare(String(a.upd || a.at)));
     const card = (n) => {
-      const st = n.kind === "fix" ? NOTE_ST[n.status] || NOTE_ST.todo : ["잘한 점", "info"];
       return `<article class="ncard ${n.kind}"><div class="ncard-h">${n.champ && CH[n.champ] ? icon(n.champ, "sm") : ""}<b>${esc(n.title)}</b>
-        ${n.kind === "fix" ? `<button class="pill ${st[1]} nst" data-act="nstat" data-id="${n.id}" title="눌러서 상태 바꾸기">${st[0]}</button>` : `<span class="pill good nst">잘한 점</span>`}</div>
+        ${n.kind === "fix" ? `<span class="pill bad nst">고칠 점</span>` : `<span class="pill good nst">잘한 점</span>`}</div>
         ${n.body ? `<p class="nbody" data-act="nmore">${esc(n.body)}</p>` : ""}
         <div class="ncard-f"><span class="pill">${esc((NOTE_WHO.find((w) => w[0] === n.who) || ["", ""])[1])}</span>${n.game ? `<button class="ng" data-act="ngo" data-id="${n.id}" title="이 경기 기록으로 이동">${esc(gameText(n.game))}</button>` : ""}
           <span class="nby">${esc(String(n.at || "").slice(5, 10).replace("-", "/"))}</span>
