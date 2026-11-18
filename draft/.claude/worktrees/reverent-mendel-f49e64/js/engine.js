@@ -86,6 +86,31 @@ window.Engine = (function () {
     const st = stacksOf(team);
     return st ? st.map((g) => ({ ...g, n: 5 })) : null;
   }
+  // 상대 연습 픽(tools/recent.py practice): 11/10 이후 팀 경기·최근 가중 분석. null = 미확보.
+  // 계정이 바뀐 선수는 빼고(다음 수집 때 반영), 그 선수가 들어간 조합·라인 바꿈도 뺀다.
+  function practiceOf(team) {
+    const R = window.RECENT;
+    if (!R || R.status !== "ok" || !team || !R.practice || !R.practice[team.id]) return null;
+    const P = R.practice[team.id];
+    const okRole = (r) => { const x = R.players && R.players[team.id] && R.players[team.id][r]; return !!(x && !x.error && (!x.riot || x.riot === team.players[r].riot)); };
+    const players = {};
+    ROLES.forEach((r) => { if (P.players && P.players[r] && okRole(r)) players[r] = P.players[r]; });
+    return { ...P, players, combos: (P.combos || []).filter((c) => c.roles.every(okRole)), swaps: (P.swaps || []).filter((s) => okRole(s.r)), stale: ROLES.filter((r) => !okRole(r)) };
+  }
+  // 그 선수의 연습 픽 한 개 (champ id). 없으면 null
+  function practicePick(team, role, id) {
+    const P = practiceOf(team);
+    const pl = P && P.players[role];
+    return pl ? pl.picks.find((x) => x.id === id) || null : null;
+  }
+  function practiceText(x) {
+    const tags = [];
+    if (x.new) tags.push(`새로 연습(${x.pre}→${x.g}판)`);
+    if (x.cu) tags.push(`내전 ${x.cu}판`);
+    else if (x.tg) tags.push(`팀 경기 ${x.tg}판`);
+    if (x.r3) tags.push(`최근 3일 ${x.r3}판`);
+    return `11/10~ ${x.g}판 ${x.w}승 ${x.g - x.w}패 · KDA ${x.kda} · ${x.ready}${tags.length ? " · " + tags.join(" · ") : ""}`;
+  }
   function stackChampRecord(team, role, id) {
     const gr = groupsOf(team);
     if (!gr) return null;
@@ -490,7 +515,18 @@ window.Engine = (function () {
           tgt = r;
         }
       }
+      // 상대 연습 픽: 그 선수가 11/10 이후 팀 경기·최근에 많이 꺼낸 챔프. 표본 적음은 약하게, 완성은 강하게.
+      let prac = false;
       for (const r of oppOpen) {
+        const x = practicePick(oppTeam, r, c.id);
+        if (!x || (!c.pos.includes(r) && !oppOpen.includes(x.r))) continue;
+        const v = Math.min(18, 3 + 1.4 * x.s) * (x.ready === "완성" ? 1.15 : x.ready === "표본 적음" ? 0.5 : 1) * (x.new ? 1.1 : 1);
+        s += v; prac = true; tgt = tgt || r;
+        reasons.push({ t: `연습 중(${x.g}판)`, d: `${ROLE_KO[r]} ${oppTeam.players[r].riot.split("#")[0]} · ${practiceText(x)}`, v, practice: true });
+        break;
+      }
+      for (const r of oppOpen) {
+        if (prac) break;   // 연습 픽이 같은 팀 경기를 이미 반영
         const tr = stackChampRecord(oppTeam, r, c.id);
         if (tr) { const v = Math.min(16, 6 * tr.g); s += v; reasons.push({ t: "함께 한 경기 픽", d: `${ROLE_KO[r]} · 팀원과 함께 한 ${tr.of}판 중 ${tr.g}판 (${tr.w}승)`, v }); tgt = tgt || r; break; }
       }
@@ -1367,6 +1403,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo,
+    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };
 })();

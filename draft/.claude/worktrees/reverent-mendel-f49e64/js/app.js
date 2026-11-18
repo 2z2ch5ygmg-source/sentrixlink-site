@@ -225,7 +225,8 @@
         ? `<option value="?" ${s.role === "?" ? "selected" : ""}>${ep && ep.role ? `모름→${ROLE_KO[ep.role]}` : "모름"}</option>` : "";
       const sel = `<select data-act="role" data-i="${i}" aria-label="라인">${unk}${ROLES.map((r) => `<option value="${r}" ${r === s.role ? "selected" : ""}>${ROLE_KO[r]}</option>`).join("")}</select>`;
       const pn = ep && !ep.role ? `<span class="unk">${ep.cands.map((r) => ROLE_KO[r]).join("·")} 중</span>` : p ? esc(nick(p.riot)) + (ep && ep.guessed ? " (추정)" : "") : "";
-      return `<div class="slot-pick ${now}">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${pn}</div></div>${sel}</div>`;
+      // 마우스를 올리면: 상대 픽 → 우리 대응 픽, 우리 픽 → 상대가 꺼낼 대응 픽(남은 라인·챔프폭 기준)
+      return `<div class="slot-pick ${now}" data-hov="${s.champ}" data-hwho="${who}" data-hrole="${eff || ""}" tabindex="0">${icon(s.champ)}<div class="who"><div class="cn">${esc(CH[s.champ].ko)}</div><div class="pn">${pn}</div></div>${sel}</div>`;
     }).join("");
     return `<section class="side ${side}"><div class="side-h"><span class="nm">${esc(t.name)}</span><span class="tag">${side === "B" ? "블루" : "레드"} · ${who === "our" ? "우리" : "상대"}</span></div><div class="bans">${bans}</div><div class="picks">${picks}</div></section>`;
   }
@@ -450,6 +451,51 @@
       ${timeline(planned)}<div class="pp-grid">${cards}</div></section>`;
   }
 
+  // 상대 연습 픽: 11/10 이후 팀 경기(내전 > 5인 > 3·4인 > 2인)·최근 3일 가중으로 본 상대 선수별 연습 챔프 (tools/recent.py practice)
+  const READY_LV = { "완성": "lv3", "연습 중": "lv2", "표본 적음": "lv1" };
+  const COMBO_KO = { bot: "바텀", jm: "정글-미드", tj: "탑-정글" };
+  function renderPractice() {
+    const t = E.teamOf(S, "enemy");
+    if (!t || t.solo) return "";
+    const R = window.RECENT;
+    const P = E.practiceOf(t);
+    const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>`;
+    if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p></section>`;
+    const tg = P.teamGames || {};
+    const since = R.since ? R.since.slice(5).replace("-", "/") : "11/10";
+    const sub = `${esc(t.name)} · ${since}~ 팀 경기 ${tg.n || 0}판${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · 수집 ${esc(R.at)}`;
+    const days = (R.practiceRule && R.practiceRule.recentDays) || 3;
+    const help = `<details class="prac-help"><summary>기준·한계</summary><ul class="plain">
+      <li>함께 한 경기(같은 팀 2명 이상 같은 편)를 더 크게 봅니다: 사용자 설정(내전·스크림) &gt; 자유랭 5인 &gt; 3·4인 &gt; 2인 &gt; 혼자.</li>
+      <li>수집 시각 기준 최근 ${days}일 경기는 1.5배. 「새로」 = 이전 랭크·숙련도에 거의 없던 챔프를 ${since} 이후 3판 이상.</li>
+      <li>「완성」 = 3판 이상·승률 50% 이상·KDA 2.5 이상, 「연습 중」 = 그 밖, 「표본 적음」 = 3판 미만(참고만).</li>
+      <li>대회 코드(토너먼트) 경기는 Riot 기록에 안 보일 수 있습니다. 닉네임(Riot ID)을 바꾼 선수는 다음 수집 때까지 빠집니다.</li></ul></details>`;
+    const rows = ROLES.map((r) => {
+      const pl = P.players[r];
+      const who = `<span class="prac-who"><b>${esc(nick(t.players[r].riot))}</b>`;
+      if (!pl) return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells">${who} <span class="dim">${P.stale.includes(r) ? "계정 변경·조회 실패 — 다음 수집 때 반영" : "자료 없음"}</span></span></div></div>`;
+      const chips = pl.picks.slice(0, 5).map((x) => {
+        const full = `${CH[x.id].ko}${x.r !== r ? ` (${ROLE_KO[x.r]})` : ""} · ${E.practiceText(x)}`;
+        return `<span class="prac-c" title="${esc(full)}">${icon(x.id, "sm").replace(/ title="[^"]*"/, "")}<span class="prac-n">${esc(CH[x.id].ko)}${x.r !== r ? `<small>${ROLE_KO[x.r]}</small>` : ""}</span>
+          <span class="st">${x.g}판 ${x.w}-${x.g - x.w} · KDA ${x.kda}</span><span class="lv ${READY_LV[x.ready] || "lv1"}">${esc(x.ready)}</span>
+          ${x.new ? `<span class="lv lvone">새로 ${x.pre}→${x.g}</span>` : ""}${x.r3 ? `<span class="prac-t">최근 ${x.r3}</span>` : ""}${x.cu ? `<span class="prac-t">내전 ${x.cu}</span>` : x.tg ? `<span class="prac-t">팀 ${x.tg}</span>` : ""}
+          <span class="sr-only">${esc(full)}</span></span>`;
+      }).join("");
+      return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells">${who} <span class="dim">${since}~ ${pl.n}판</span></span>
+        <div class="row-chips">${chips || `<span class="dim">2판 이상 꺼낸 챔프 없음</span>`}</div></div></div>`;
+    }).join("");
+    const pair = (ids) => ids.map((id) => `${icon(id, "sm").replace(/ title="[^"]*"/, "")}`).join("");
+    const combos = P.combos.slice(0, 5).map((c) => `<span class="prac-c" title="${esc(`${COMBO_KO[c.kind]} ${c.ids.map((id) => CH[id].ko).join("+")} · ${c.g}판 ${c.w}승${c.cu ? ` · 내전 ${c.cu}판` : ""}`)}">${pair(c.ids)}<span class="prac-n">${esc(c.ids.map((id) => CH[id].ko).join("+"))}<small>${COMBO_KO[c.kind]}</small></span><span class="st">${c.g}판 ${c.w}-${c.g - c.w}</span>${c.cu ? `<span class="prac-t">내전 ${c.cu}</span>` : ""}${c.r3 ? `<span class="prac-t">최근 ${c.r3}</span>` : ""}</span>`).join("");
+    const bans = P.bans.slice(0, 6).map((b) => `<span class="chip" title="${esc(`${CH[b.id].ko} · 팀 경기 밴 ${b.n}회${b.cu ? ` (내전 ${b.cu})` : ""}`)}">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(CH[b.id].ko)}<span class="st">${b.n}</span></span>`).join("");
+    const swaps = P.swaps.map((s) => `<li><b>${ROLE_KO[s.r]} ${esc(nick(t.players[s.r].riot))}</b> → ${ROLE_KO[s.to]} ${s.g}/${s.of}판${s.tg ? ` (팀 경기 ${s.tg})` : ""}${s.ids.length ? ` · ${esc(s.ids.map((id) => CH[id] ? CH[id].ko : id).join("·"))}` : ""}</li>`).join("");
+    return `<section class="plan-box prac-box">${head(sub)}${help}<div class="sc-rows">${rows}</div>
+      <div class="prac-foot">
+        <div><div class="sub">함께 연습한 조합</div><div class="row-chips">${combos || `<span class="dim">2판 이상 반복된 조합 없음</span>`}</div></div>
+        <div><div class="sub">팀 경기에서 자주 밴</div><div class="row-chips">${bans || `<span class="dim">${tg.banGames ? "없음" : "밴 기록이 있는 팀 경기 없음"}</span>`}</div></div>
+        ${swaps ? `<div><div class="sub">라인 바꿈 가능성</div><ul class="plain prac-sw">${swaps}</ul></div>` : ""}
+      </div></section>`;
+  }
+
   function renderLive() {
     const seg = (act, cur, items) => `<div class="seg">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
     const plan = E.pickPlan(S, "our");
@@ -467,7 +513,7 @@
     ${renderStatus("dstat-m")}
     <div class="board">
       <div class="dh">${renderSide("B", planned)}${renderStatus()}${renderSide("R", planned)}</div>
-      <div class="col-main">${renderNow()}${renderScenarios()}${renderThreat(true)}${renderPlan()}</div>
+      <div class="col-main">${renderNow()}${renderScenarios()}${renderThreat(true)}${renderPlan()}${renderPractice()}</div>
       <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
     </div>
     ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
@@ -792,7 +838,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=53" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=60" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -821,6 +867,11 @@
     return head + (mode === "drill" ? renderDrill(V) : mode === "spots" ? renderSummary(V) : renderLearn(V));
   }
   const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  // 운영 문제 출처(2026 자료): 영상은 챕터 시각으로, 글은 그대로
+  const refLinks = (V, refs) => `<span class="drefs">${refs.map(([k, at]) => { const r = (V.macroRefs || {})[k]; if (!r) return ""; const vid = !/^https?:/.test(r[1]);
+    const sec = at ? at.split(":").reduce((a, b) => a * 60 + Number(b), 0) : 0;
+    const href = vid ? `https://www.youtube.com/watch?v=${r[1]}${sec ? `&t=${sec}s` : ""}` : r[1];
+    return `<a class="vlink" href="${href}" target="_blank" rel="noopener" title="${esc(r[0])}${at ? " " + at : ""}">${ico("eye")}${esc(r[0])}${at ? " " + at : ""}</a>`; }).join("")}</span>`;
   const vlink = (V, t) => `<a class="vlink" href="${V.source.url}&t=${t}s" target="_blank" rel="noopener" title="${esc(V.source.title)} ${mmss(t)} 장면 열기">${ico("eye")}영상 ${mmss(t)}</a>`;
 
   // ----- 장면 무대: 실제 미니맵 위에 챔프·와드·시야·화살표를 그리고, 이전 장면에서 움직임을 애니메이션으로 이어 준다 -----
@@ -892,7 +943,7 @@
     const waveHtml = wv.map((q) => { const seeThem = q.them > 0 && inSight(q.themAt), at0 = q.us > 0 ? q.usAt : q.themAt;
       const tip = `${q.ko} 웨이브 — 우리 ${q.us}마리 · 상대 ${q.them > 0 ? (seeThem ? q.them + "마리" : "시야 밖") : "없음"}${q.note ? " · " + q.note : ""}`;
       return `<span class="sc-wv" style="${pct(at0)}" title="${esc(tip)}" aria-label="${esc(tip)}"><b class="s-${side("us")}">${q.us}</b><b class="${q.them > 0 && !seeThem ? "unk" : "s-" + side("them")}">${q.them > 0 ? (seeThem ? q.them : "?") : 0}</b></span>`
-        + (q.note ? `<span class="sc-lab wvl" style="left:${at0[0]}%;top:${at0[1] + 2.4}%;transform:translate(${at0[0] > 82 ? -92 : at0[0] < 18 ? -8 : -50}%,-50%)">${esc(q.note)}</span>` : ""); }).join("");
+        + (q.note ? `<span class="sc-lab wvl" style="left:${at0[0]}%;top:${at0[1] + (at0[1] > 82 ? -2.8 : 2.4)}%;transform:translate(${at0[0] > 82 ? -92 : at0[0] < 18 ? -8 : -50}%,-50%)">${esc(q.note)}</span>` : ""); }).join("");
     const towerHtml = towers.map((t) => `<span class="sc-tower s-${t.side} ${t.side === ourSide ? "us" : "them"}" style="${pct(t.at)}" title="${t.side === ourSide ? "우리" : "상대"} 포탑 · ${esc(t.kind)}"></span>`).join("");
     // 다른 시야 출처(우리 라인 미니언 등): 작은 표시 + 이름
     const vsrc = (sc.vis || []).map((v) => `<span class="sc-vsrc" style="${pct(v)}" title="${esc(v[3] || "우리 시야")}"></span><span class="sc-lab vsrc" style="left:${v[0]}%;top:${v[1] + 2.2}%">${esc(v[3] || "우리 시야")}</span>`).join("")
@@ -914,7 +965,7 @@
     const base = red ? `<span class="sc-base r" style="right:8px;bottom:8px">우리 = 레드</span>` : "";
     // 보기 핀(버튼)이 들어 있으면 그림(role=img)이 아니라 묶음(group)이어야 버튼을 누를 수 있다
     const role = extra && extra.pins ? `role="group" aria-label="${esc(sc.cap || "맵에서 보기 고르기")}"` : `role="img" aria-label="${esc(sc.cap || "맵 그림")}"`;
-    const zoomBar = `<div class="sc-zoom" role="group" aria-label="미니맵 확대·축소"><button type="button" data-act="mzoom" data-v="in" aria-label="확대">＋</button><button type="button" data-act="mzoom" data-v="out" aria-label="축소">−</button><button type="button" data-act="mapmode" data-v="full" aria-pressed="${!focusMode}">전체</button><button type="button" data-act="mapmode" data-v="focus" aria-pressed="${focusMode}">장면 확대</button></div>`;
+    const zoomBar = `<div class="sc-zoom" role="group" aria-label="미니맵 확대·축소"><button type="button" data-act="mzoom" data-v="in" aria-label="확대">＋</button><button type="button" data-act="mzoom" data-v="out" aria-label="축소">−</button><button type="button" data-act="mapmode" data-v="full" aria-pressed="${!focusMode}">전체</button><button type="button" data-act="mapmode" data-v="focus" aria-pressed="${focusMode}" aria-label="장면 확대"><span class="zl">장면 확대</span><span class="zs" aria-hidden="true">확대</span></button></div>`;
     return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""} ${viewCam[2] < 99.9 ? "zoomed" : ""}" ${role} data-cam='${JSON.stringify(viewCam)}' data-focus='${JSON.stringify(sc.cam)}'>${zoomBar}
       <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${towerHtml}${waveHtml}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
       ${base}${sc.approx ? `<span class="sc-approx">대략 자리 · 정확한 자리는 영상</span>` : ""}</div>`;
@@ -984,9 +1035,11 @@
   // 마우스 휠(트랙패드 두 손가락)로 확대·축소 — 커서 아래 지점을 고정한 채로
   let zoomUsed = false;
   function zoomHintDone() { if (zoomUsed) return; zoomUsed = true; document.querySelectorAll(".sc-hint").forEach((h) => { h.classList.add("out"); setTimeout(() => h.remove(), 400); }); }
+  let hintShown = false;   // 처음 보이는 그림 한 번만
   function addZoomHint(root) {
-    if (zoomUsed || !root) return;
+    if (zoomUsed || hintShown || !root) return;
     const st = root.querySelector(".sc-stage"); if (!st) return;
+    hintShown = true;
     st.insertAdjacentHTML("beforeend", `<div class="sc-hint" aria-hidden="true"><span class="sc-hint-b"><b class="hint-wheel">마우스 스크롤로 확대·축소할 수 있습니다</b><b class="hint-touch">＋ − 버튼으로 확대·축소할 수 있습니다</b><small>확대한 뒤에는 끌어서 옮기기 · 「전체」로 돌아오기</small></span></div>`);
   }
   document.addEventListener("wheel", (ev) => {
@@ -1059,9 +1112,9 @@
       const n = un.scenes.length, k = Math.min(Math.max(0, T.k || 0), n - 1);
       const sc = un.scenes[k], prev = T.pk != null && T.pk >= 0 && T.pk < n ? un.scenes[T.pk] : null;
       const dots = un.scenes.map((_, i) => `<button class="sc-dot ${i === k ? "on" : i < k ? "seen" : ""}" data-act="tscene" data-k="${i}" aria-label="장면 ${i + 1}" ${i === k ? 'aria-current="step"' : ""}></button>`).join("");
-      body = `<div class="sc-wrap">${stageHtml({ ...sc, ph: sc.ph != null ? sc.ph : un.ph }, prev ? { ...prev, ph: prev.ph != null ? prev.ph : un.ph } : prev)}
+      body = `<div class="sc-wrap">${stageHtml({ ...sc, ph: sc.ph != null ? sc.ph : un.ph, waves: sc.waves || un.waves }, prev ? { ...prev, ph: prev.ph != null ? prev.ph : un.ph, waves: prev.waves || un.waves } : prev)}
         <div class="sc-cap"><div class="sc-cap-h"><span class="sc-n">${k + 1} / ${n}</span><b>${esc(sc.cap)}</b></div><p>${esc(sc.say)}</p>
-          <div class="sc-meta">${sc.t != null ? vlink(V, sc.t) : `<span class="dim">영상 밖 기본 원칙</span>`}${sc.approx ? `<span class="dim">그림 자리는 대략 — 정확한 자리는 영상에서</span>` : ""}</div>
+          <div class="sc-meta">${sc.t != null ? vlink(V, sc.t) : sc.refs ? refLinks(V, sc.refs) : `<span class="dim">영상 밖 기본 원칙</span>`}${sc.approx ? `<span class="dim">그림 자리는 대략 — 정확한 자리는 영상에서</span>` : ""}</div>
           <div class="sc-dots" role="group" aria-label="장면">${dots}</div>
           <div class="dnav"><button class="btn sm ghost" data-act="tscene" data-k="${k - 1}" ${k ? "" : "disabled"}>이전</button><button class="btn sm ghost" data-act="treplay">다시 보기</button>${k < n - 1 ? `<button class="btn sm primary" data-act="tscene" data-k="${k + 1}">다음 장면</button>` : `<button class="btn sm primary" data-act="tstart">문제 풀기 (${un.drills.length}문제)</button>`}</div></div></div>`;
     } else if (T.step === "quiz") {
@@ -1128,7 +1181,7 @@
         const af = d.opts[ans].after; const a = { ...base.a };
         Object.entries(af.a || {}).forEach(([id, t]) => { a[id] = { ...(a[id] || {}), ...t }; });
         const w = { ...base.w }; Object.entries(af.w || {}).forEach(([id, t]) => { w[id] = t; });
-        sc = { ...base, a, w, p: af.p, hit: af.hit, l: af.l || base.l, z: [...(base.z || []), ...(af.z || [])] };
+        sc = { ...base, a, w, p: af.p, hit: af.hit, l: af.l || base.l, z: [...(base.z || []), ...(af.z || [])], waves: af.waves ? { ...(base.waves || {}), ...af.waves } : base.waves };
         prev = base;
       }
       const pins = pinned ? d.opts.map((o, i) => `<button class="dpin sc-pin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>`).join("") : "";
@@ -1156,7 +1209,7 @@
     const verdict = done ? (d.opts[ans].ok ? `<p class="dres ok">맞음 — ${esc(d.opts[ans].why)}</p>` : `<p class="dres no">아쉬움 — 정답은 ${"ABCD"[d.opts.findIndex((o) => o.ok)]}. ${esc(d.opts.find((o) => o.ok).why)}</p>`) : "";
     const red = d.side === "R";
     const sides = d.kind === "map" ? `<span class="dside ${red ? "r" : "b"}">우리 = ${red ? "레드(오른쪽 위)" : "블루(왼쪽 아래)"}</span><span class="dside ${red ? "b" : "r"}">상대 = ${red ? "블루(왼쪽 아래)" : "레드(오른쪽 위)"}</span>` : "";
-    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)}${d.obj ? " · " + esc(d.obj) : ""}</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
+    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)}${d.obj ? " · " + esc(d.obj) : ""}</span>${d.src != null ? vlink(V, d.src) : d.refs ? refLinks(V, d.refs) : `<span class="dim">기본 원칙</span>`}</div>
       <div class="dsides">${sides}${d.when ? `<span class="dwhen"><b>언제</b> ${esc(d.when)}</span>` : ""}</div>
       <div class="dteams"><div><span class="dt-l ${red ? "r" : "b"}">우리${d.kind === "map" ? " · " + (red ? "레드" : "블루") : ""}</span>${teamRow(d.us, "us")}</div><div><span class="dt-l ${red ? "b" : "r"}">상대${d.kind === "map" ? " · " + (red ? "블루" : "레드") : ""}</span>${teamRow(d.them, "them")}</div></div>
       ${d.note ? `<div class="dnote" role="note"><b class="dnote-h">상황</b>${Array.isArray(d.note) ? `<ul>${d.note.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : `<p>${esc(d.note)}</p>`}</div>` : ""}
@@ -1165,7 +1218,8 @@
   // 문제 모음: 종류별로 차례대로
   // 문제 종류: 와드·한타·포지셔닝·운영(조합별·불리·유리·오브젝트)
   const DCATS = [["와드", "와드·시야", "어디에 박고, 왜 거기인가"], ["한타", "한타", "싸울지·피할지, 숫자와 체력"], ["포지셔닝", "포지셔닝", "실제 거리로 서는 자리"],
-    ["운영:조합", "운영 · 조합별", "사이드 조합·한타 조합의 운영"], ["운영:불리", "운영 · 불리할 때", "버티고 바꿔 먹는 선택"], ["운영:유리", "운영 · 유리할 때", "이득을 굴려 끝내는 선택"], ["운영:오브젝트", "운영 · 오브젝트", "유충·전령·용·바론 판단"]];
+    ["운영:조합", "운영 · 조합별", "사이드 조합·한타 조합의 운영"], ["운영:불리", "운영 · 불리할 때", "버티고 바꿔 먹는 선택"], ["운영:유리", "운영 · 유리할 때", "이득을 굴려 끝내는 선택"], ["운영:오브젝트", "운영 · 오브젝트", "유충·전령·용·바론 판단"],
+    ["운영:라인", "운영 · 쌓여도 밀면 안 될 때", "정보·점멸·오브젝트·인원을 보고 참기"], ["운영:모름", "운영 · 적 위치를 모를 때", "안 보이는 적은 우리 쪽으로 온다고 가정"]];
   const dcatOf = (d) => (d.cat === "운영" ? `운영:${d.sub}` : d.cat);
   function renderDrill(V) {
     const D = allDrills(), u = S.ui, score = u.dScore || {};
@@ -1369,17 +1423,27 @@
   document.addEventListener("mouseout", (ev) => { const b = ev.target.closest && ev.target.closest(".bdg"); if (b && b.dataset.hov && !b.contains(ev.relatedTarget)) { b.open = false; delete b.dataset.hov; } });
   function hcAllowed() { return pcPointer.matches && S.tab === "live" && !!curStep(); }
   function showHover(el) {
-    if (!hcAllowed() || !CH[el.dataset.id]) return;
-    const id = el.dataset.id;
-    // 누구의 챔프로 볼지: 우리 픽 차례이거나 우리 챔프폭에 있으면 우리 관점, 아니면 상대 관점
-    const st = curStep();
-    const ourTurnPick = st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
-    const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
-    const who = ourTurnPick || inOurPool ? "our" : "enemy";
-    const role = (who === "our" && el.dataset.role) || E.guessRole(S, who, id);
+    const slot = !!el.dataset.hov;
+    if (slot ? !(pcPointer.matches && S.tab === "live") : !hcAllowed()) return;
+    const id = slot ? el.dataset.hov : el.dataset.id;
+    if (!CH[id]) return;
+    let who, role;
+    if (slot) { who = el.dataset.hwho; role = el.dataset.hrole || E.guessRole(S, who, id); }
+    else {
+      // 누구의 챔프로 볼지: 우리 픽 차례이거나 우리 챔프폭에 있으면 우리 관점, 아니면 상대 관점
+      const st = curStep();
+      const ourTurnPick = st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
+      const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
+      who = ourTurnPick || inOurPool ? "our" : "enemy";
+      role = (who === "our" && el.dataset.role) || E.guessRole(S, who, id);
+    }
     if (!role) return;
     const h = E.hoverInfo(S, who, id, role);
-    const labels = who === "our"
+    const labels = slot
+      ? (who === "our"
+        ? { bad: h.laner ? "상대 같은 라인(이미 픽)" : "상대 대응 픽 예상 · " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리 픽" }
+        : { bad: h.laner ? "우리 같은 라인(이미 픽)" : "우리 대응 픽 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대 픽" })
+      : who === "our"
       ? { bad: h.laner ? "상대 같은 라인" : "카운터 위험 · 상대 " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리" }
       : { bad: h.laner ? "우리 같은 라인" : "우리 카운터 후보 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대" };
     const row = (x) => `<li>${icon(x.id, "sm")}<span><b>${esc(CH[x.id].ko)}</b><small>${esc(x.d)}</small></span></li>`;
@@ -1396,11 +1460,11 @@
   }
   function hideHover() { if (hcFor) hcFor.removeAttribute("aria-describedby"); hc.hidden = true; hcFor = null; }
   document.addEventListener("mouseover", (ev) => {
-    const el = ev.target.closest("[data-act='pick'][data-id]");
+    const el = ev.target.closest("[data-act='pick'][data-id], .slot-pick[data-hov]");
     if (el === hcFor) return;
     if (el) showHover(el); else if (hcFor && !ev.target.closest(".hovercard")) hideHover();
   });
-  document.addEventListener("focusin", (ev) => { const el = ev.target.closest("[data-act='pick'][data-id]"); if (el) showHover(el); else hideHover(); });
+  document.addEventListener("focusin", (ev) => { const el = ev.target.closest("[data-act='pick'][data-id], .slot-pick[data-hov]"); if (el) showHover(el); else hideHover(); });
   window.addEventListener("scroll", () => hcFor && hideHover(), { passive: true });
 
   document.getElementById("champList").innerHTML = window.CHAMPIONS.map((c) => `<option value="${esc(c.ko)}">`).join("");

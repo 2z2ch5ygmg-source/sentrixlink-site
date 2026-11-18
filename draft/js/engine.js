@@ -131,6 +131,9 @@ window.Engine = (function () {
     return { ...x, g, w, elsewhere: other };
   }
   const MANUAL_SCORE = { 3: 0.75, 2: 0.45, 1: 0.2 };
+  // 우리 팀 직접 입력 = 본인 자기평가(그 목록만 씀). 상대 팀 직접 입력 = 전적에 더하는 정찰 메모(전적 추천은 그대로 둠)
+  let OUR_ID = window.SEED_OUR_TEAM;
+  function setOurTeam(id) { OUR_ID = id; }
   function poolMap(team, role) {
     const m = {};
     const p = team && team.players[role];
@@ -163,14 +166,15 @@ window.Engine = (function () {
       // 전적 점수·원챔 여부는 따로 보관: 우리 픽 추천은 본인 평가로, 상대 입장의 위협 계산은 실제 기록까지 본다
       if (st) Object.assign(m[id], { g: st.g, w: st.w, wr: st.wr, kda: st.kda, mp: st.mp, rg: st.rg, rw: st.rw, sscore: st.score, sone: st.one, share: st.share });
     });
-    // 자기평가가 있는 선수는 그 목록만 쓴다. 없는 선수는 전적 전체.
-    if (!manual.length) Object.entries(stats).forEach(([id, e]) => {
+    // 우리 팀: 자기평가가 있는 선수는 그 목록만 쓴다. 없는 선수와 상대 팀은 전적 전체(직접 넣은 챔프가 앞섬).
+    if (!manual.length || team.id !== OUR_ID) Object.entries(stats).forEach(([id, e]) => {
       if (m[id] || e.score < 0.15) return;
       m[id] = e;
     });
     // 판수가 적은 선수라도 라인이 비지 않게: 판수·숙련도 상위 3개는 남긴다
-    if (!Object.keys(m).length) {
-      Object.entries(stats).sort((a, b) => b[1].score - a[1].score || b[1].mp - a[1].mp).slice(0, 3).forEach(([id, e]) => (m[id] = e));
+    // (상대 팀은 직접 넣은 챔프가 있어도 전적 몫을 따로 센다)
+    if (!Object.values(m).some((e) => !e.manual) && (!manual.length || team.id !== OUR_ID)) {
+      Object.entries(stats).sort((a, b) => b[1].score - a[1].score || b[1].mp - a[1].mp).slice(0, 3).forEach(([id, e]) => { if (!m[id]) m[id] = e; });
     }
     return m;
   }
@@ -1401,7 +1405,7 @@ window.Engine = (function () {
   }
 
   return {
-    champ, ko, j, poolMap, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
+    champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
     recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };

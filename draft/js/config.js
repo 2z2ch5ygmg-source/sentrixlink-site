@@ -3,3 +3,5 @@
 window.SELF_EVAL_CSV_URL = "";
 // 「우리 팀 함께 한 경기」 갱신하기: Riot에서 바로 가져오는 Cloudflare Worker 주소(tools/worker). 비어 있으면 최신 js/recent.js를 다시 읽는다.
 window.RECENT_LIVE_URL = "https://fearless-draft-recent.fearless-draft-worker.workers.dev";
+// 팀 공유 자기평가 저장소: 같은 Worker의 /selfeval. 비어 있으면 이 브라우저에만 저장한다.
+window.SELF_EVAL_SHARE_URL = window.RECENT_LIVE_URL;

@@ -61,6 +61,7 @@
     return fresh();
   }
   let S = ensureSolo(load());
+  E.setOurTeam(S.ourTeam);
   if (isSolo(S.enemyTeam)) window.KB.useOrder("ranked", S.draft.ourSide);
   S.ui.sheet = false;
   S.ui.predRole = "";
@@ -646,8 +647,9 @@
       ["함께 한 경기(2인 이상)", "Riot API match-v5", R && R.status === "ok" ? R.at : "미확보", stackTxt],
       ["메타·라인 상성", "op.gg 솔랭 · gol.gg 시즌 통계", M ? M.at : "미확보", M ? `패치 ${esc(M.patch)} · 상성 ${Object.keys(M.mu || {}).length}챔프` : "-"],
       ["프로 밴픽 순서·바텀 조합", "gol.gg 경기별 페이지", P ? P.at : "미확보", P ? `${P.games}경기 (${P.tournaments.filter((t) => t.games).map((t) => esc(t.name) + " " + t.games).join(", ")})` : "-"],
-      ["자기평가", window.SELF_EVAL.status === "ok" ? "팀 공유 시트(CSV)" : "팀원 직접 입력", window.SELF_EVAL.status === "ok" ? window.SELF_EVAL.at : selfN ? "입력됨" : "미입력",
-        window.SELF_EVAL.status === "ok" ? `${window.SELF_EVAL.rows}개 응답 · ${selfN}/5명` : window.SELF_EVAL.status === "error" ? `공유 시트 읽기 실패: ${esc(window.SELF_EVAL.reason)}` : `${selfN}/5명 · 이 브라우저에 저장(공유 저장소 미설정)`],
+      ["자기평가·상대 챔프폭 메모", window.SELF_EVAL.status === "ok" ? "팀 공유 시트(CSV)" : SH.url ? "팀원 직접 입력 · 팀 공유 저장소" : "팀원 직접 입력", window.SELF_EVAL.status === "ok" ? window.SELF_EVAL.at : selfN ? "입력됨" : "미입력",
+        window.SELF_EVAL.status === "ok" ? `${window.SELF_EVAL.rows}개 응답 · ${selfN}/5명` : window.SELF_EVAL.status === "error" ? `공유 시트 읽기 실패: ${esc(window.SELF_EVAL.reason)}`
+          : SH.url ? `${selfN}/5명 · ${SH.status === "ok" ? "팀원 모두에게 공유됨" : SH.status === "error" ? `공유 저장소 연결 실패: ${esc(SH.err)}` : "공유 저장소 읽는 중"}` : `${selfN}/5명 · 이 브라우저에 저장(공유 저장소 미설정)`],
     ];
     return `<div class="section-title"><h2>자료 현황</h2><p>출처 · 수집 시각 · 표본</p></div>
       <div class="card tbl-wrap"><table class="study cards-m"><thead><tr><th>자료</th><th>출처</th><th>수집 시각</th><th>표본</th></tr></thead><tbody>
@@ -755,7 +757,7 @@
     const r = el.dataset.role, row = el.closest(".ed-row"), p = team(editing).players[r];
     const t = row.querySelector('[data-tf="t"]').value, d = row.querySelector('[data-tf="d"]'), lp = row.querySelector('[data-tf="lp"]');
     p.tier = !t ? "" : HIGH(t) ? (lp && lp.value !== "" && el.dataset.tf !== "t" ? `${t} ${Math.max(0, parseInt(lp.value, 10) || 0)}LP` : t) : (d && d.value && el.dataset.tf !== "t" ? `${t} ${d.value}` : t);
-    save();
+    save(); shareChanged(editing, r);
   }
   function renderEditor() {
     const root = document.getElementById("modal");
@@ -771,7 +773,8 @@
       <button class="btn sm" data-act="add" data-role="${r}">추가</button></div></div>`; }).join("");
     root.innerHTML = `<div class="modal-bg" data-act="close"><div class="modal" role="dialog" aria-modal="true" aria-label="챔프폭 편집">
       <div class="modal-h"><h2>${esc(t.name)} · ${t.id === S.ourTeam ? "자기평가 입력" : "챔프폭 편집"}</h2><button class="btn sm" data-act="close">닫기</button></div>
-      <p class="help">${t.id === S.ourTeam ? "<b>대회에서 실제로 꺼낼 수 있는 챔프</b>만 넣고 자신감을 고르세요. 본인 평가가 있는 선수는 이 목록만 추천에 쓰고, 전적은 참고로만 붙습니다. " : ""}칩을 누르면 상 → 중 → 하 → 원챔 순서로 바뀝니다. ×는 삭제. 지금은 이 브라우저에만 저장됩니다(팀 공유 저장소 미설정) — 나누려면 상단 「데이터」에서 내보내기 하세요.</p>
+      <p class="help">${t.id === S.ourTeam ? "<b>대회에서 실제로 꺼낼 수 있는 챔프</b>만 넣고 자신감을 고르세요. 본인 평가가 있는 선수는 이 목록만 추천에 쓰고, 전적은 참고로만 붙습니다. " : ""}${t.id === S.ourTeam ? "" : "여기 넣은 챔프는 전적 추천에 <b>더해집니다</b>(전적 챔프는 그대로 남음). "}칩을 누르면 상 → 중 → 하 → 원챔 순서로 바뀝니다. ×는 삭제.</p>
+      <p class="help" id="shareNote" aria-live="polite">${t.solo ? "개인(솔랭) 상대는 이 브라우저에만 저장됩니다." : shareNote()}</p>
       ${roles}</div></div>`;
   }
   function addChamp(r) {
@@ -783,7 +786,7 @@
     const p = team(editing).players[r];
     p.pool = (p.pool || []).filter((x) => x[0] !== c.id);
     p.pool.push(lvv === "one" ? [c.id, 3, true] : [c.id, Number(lvv)]);
-    save(); renderEditor(); render();
+    save(); shareChanged(editing, r); renderEditor(); render();
     const again = document.querySelector(`[data-add="${r}"]`); if (again) again.focus();
   }
 
@@ -800,7 +803,7 @@
       try {
         const d = JSON.parse(fr.result);
         if (!Array.isArray(d.teams)) throw new Error("teams 없음");
-        S.teams = d.teams; if (d.ourTeam) S.ourTeam = d.ourTeam;
+        S.teams = d.teams; if (d.ourTeam) S.ourTeam = d.ourTeam; E.setOurTeam(S.ourTeam);
         if (!S.teams.find((t) => t.id === S.enemyTeam) || S.enemyTeam === S.ourTeam) S.enemyTeam = S.teams.find((t) => t.id !== S.ourTeam).id;
         save(); render(); alert("불러왔습니다.");
       } catch (e) { alert("파일 형식이 맞지 않습니다: " + e.message); }
@@ -1317,16 +1320,16 @@
         S.ui.tut = { ...S.ui.tut, step: "quiz", queue: wrong, k: 0, retry: true }; save(); render(); window.scrollTo(0, 0); break; }
       case "vspot": S.ui.vSpot = S.ui.vSpot === Number(el.dataset.id) ? null : Number(el.dataset.id); render(); break;
       case "sheet": S.ui.sheet = !S.ui.sheet; render(); if (S.ui.sheet) { const q = document.getElementById("q"); if (q && matchMedia("(min-width: 761px)").matches) q.focus(); } break;
-      case "edit": editing = el.dataset.team; renderEditor(); break;
+      case "edit": editing = el.dataset.team; renderEditor(); pullShared(); break;
       case "close": editing = null; renderEditor(); break;
       case "add": addChamp(el.dataset.role); break;
-      case "del": { ev.stopPropagation(); const p = team(el.dataset.team).players[el.dataset.role]; p.pool = p.pool.filter((x) => x[0] !== el.dataset.id); save(); renderEditor(); render(); break; }
+      case "del": { ev.stopPropagation(); const p = team(el.dataset.team).players[el.dataset.role]; p.pool = p.pool.filter((x) => x[0] !== el.dataset.id); save(); shareChanged(el.dataset.team, el.dataset.role); renderEditor(); render(); break; }
       case "cycle": { const p = team(el.dataset.team).players[el.dataset.role]; const e = p.pool.find((x) => x[0] === el.dataset.id);
         if (e[2]) { e[1] = 3; e.length = 2; } else if (e[1] === 1) { e[1] = 3; e[2] = true; } else e[1] = e[1] - 1;
-        save(); renderEditor(); render(); break; }
+        save(); shareChanged(el.dataset.team, el.dataset.role); renderEditor(); render(); break; }
       case "export": exportData(); break;
       case "import": document.getElementById("file").click(); break;
-      case "wipe": if (confirm("모든 입력(챔프폭·밴픽·피어리스)을 처음 상태로 되돌릴까요?")) { S = fresh(); save(); render(); } break;
+      case "wipe": if (confirm("모든 입력(챔프폭·밴픽·피어리스)을 처음 상태로 되돌릴까요?")) { S = fresh(); E.setOurTeam(S.ourTeam); save(); render(); } break;
       case "data": { const m = document.getElementById("dataMenu"); m.hidden = !m.hidden; break; }
     }
   });
@@ -1341,7 +1344,7 @@
   });
   document.addEventListener("change", (ev) => {
     const t = ev.target;
-    if (t.id === "ourSel") { S.ourTeam = t.value; if (S.enemyTeam === S.ourTeam) S.enemyTeam = S.teams.find((x) => x.id !== S.ourTeam && !x.solo).id; syncQueue(true); save(); render(); }
+    if (t.id === "ourSel") { S.ourTeam = t.value; E.setOurTeam(S.ourTeam); if (S.enemyTeam === S.ourTeam) S.enemyTeam = S.teams.find((x) => x.id !== S.ourTeam && !x.solo).id; syncQueue(true); save(); render(); }
     else if (t.id === "enemySel" || t.id === "enemyPick") { S.enemyTeam = t.value; syncQueue(true); save(); render(); }
     else if (t.dataset && t.dataset.act === "role") setRole(Number(t.dataset.i), t.value);
     else if (t.id === "file" && t.files[0]) { importData(t.files[0]); t.value = ""; }
@@ -1408,6 +1411,69 @@
     render();
   }
 
+  // ---------- 팀 공유 챔프폭 (js/config.js SELF_EVAL_SHARE_URL = Worker /selfeval) ----------
+  // 우리 자기평가와 상대 챔프폭 메모를 링크를 받은 팀원끼리 같이 본다. 팀·라인별 칸 하나, 마지막 저장이 남는다.
+  const SH = { url: window.SELF_EVAL_SHARE_URL || "", status: window.SELF_EVAL_SHARE_URL ? "loading" : "unset", at: "", err: "", pending: {}, timers: {} };
+  const seedP = (tid, r) => { const t = window.SEED_TEAMS.find((x) => x.id === tid); return (t && t.players[r]) || {}; };
+  const normPool = (pool) => (pool || []).map((e) => (e[2] ? [e[0], 3, true] : [e[0], e[1]]));
+  const sameJ = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const shareable = (tid) => { const t = team(tid); return !!t && !t.solo; };
+  function sharedBody(tid, r) { const p = team(tid).players[r]; return { pool: normPool(p.pool), tier: p.tier && p.tier !== seedP(tid, r).tier ? p.tier : "" }; }
+  function editedLocally(tid, r) { const p = team(tid).players[r], sp = seedP(tid, r); return !sameJ(normPool(p.pool), normPool(sp.pool)) || (p.tier || "") !== (sp.tier || ""); }
+  function shareChanged(tid, r) {
+    if (!SH.url || !shareable(tid)) return;
+    const k = tid + "|" + r; SH.pending[k] = (SH.pending[k] || 0) + 1;   // 바꿀 때마다 번호가 올라감
+    clearTimeout(SH.timers[k]);
+    SH.timers[k] = setTimeout(() => pushShared(tid, r), 700);
+  }
+  async function pushShared(tid, r) {
+    const k = tid + "|" + r, seq = SH.pending[k];
+    try {
+      const res = await fetch(`${SH.url}/selfeval?team=${encodeURIComponent(tid)}&role=${r}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedBody(tid, r)) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
+      Object.assign(SH, { status: "ok", at: d.saved.at, err: "" });
+      team(tid).players[r].sharedAt = d.saved.at; save();
+    } catch (err) { Object.assign(SH, { status: "error", err: String(err.message || err) }); }
+    if (SH.pending[k] === seq) delete SH.pending[k];   // 보내는 사이 또 바꿨으면 그 저장이 끝날 때까지 기다림
+    shareNoteUpdate();
+  }
+  async function pullShared() {
+    if (!SH.url) return;
+    let changed = false;
+    try {
+      const res = await fetch(`${SH.url}/selfeval?team=all`, { cache: "no-store" });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
+      S.teams.filter((t) => shareable(t.id)).forEach((t) => ROLES.forEach((r) => {
+        if (SH.pending[t.id + "|" + r]) return;   // 내가 방금 바꾼 칸은 저장이 끝날 때까지 그대로
+        const v = d.teams && d.teams[t.id] && d.teams[t.id][r], p = t.players[r];
+        if (!v) { if (editedLocally(t.id, r)) shareChanged(t.id, r); return; }   // 공유 전에 이 브라우저에만 넣어 둔 입력은 올린다
+        const tier = v.tier || seedP(t.id, r).tier || p.tier;
+        if (!sameJ(normPool(p.pool), v.pool) || p.tier !== tier) { p.pool = v.pool; p.tier = tier; changed = true; }
+        p.sharedAt = v.at;
+      }));
+      Object.assign(SH, { status: "ok", err: "" });
+    } catch (err) { Object.assign(SH, { status: "error", err: String(err.message || err) }); }
+    if (changed) {
+      save(); render();
+      // 편집 창이 열려 있으면 다시 그리되, 쓰던 챔프 이름 칸은 살린다
+      if (editing) { const a = document.activeElement, keep = a && a.dataset && a.dataset.add ? [a.dataset.add, a.value] : null; renderEditor();
+        if (keep) { const n = document.querySelector(`[data-add="${keep[0]}"]`); if (n) { n.value = keep[1]; n.focus(); } } }
+    } else shareNoteUpdate();
+  }
+  function shareNote() {
+    if (!SH.url) return "지금은 이 브라우저에만 저장됩니다(팀 공유 저장소 미설정) — 나누려면 상단 「데이터」에서 내보내기 하세요.";
+    if (SH.status === "error") return `<b>팀 공유 저장 실패</b>(${esc(SH.err)}) — 이 브라우저에는 저장됐고, 다시 바꾸면 또 올립니다.`;
+    if (Object.keys(SH.pending).length) return "팀 공유 저장 중…";
+    return `입력하면 링크를 받은 팀원 모두에게 공유됩니다${SH.at ? ` · 마지막 저장 ${esc(SH.at)}` : ""}.`;
+  }
+  function shareNoteUpdate() { const n = document.getElementById("shareNote"); if (n) n.innerHTML = shareNote(); }
+  if (SH.url) {
+    setInterval(() => { if (document.visibilityState === "visible") pullShared(); }, 45000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pullShared(); });
+  }
+
   // ---------- 픽 후보 정보 카드 (PC 전용: 마우스 올림·키보드 초점) ----------
   const hc = document.createElement("div");
   hc.className = "hovercard"; hc.hidden = true; hc.setAttribute("role", "tooltip"); hc.id = "hovercard";
@@ -1470,4 +1536,5 @@
   document.getElementById("champList").innerHTML = window.CHAMPIONS.map((c) => `<option value="${esc(c.ko)}">`).join("");
   render();
   loadSelfEval();
+  pullShared();
 })();
