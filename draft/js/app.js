@@ -299,12 +299,13 @@
     let list = type === "ban" ? E.recommendBan(S, who) : E.recommendPick(S, who);
     // 우리 픽: 추천 조합 1순위가 남은 라인에 쓰는 챔프도 같은 금색으로(이름표 「OO 추천 조합」). 6장 안에 없으면 마지막 칸에 넣는다
     if (type === "pick" && who === "our") {
-      const top = E.liveComps(S)[0];
+      const scs = E.scenarios(S, "our", true) || [];
+      const top = scs.find((x) => x.key === S.ui.scen) || scs[0];
       if (top) {
         const C = COMPS[top.key];
         ROLES.forEach((r) => {
           const sl = top.slots[r];
-          if (!sl || sl.fixed || !sl.id || sl.suggest) return;
+          if (!sl || sl.done || !sl.id) return;
           let card = list.find((x) => x.id === sl.id);
           if (!card && !list.some((x) => x.comp)) { card = E.recommendPick(S, "our", r).find((x) => x.id === sl.id); if (card) list = list.slice(0, 5).concat([card]); }
           if (card && !card.comp) card.comp = `${C.short} 추천 조합`;
@@ -498,17 +499,31 @@
   function renderLiveComps() {
     const t = team(S.ourTeam);
     if (!t || !E.teamHasPools(t)) return "";
-    const list = E.liveComps(S).slice(0, 4);
-    if (!list.length) return "";
     const n = E.picks(S, "our").length;
-    if (n >= 5) return `<section class="live-comps"><div class="section-title"><h2>우리 조합</h2><p>픽 완료 · 운영 방향은 「운영 전략」 탭</p></div>
-      <div class="comps">${compCard(list[0], null, `<span class="pill gold">확정</span>`)}</div></section>`;
-    return `<section class="live-comps"><div class="section-title"><h2>추천 조합</h2><p>${n ? `우리 픽 ${n}개 고정 · ` : ""}밴·픽·피어리스 잠금을 뺀 남은 챔프로 다시 짠 조합 · 픽마다 갱신</p></div>
-      <div class="comps">${list.map((c, i) => compCard(c, null, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>`)).join("")}</div></section>`;
+    if (n >= 5) { const fin = E.liveComps(S)[0]; return fin ? `<section class="live-comps"><div class="section-title"><h2>우리 조합</h2><p>픽 완료 · 운영 방향은 「운영 전략」 탭</p></div>
+      <div class="comps">${compCard(fin, null, `<span class="pill gold">확정</span>`)}</div></section>` : ""; }
+    // 추천 순서와 같은 계산(scenarios): 상대 라이너 상성·바텀 세트·사일러스·상대 조합 방향까지 반영, 라인마다 대체 픽
+    const list = E.scenarios(S, "our", true) || [];
+    if (!list.length) return "";
+    const st = curStep();
+    const ourTurn = st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
+    const chip = (id, r) => `<button class="chip pp-c" ${ourTurn ? `data-act="pick" data-id="${id}" data-role="${r}"` : "disabled"}>${icon(id, "sm")}${esc(CH[id].ko)}</button>`;
+    const cards = list.map((sc, i) => {
+      const c = { key: sc.key, slots: Object.fromEntries(ROLES.filter((r) => sc.slots[r] && sc.slots[r].id).map((r) => { const x = sc.slots[r]; return [r, { id: x.id, lv: x.lv || 0, fixed: !!x.done }]; })) };
+      const alts = ROLES.filter((r) => sc.slots[r] && !sc.slots[r].done && sc.slots[r].alts && sc.slots[r].alts.length)
+        .map((r) => `<div class="lc-alt"><span class="pp-role">${ROLE_KO[r]}</span>${sc.slots[r].alts.map((a) => chip(a.id, r)).join("")}</div>`).join("");
+      const on = S.ui.scen === sc.key;
+      const why = sc.why.map((w) => `<span class="cp ${/잡는 방향/.test(w) ? "good" : "bad"}">${esc(w.replace(/^상대 (\S+) 조합을 잡는 방향$/, "$1 상대 유리").replace(/ — .*$/, ""))}</span>`).join("");
+      const extra = `${why ? `<div class="cpills lc-why">${why}</div>` : ""}${alts ? `<div class="lc-alts"><span class="help">대체 픽</span>${alts}</div>` : ""}
+        <div class="dnav"><button class="btn sm ${on ? "primary" : "ghost"}" data-act="scen" data-k="${sc.key}" aria-pressed="${on}">${on ? "추천 순서에 반영 중" : "이 조합 기준으로 추천"}</button></div>`;
+      return compCard(c, null, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>`, false, false, extra);
+    }).join("");
+    return `<section class="live-comps"><div class="section-title"><h2>추천 조합</h2><p>${n ? `우리 픽 ${n}개 고정 · ` : ""}남은 챔프로 다시 짠 조합 · 추천 순서와 같은 계산 · 픽마다 갱신</p></div>
+      <div class="comps">${cards}</div></section>`;
   }
   // 실시간 벤픽 아래 섹션을 탭 하나로(시안 A): 한 번에 하나만 보여 스크롤을 줄인다.
   // 차례에 맞춰 자동으로 고르고(밴 → 요주의 인물, 우리 픽 → 추천 조합, 상대 픽 → 상대 연습 픽, 끝 → 운영 전략), 직접 누르면 그 차례 동안 유지
-  const DOCK = [["comps", "추천 조합"], ["scen", "큰 그림"], ["threat", "요주의 인물"], ["prac", "상대 연습 픽"], ["plan", "픽 순서"], ["strat", "운영 전략"], ["series", "피어리스·저장"]];
+  const DOCK = [["comps", "추천 조합"], ["threat", "요주의 인물"], ["prac", "상대 연습 픽"], ["plan", "픽 순서"], ["strat", "운영 전략"], ["series", "피어리스·저장"]];
   function dockAuto() {
     const st = curStep();
     if (!st) return "strat";
@@ -516,8 +531,8 @@
     return E.whoOfSide(S, st[0]) === "our" ? "comps" : "prac";
   }
   function renderDock() {
-    const key = S.ui.dock && S.ui.dockAt === S.draft.idx ? S.ui.dock : dockAuto();
-    const body = { comps: renderLiveComps, scen: renderScenarios, threat: () => renderThreat(true), prac: renderPractice, plan: renderPlan, strat: renderStrategy,
+    const key = S.ui.dock && S.ui.dockAt === S.draft.idx && DOCK.some((d) => d[0] === S.ui.dock) ? S.ui.dock : dockAuto();
+    const body = { comps: renderLiveComps, threat: () => renderThreat(true), prac: renderPractice, plan: renderPlan, strat: renderStrategy,
       series: () => renderFearless() + renderSaved() }[key]();
     const tabs = DOCK.map(([k, n]) => `<button role="tab" data-act="dock" data-k="${k}" aria-selected="${k === key}">${n}${k === dockAuto() && k !== key ? `<span class="dk-dot" aria-label="지금 차례 추천"></span>` : ""}</button>`).join("");
     return `<section class="dock"><div class="dock-tabs" role="tablist" aria-label="밴픽 도움 정보">${tabs}</div>
@@ -664,14 +679,14 @@
   }
 
   // ---------- our team ----------
-  function compCard(c, title, sub, compact, enemy) {
+  function compCard(c, title, sub, compact, enemy, extra) {
     const C = COMPS[c.key];
     const five = ROLES.map((r) => { const s = c.slots[r]; if (!s) return `<div class="s"><span class="ic"></span></div>`;
       return `<div class="s ${s.suggest ? "suggest" : ""} ${s.fixed ? "fixed" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.fixed ? `<span class="lv lvone">픽 완료</span>` : s.suggest ? `<span class="lv lv1">새로</span>` : lvTag({ lv: Math.min(3, Math.round(s.lv)), one: s.lv > 3 })}</div>`; }).join("");
     const filled = ROLES.map((r) => c.slots[r]).filter(Boolean);
     const first = filled.filter((s) => !s.suggest).sort((a, b) => b.lv - a.lv || CH[b.id].pos.length - CH[a.id].pos.length)[0];
     const last = filled.filter((s) => (window.KB.COUNTERS[s.id] || []).length && s !== first).sort((a, b) => (window.KB.COUNTERS[b.id] || []).length - (window.KB.COUNTERS[a.id] || []).length)[0];
-    return `<div class="card"><div class="comp-h"><h3>${esc(title || C.name)}</h3>${sub || ""}</div><div class="five">${five}</div>
+    return `<div class="card"><div class="comp-h"><h3>${esc(title || C.name)}</h3>${sub || ""}</div><div class="five">${five}</div>${extra || ""}
       <div class="plan"><dl>${compact ? "" : `<dt>승리 조건</dt><dd>${esc(C.win)}</dd><dt>초반</dt><dd>${esc(C.early)}</dd><dt>중반</dt><dd>${esc(C.mid)}</dd><dt>후반</dt><dd>${esc(C.late)}</dd>`}
       ${enemy ? `<dt>밴 포인트</dt><dd>${first ? `조합의 중심 <b>${esc(CH[first.id].ko)}</b> — 밴하거나 먼저 가져가면 이 조합이 흔들립니다` : ""}</dd>`
         : `<dt>밴픽 순서</dt><dd>${first ? `먼저 가져갈 챔프: <b>${esc(CH[first.id].ko)}</b>` : ""}${last ? ` · 카운터가 있는 <b>${esc(CH[last.id].ko)}</b>는 마지막 픽으로 숨기기` : ""}</dd>`}
@@ -1496,7 +1511,7 @@
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
       case "pred": S.ui.predRole = el.dataset.r; render(); break;
       case "ourrole": S.ui.ourRole = el.dataset.r; render(); break;
-      case "scen": S.ui.scen = el.dataset.k; save(); render(); break;
+      case "scen": S.ui.scen = S.ui.scen === el.dataset.k ? "" : el.dataset.k; save(); render(); break;
       case "ensec": S.ui.enSec = el.dataset.k; save(); render(); break;
       case "nnew": { const g = el.dataset.gk ? GAMEREF[el.dataset.gk] : null; openNoteForm({ game: g, cat: el.dataset.cat }); break; }
       case "nedit": { const n = (NT.list || []).find((x) => x.id === el.dataset.id); if (n) openNoteForm({ note: n }); break; }

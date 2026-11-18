@@ -1051,9 +1051,10 @@ window.Engine = (function () {
 
   // ---- 큰 그림: 1차 밴이 끝난 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 ----
   // 밴·상대 픽·피어리스 잠금을 뺀 챔프폭으로 조합별 5칸을 채우고(주 픽 + 대체 2), 양쪽 픽이 들어올 때마다 다시 계산한다.
-  function scenarios(state, who) {
+  // anytime: 화면의 「추천 조합」은 밴 단계에도 보여 준다(추천 순서 가산은 첫 밴 단계 뒤부터)
+  function scenarios(state, who, anytime) {
     who = who || "our";
-    if (state.draft.idx < firstPick()) return null;   // 첫 밴 단계가 끝난 뒤부터
+    if (!anytime && state.draft.idx < firstPick()) return null;   // 첫 밴 단계가 끝난 뒤부터
     const opp = who === "our" ? "enemy" : "our";
     const team = teamOf(state, who);
     if (!teamHasPools(team)) return null;

@@ -932,3 +932,8 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .prac-box .prac-help { margin-top: 8px; }
 @media (max-width: 1180px) { .pr-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .pr-grid { grid-template-columns: minmax(0, 1fr); } }
+.lc-why { justify-content: flex-start; margin: 2px 0 8px; }
+.lc-alts { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; }
+.lc-alt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.lc-alt .pp-role { min-width: 34px; font-size: 12px; font-weight: 800; color: var(--gold); }
+.live-comps .card .dnav { margin: 0 0 10px; }
