@@ -632,6 +632,12 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 @media (max-width: 760px) { .pager .btn { min-width: 44px; min-height: 44px; } .pager-c { width: 100%; margin-left: 0; } }
 .g-refresh { flex-basis: 100%; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
 .g-refresh .help { margin: 0; }
+.g-refresh .g-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.g-refresh .g-btn .ico { width: 15px; height: 15px; stroke-width: 2.4; }
+.g-refresh .g-btn:disabled { opacity: 0.75; cursor: progress; }
+.g-refresh .g-btn.busy .ico { animation: g-spin 0.9s linear infinite; }
+@keyframes g-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .g-refresh .g-btn.busy .ico { animation: none; } }
 @media (max-width: 760px) { .g-refresh .btn { min-height: 44px; padding: 0 16px; } }
 
 /* ---------- 시야 공부: 애니메이션 장면 무대 (11-18) ---------- */

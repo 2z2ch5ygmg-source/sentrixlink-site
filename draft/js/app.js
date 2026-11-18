@@ -507,6 +507,7 @@
   // 갱신하기: Cloudflare Worker(js/config.js RECENT_LIVE_URL)가 Riot에서 바로 「함께 한 경기」를 가져온다(키는 Worker에만 있음).
   // Worker가 없거나 실패하면 예전처럼 매일 0시 자동 수집한 최신 js/recent.js를 다시 읽는다.
   let refreshing = false;
+  const REFRESH_ICO = `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>`;
   const liveOf = (t) => { const R = window.RECENT; return R && R.live && t && R.live[t.id]; };
   const champId = (name) => { if (!name) return null; if (CH[name]) return name; const lo = String(name).toLowerCase(); return Object.keys(CH).find((k) => k.toLowerCase() === lo) || null; };
   function refreshRecent() {
@@ -555,7 +556,7 @@
   function stacksHtml(t, mine) {
     const R = window.RECENT;
     const rs = S.ui.rState || {};
-    const refresh = mine ? `<div class="g-refresh"><button class="btn sm" data-act="grefresh" ${refreshing ? "disabled" : ""}>${refreshing ? "갱신 중…" : "갱신하기"}</button><span class="help" role="status">${esc(rs.msg || (liveOf(t) ? `Riot에서 바로 가져옴 · ${liveOf(t).at}` : R && R.at ? `매일 0시 자동 수집 ${R.at} · 누르면 Riot에서 바로 가져옵니다` : ""))}</span></div>` : "";
+    const refresh = mine ? `<div class="g-refresh"><button class="btn sm primary g-btn${refreshing ? " busy" : ""}" data-act="grefresh" ${refreshing ? "disabled" : ""}>${REFRESH_ICO}${refreshing ? "갱신 중…" : "갱신하기"}</button><span class="help" role="status">${esc(rs.msg || (liveOf(t) ? `Riot에서 바로 가져옴 · ${liveOf(t).at}` : R && R.at ? `매일 0시 자동 수집 ${R.at} · 누르면 Riot에서 바로 가져옵니다` : ""))}</span></div>` : "";
     const head = `<div class="section-title"><h2>${mine ? "우리 팀 함께 한 경기" : "상대 팀 함께 한 경기"}</h2><p>같은 팀 선수 2명 이상이 같은 편이었던 경기(자랭 등) · ${R && R.since ? esc(R.since) : "11/10"} 이후</p>${refresh}</div>`;
     if (!R || R.status !== "ok") return head + `<div class="note">미확보 — Riot 최근 경기 수집 전입니다.</div>`;
     const st = E.groupsOf(t);
