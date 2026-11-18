@@ -24,7 +24,7 @@ window.SEED_TEAMS = [
     S: { riot: "감 자#災厄の狐", tier: "플래티넘 1 0LP", pts: 35, pool: [] } } },
   { id: "trionfo", name: "trionfo", players: {
     T: { riot: "Phoebus#solar", tier: "골드 2 25LP", pts: 25, pool: [] },
-    J: { riot: "Novelbright#流星群", tier: "마스터 6LP", pts: 70, pool: [] },
+    J: { riot: "Novelbright#流星群", alts: ["지예아나는다채로운래핑과라이밍혹#랩스킬로혼"], tier: "마스터 6LP", pts: 70, pool: [] },
     M: { riot: "Loki#살 하", tier: "플래티넘 1 4LP", pts: 35, pool: [] },
     A: { riot: "AD Wondealer#KR1", tier: "다이아 4 90LP", pts: 60, pool: [] },
     S: { riot: "모몽가#나귀엽지", tier: "플래티넘 2 85LP", pts: 35, pool: [] } } },
@@ -37,7 +37,7 @@ window.SEED_TEAMS = [
   { id: "subin", name: "수빈이의아이들", players: {
     T: { riot: "loegu#kr1", tier: "에메랄드 4 24LP", pts: 45, pool: [
       ["Darius", 3], ["Malphite", 3], ["Kennen", 2], ["Mordekaiser", 2], ["Pantheon", 1]] },
-    J: { riot: "키아나#1234", tier: "챌린저 630LP (자유랭)", pts: 90, pool: [
+    J: { riot: "키아나#1234", alts: ["장국보#KR1"], tier: "챌린저 630LP (자유랭)", pts: 90, pool: [
       ["Qiyana", 3], ["Nunu", 3], ["Zac", 2], ["Chogath", 2], ["Vi", 1]] },
     M: { riot: "예전같지않아#노인의공격", tier: "에메랄드 2 79LP", pts: 45, pool: [
       ["Azir", 3], ["Orianna", 3], ["Lissandra", 2], ["Malzahar", 2], ["Galio", 1]] },
