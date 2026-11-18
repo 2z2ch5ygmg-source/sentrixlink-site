@@ -451,6 +451,51 @@
       ${timeline(planned)}<div class="pp-grid">${cards}</div></section>`;
   }
 
+  // 상대 연습 픽: 11/10 이후 팀 경기(내전 > 5인 > 3·4인 > 2인)·최근 3일 가중으로 본 상대 선수별 연습 챔프 (tools/recent.py practice)
+  const READY_LV = { "완성": "lv3", "연습 중": "lv2", "표본 적음": "lv1" };
+  const COMBO_KO = { bot: "바텀", jm: "정글-미드", tj: "탑-정글" };
+  function renderPractice() {
+    const t = E.teamOf(S, "enemy");
+    if (!t || t.solo) return "";
+    const R = window.RECENT;
+    const P = E.practiceOf(t);
+    const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>`;
+    if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p></section>`;
+    const tg = P.teamGames || {};
+    const since = R.since ? R.since.slice(5).replace("-", "/") : "11/10";
+    const sub = `${esc(t.name)} · ${since}~ 팀 경기 ${tg.n || 0}판${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · 수집 ${esc(R.at)}`;
+    const days = (R.practiceRule && R.practiceRule.recentDays) || 3;
+    const help = `<details class="prac-help"><summary>기준·한계</summary><ul class="plain">
+      <li>함께 한 경기(같은 팀 2명 이상 같은 편)를 더 크게 봅니다: 사용자 설정(내전·스크림) &gt; 자유랭 5인 &gt; 3·4인 &gt; 2인 &gt; 혼자.</li>
+      <li>수집 시각 기준 최근 ${days}일 경기는 1.5배. 「새로」 = 이전 랭크·숙련도에 거의 없던 챔프를 ${since} 이후 3판 이상.</li>
+      <li>「완성」 = 3판 이상·승률 50% 이상·KDA 2.5 이상, 「연습 중」 = 그 밖, 「표본 적음」 = 3판 미만(참고만).</li>
+      <li>대회 코드(토너먼트) 경기는 Riot 기록에 안 보일 수 있습니다. 닉네임(Riot ID)을 바꾼 선수는 다음 수집 때까지 빠집니다.</li></ul></details>`;
+    const rows = ROLES.map((r) => {
+      const pl = P.players[r];
+      const who = `<span class="prac-who"><b>${esc(nick(t.players[r].riot))}</b>`;
+      if (!pl) return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells">${who} <span class="dim">${P.stale.includes(r) ? "계정 변경·조회 실패 — 다음 수집 때 반영" : "자료 없음"}</span></span></div></div>`;
+      const chips = pl.picks.slice(0, 5).map((x) => {
+        const full = `${CH[x.id].ko}${x.r !== r ? ` (${ROLE_KO[x.r]})` : ""} · ${E.practiceText(x)}`;
+        return `<span class="prac-c" title="${esc(full)}">${icon(x.id, "sm").replace(/ title="[^"]*"/, "")}<span class="prac-n">${esc(CH[x.id].ko)}${x.r !== r ? `<small>${ROLE_KO[x.r]}</small>` : ""}</span>
+          <span class="st">${x.g}판 ${x.w}-${x.g - x.w} · KDA ${x.kda}</span><span class="lv ${READY_LV[x.ready] || "lv1"}">${esc(x.ready)}</span>
+          ${x.new ? `<span class="lv lvone">새로 ${x.pre}→${x.g}</span>` : ""}${x.r3 ? `<span class="prac-t">최근 ${x.r3}</span>` : ""}${x.cu ? `<span class="prac-t">내전 ${x.cu}</span>` : x.tg ? `<span class="prac-t">팀 ${x.tg}</span>` : ""}
+          <span class="sr-only">${esc(full)}</span></span>`;
+      }).join("");
+      return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells">${who} <span class="dim">${since}~ ${pl.n}판</span></span>
+        <div class="row-chips">${chips || `<span class="dim">2판 이상 꺼낸 챔프 없음</span>`}</div></div></div>`;
+    }).join("");
+    const pair = (ids) => ids.map((id) => `${icon(id, "sm").replace(/ title="[^"]*"/, "")}`).join("");
+    const combos = P.combos.slice(0, 5).map((c) => `<span class="prac-c" title="${esc(`${COMBO_KO[c.kind]} ${c.ids.map((id) => CH[id].ko).join("+")} · ${c.g}판 ${c.w}승${c.cu ? ` · 내전 ${c.cu}판` : ""}`)}">${pair(c.ids)}<span class="prac-n">${esc(c.ids.map((id) => CH[id].ko).join("+"))}<small>${COMBO_KO[c.kind]}</small></span><span class="st">${c.g}판 ${c.w}-${c.g - c.w}</span>${c.cu ? `<span class="prac-t">내전 ${c.cu}</span>` : ""}${c.r3 ? `<span class="prac-t">최근 ${c.r3}</span>` : ""}</span>`).join("");
+    const bans = P.bans.slice(0, 6).map((b) => `<span class="chip" title="${esc(`${CH[b.id].ko} · 팀 경기 밴 ${b.n}회${b.cu ? ` (내전 ${b.cu})` : ""}`)}">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(CH[b.id].ko)}<span class="st">${b.n}</span></span>`).join("");
+    const swaps = P.swaps.map((s) => `<li><b>${ROLE_KO[s.r]} ${esc(nick(t.players[s.r].riot))}</b> → ${ROLE_KO[s.to]} ${s.g}/${s.of}판${s.tg ? ` (팀 경기 ${s.tg})` : ""}${s.ids.length ? ` · ${esc(s.ids.map((id) => CH[id] ? CH[id].ko : id).join("·"))}` : ""}</li>`).join("");
+    return `<section class="plan-box prac-box">${head(sub)}${help}<div class="sc-rows">${rows}</div>
+      <div class="prac-foot">
+        <div><div class="sub">함께 연습한 조합</div><div class="row-chips">${combos || `<span class="dim">2판 이상 반복된 조합 없음</span>`}</div></div>
+        <div><div class="sub">팀 경기에서 자주 밴</div><div class="row-chips">${bans || `<span class="dim">${tg.banGames ? "없음" : "밴 기록이 있는 팀 경기 없음"}</span>`}</div></div>
+        ${swaps ? `<div><div class="sub">라인 바꿈 가능성</div><ul class="plain prac-sw">${swaps}</ul></div>` : ""}
+      </div></section>`;
+  }
+
   function renderLive() {
     const seg = (act, cur, items) => `<div class="seg">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
     const plan = E.pickPlan(S, "our");
@@ -468,7 +513,7 @@
     ${renderStatus("dstat-m")}
     <div class="board">
       <div class="dh">${renderSide("B", planned)}${renderStatus()}${renderSide("R", planned)}</div>
-      <div class="col-main">${renderNow()}${renderScenarios()}${renderThreat(true)}${renderPlan()}</div>
+      <div class="col-main">${renderNow()}${renderScenarios()}${renderThreat(true)}${renderPlan()}${renderPractice()}</div>
       <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
     </div>
     ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
@@ -793,7 +838,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=59" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=60" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {

@@ -779,3 +779,22 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sc-world > .sc-wv .unk { background: #3a3f4b; color: #c9ced8; }
 .sc-world > .sc-lab.wvl { font-size: 11px; z-index: 4; }
 .drefs { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+
+/* ---------- 상대 연습 픽 (실시간 밴픽) ---------- */
+.prac-box { display: grid; gap: 10px; }
+.prac-box .now-h { margin-bottom: 0; }
+.prac-help summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--muted); display: inline-flex; align-items: center; min-height: 32px; }
+.prac-help ul { font-size: 12px; color: var(--muted); }
+.prac-who { font-size: 13px; overflow-wrap: anywhere; }
+.prac-c { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 3px 8px 3px 3px; border-radius: 14px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; max-width: 100%; min-width: 0; }
+.prac-c .ic.sm { width: 22px; height: 22px; border-radius: 50%; }
+.prac-c .ic.sm + .ic.sm { margin-left: -8px; }
+.prac-c .st { color: var(--muted); }
+.prac-n { font-weight: 700; white-space: nowrap; }
+.prac-n small { font-weight: 600; color: var(--dim); margin-left: 4px; font-size: 12px; }
+.prac-t { font-size: 12px; color: var(--gold); white-space: nowrap; }
+.prac-foot { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.prac-foot .sub { font-size: 12px; color: var(--gold); font-weight: 700; margin-bottom: 6px; }
+.prac-sw { font-size: 12px; color: var(--muted); }
+.prac-sw b { color: var(--text); }
+@media (max-width: 760px) { .prac-help summary { min-height: 44px; } .prac-foot { grid-template-columns: minmax(0, 1fr); } }
