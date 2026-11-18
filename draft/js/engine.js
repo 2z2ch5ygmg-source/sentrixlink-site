@@ -621,12 +621,14 @@ window.Engine = (function () {
       .sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([x]) => x);
   }
 
-  function recommendPick(state, who) {
+  // only: 라인 하나만 보고 싶을 때(라인별 칸). 조합·딜러 계산은 남은 라인 전체로 그대로 한다
+  function recommendPick(state, who, only) {
     const opp = who === "our" ? "enemy" : "our";
     const team = teamOf(state, who);
     const oppTeam = teamOf(state, opp);
     const open = openRoles(state, who);
     if (!open.length) return [];
+    const tryRoles = only && open.includes(only) ? [only] : open;
     const mine = picks(state, who);
     const theirs = picks(state, opp);
     const dir = direction(state, who);
@@ -656,7 +658,7 @@ window.Engine = (function () {
     const res = [];
     for (const c of available(state, who)) {
       let best = null;
-      for (const r of open) {
+      for (const r of tryRoles) {
         const pm = poolMap(team, r);
         const e = pm[c.id];
         const bp = botPartner(state, who, r, c.id);

@@ -65,6 +65,7 @@
   if (isSolo(S.enemyTeam)) window.KB.useOrder("ranked", S.draft.ourSide);
   S.ui.sheet = false;
   S.ui.predRole = "";
+  S.ui.ourRole = "";
   if (S.ui.tut && S.ui.tut.k != null) S.ui.tut.pk = S.ui.tut.k;
   S.ui.ans = {};   // 새로 열면 문제는 처음부터 다시 푼다(맞힌 기록 dScore는 진행률로 남김)
   if (S.ui.tut && S.ui.tut.step === "quiz") S.ui.tut = { ...S.ui.tut, k: 0 };   // 새로 열면 장면은 마지막 모습으로(다시 보기로 재생)
@@ -255,19 +256,27 @@
     const dirTxt = dir ? `${who === "our" ? "우리" : "상대"} 조합 방향 <b>${COMPS[dir].name}</b>` : "";
     const title = `${who === "our" ? "우리팀" : esc(t.name)} ${type === "ban" ? "밴" : "픽"} 차례${who === "enemy" ? " · 예상" : ""}`;
     let body;
-    const pr = who === "enemy" ? S.ui.predRole || "" : "";
-    const theirPicks = who === "enemy" ? E.picks(S, "enemy") : [];
-    const roleTabs = who === "enemy" ? `<div class="seg pred-seg" role="group" aria-label="라인별 예상">${[["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])).map(([r, n]) => {
-      const done = r && theirPicks.find((p) => p.role === r);
-      return `<button data-act="pred" data-r="${r}" aria-pressed="${pr === r}" ${done ? `disabled title="${esc(CH[done.champ].ko)} 픽 완료"` : ""}>${n}</button>`; }).join("")}</div>` : "";
-    if (pr) {
+    // 라인별 칸: 상대 차례 = 그 라인 선수 예상, 우리 픽 차례 = 그 라인 우리 추천, 우리 밴 차례 = 상대 그 라인 선수가 꺼낼 챔프(밴 후보)
+    const pr = (who === "enemy" ? S.ui.predRole : S.ui.ourRole) || "";
+    const tabSide = who === "our" && type === "pick" ? "our" : "enemy";
+    const donePicks = E.picks(S, tabSide);
+    const roleTabs = `<div class="seg pred-seg" role="group" aria-label="${who === "our" ? "라인별 추천" : "라인별 예상"}">${[["", "전체"]].concat(ROLES.map((r) => [r, ROLE_KO[r]])).map(([r, n]) => {
+      const done = r && donePicks.find((p) => p.role === r);
+      return `<button data-act="${who === "enemy" ? "pred" : "ourrole"}" data-r="${r}" aria-pressed="${pr === r}" ${done ? `disabled title="${esc(CH[done.champ].ko)} 픽 완료"` : ""}>${n}</button>`; }).join("")}</div>`;
+    if (pr && who === "our" && type === "pick") {
+      const ol = E.recommendPick(S, "our", pr);
+      body = ol.length ? `<p class="help pred-h">${ROLE_KO[pr]} ${esc(nick(t.players[pr].riot))} 선수 추천 · 눌러서 ${ROLE_KO[pr]} 픽으로 기록</p><div class="recs">${ol.map((r, i) => recCard(r, type, false, i + 1)).join("")}</div>`
+        : `<div class="empty-recs">${ROLE_KO[pr]} 추천 챔프가 없습니다. 아래에서 직접 고르세요.</div>`;
+    } else if (pr) {
+      const et = E.teamOf(S, "enemy");
       const pl = E.predictRole(S, "enemy", pr);
-      const p = t.players[pr];
-      body = pl.length ? `<p class="help pred-h">${ROLE_KO[pr]} ${esc(nick(p.riot))} 선수가 꺼낼 수 있는 챔프 · 눌러서 상대 ${type === "ban" ? "밴" : "픽"}으로 기록</p><div class="recs">${pl.map((x) => `<button class="rec muted pred" data-act="pick" data-id="${x.id}">
+      const p = et.players[pr];
+      const act = who === "our" ? "우리 밴" : `상대 ${type === "ban" ? "밴" : "픽"}`;
+      body = pl.length ? `<p class="help pred-h">상대 ${ROLE_KO[pr]} ${esc(nick(p.riot))} 선수가 꺼낼 수 있는 챔프 · 눌러서 ${act}으로 기록</p><div class="recs">${pl.map((x) => `<button class="rec muted pred" data-act="pick" data-id="${x.id}">
         <span class="lab">${esc(x.label)}</span>${icon(x.id, "lg")}<span class="cn">${esc(CH[x.id].ko)}</span><span class="why">${esc(x.d)}${x.meta ? `<br>${esc(x.meta)}` : ""}</span>
         ${x.vsOurs.length ? `<span class="vs-ours">${x.vsOurs.map(esc).join("<br>")}</span>` : ""}
         ${x.answers.length ? `<span class="ans">우리 대응 ${x.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`).join("")}</div>`
-        : `<div class="empty-recs">${ROLE_KO[pr]} 예상 챔프가 없습니다.</div>`;
+        : `<div class="empty-recs">상대 ${ROLE_KO[pr]} 예상 챔프가 없습니다.</div>`;
     } else if (list.length) body = `<div class="recs">${list.map((r, i) => recCard(r, type, who === "enemy", who === "our" ? i + 1 : 0)).join("")}</div>`;
     else body = `<div class="empty-recs">${who === "enemy" && !E.teamHasPools(t) ? "상대 챔프폭이 비어 있어 예상이 어렵습니다. 「상대팀 분석」에서 챔프폭을 넣으면 예상이 나옵니다." : "추천할 챔프가 없습니다. 아래에서 직접 고르세요."}</div>`;
     return `<div class="now-box"><div class="now-h"><span class="what ${side}">${who === "our" ? "추천 순서" : "상대 예상"}</span><span class="step">${title}</span>${roleTabs}<span class="dir">${dirTxt}</span></div>${body}</div>`;
@@ -822,10 +831,11 @@
     step.cands = undefined;
     if (st[1] !== "pick") step.role = null;
     else if (who === "enemy" && S.ui.predRole && E.openRoles(S, "enemy").includes(S.ui.predRole)) step.role = S.ui.predRole;
-    else if (who === "our" && wantRole && E.openRoles(S, "our").includes(wantRole)) step.role = wantRole;
+    else if (who === "our" && (wantRole || S.ui.ourRole) && E.openRoles(S, "our").includes(wantRole || S.ui.ourRole)) step.role = wantRole || S.ui.ourRole;
     else { const pr = E.pickRole(S, who, id); step.role = pr.role; step.cands = pr.cands; }
     S.draft.idx++;
     if (S.ui.predRole && !E.openRoles(S, "enemy").includes(S.ui.predRole)) S.ui.predRole = "";
+    S.ui.ourRole = "";   // 우리 라인 칸은 한 번 고르면 전체로 돌아감(다음 차례는 다른 라인일 수 있음)
     S.ui.sheet = false; S.ui.q = "";
     save(); render();
   }
@@ -1282,6 +1292,7 @@
       case "frole": S.ui.role = el.dataset.r; save(); render(); break;
       case "onlypool": S.ui.onlyPool = !S.ui.onlyPool; save(); render(); break;
       case "pred": S.ui.predRole = el.dataset.r; render(); break;
+      case "ourrole": S.ui.ourRole = el.dataset.r; render(); break;
       case "scen": S.ui.scen = el.dataset.k; save(); render(); break;
       case "grefresh": refreshRecent(); break;
       case "gpage": { S.ui.gPage = { ...(S.ui.gPage || {}), [el.dataset.k]: Number(el.dataset.p) }; save(); render();
