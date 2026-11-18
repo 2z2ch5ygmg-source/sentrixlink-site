@@ -770,3 +770,4 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sc-world > .sc-wv b { min-width: 15px; padding: 0 3px; display: grid; place-items: center; }
 .sc-world > .sc-wv .s-b { background: var(--blue); } .sc-world > .sc-wv .s-r { background: var(--red); }
 .sc-world > .sc-wv .unk { background: #3a3f4b; color: #c9ced8; }
+.sc-world > .sc-lab.wvl { font-size: 11px; z-index: 4; }

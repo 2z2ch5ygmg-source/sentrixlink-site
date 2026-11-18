@@ -210,5 +210,8 @@ window.KB = (function () {
     ORDER.splice(0, ORDER.length, ...src.map((x) => x.slice()));
     ORDER.kind = kind === "ranked" ? "ranked" : "tournament";
   }
-  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS, useOrder };
+  // 탱커 녹이기: 최대·잃은 체력 비례 피해, 고정 피해, 긴 지속딜로 앞라인이 두꺼운 상대를 녹이는 챔프 (사용자 요청 11-18)
+  const TANKBUSTER = ["Vayne", "KogMaw", "Kaisa", "Gwen", "Cassiopeia", "Aphelios", "Fiora", "Brand", "Lillia", "Varus", "Kayle", "Twitch",
+    "Darius", "Trundle", "Vi", "Belveth", "Camille", "Jax", "Smolder", "Kindred", "MasterYi", "Malzahar", "Olaf", "Yunara", "Mordekaiser"];
+  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS, TANKBUSTER, useOrder };
 })();

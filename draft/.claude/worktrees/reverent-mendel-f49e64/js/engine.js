@@ -215,6 +215,14 @@ window.Engine = (function () {
     return out.sort((x, y) => y.v - x.v).slice(0, 3);
   }
 
+  // ---- 딜러·탱커 구분 (사용자 요청 11-18: 상대가 탱커 위주면 지속딜이 필요) ----
+  const TANKBUSTER = new Set(window.KB.TANKBUSTER || []);
+  // 앞라인: 탱커 유형이거나 앞라인 성향
+  function isFront(c) { return !!c && (c.dmg === "TK" || c.st.includes("front")); }
+  // 딜러: 탱커가 아니고, 앞라인 성향이면 교전·스플릿·핵심딜도 있어야(다리우스·세트는 딜러, 말파이트·누누·갈리오는 아님)
+  function isDealer(c) { return !!c && c.dmg !== "TK" && (!c.st.includes("front") || c.st.some((t) => t === "skirm" || t === "split" || t === "carry")); }
+  // 탱커에 약함: 순간딜·포킹 위주이고 지속딜(핵심딜)·체력 비례 딜이 없음 (예: 이즈리얼·제라스·신드라)
+  function weakVsTanks(c) { return !!c && !TANKBUSTER.has(c.id) && !c.st.includes("carry") && (c.st.includes("burst") || c.st.includes("poke")); }
   // ---- 조합 적합도 ----
   function fit(c, key) {
     const w = COMPS[key].w;
@@ -586,8 +594,14 @@ window.Engine = (function () {
     const threat = keyThreats(state, who);
     const nowRoles = (pp.plan.find((p) => p.idxs.includes(state.draft.idx)) || { items: [] }).items.filter((x) => !x.done && x.role).map((x) => x.role);
     const hasFront = mine.some((p) => CH[p.champ].st.includes("front"));
-    const ad = mine.filter((p) => CH[p.champ].dmg === "AD").length;
-    const ap = mine.filter((p) => CH[p.champ].dmg === "AP").length;
+    // 딜 계산은 실제 딜러만 센다(말파이트·누누·갈리오 같은 탱커는 AP여도 딜러가 아님)
+    const dealers = mine.filter((p) => isDealer(CH[p.champ]));
+    const ad = dealers.filter((p) => CH[p.champ].dmg === "AD").length;
+    const ap = dealers.filter((p) => CH[p.champ].dmg === "AP").length;
+    // 상대 앞라인이 3명 이상이면 지속딜·체력 비례 딜이 필요하고, 순간딜·포킹만으로는 못 녹인다
+    const theirFront = theirs.filter((t) => isFront(CH[t.champ]));
+    const tankK = theirFront.length >= 3 ? theirFront.length - 2 : 0;
+    const frontTxt = theirFront.slice(0, 3).map((t) => ko(t.champ)).join("·") + (theirFront.length > 3 ? " 등" : "");
     const oppOpen = openRoles(state, opp);
     const sy = sylasRisk(state, who);
     // 우리 밴이 남아 있으면(2차 밴) 사일러스를 밴해서 막을 수 있으니 감점을 줄이고 밴을 권한다
@@ -637,6 +651,16 @@ window.Engine = (function () {
           if (f >= 2) { s += f * 2.5; reasons.push({ t: `${COMPS[dir].short} 조합`, d: `${COMPS[dir].name}에 맞음`, v: f * 2.5, comp: true }); }
         }
         if (!hasFront && c.st.includes("front") && "TJS".includes(r)) { s += 5; reasons.push({ t: "앞라인 보강", d: "아직 탱커가 없음", v: 5 }); }
+        const dealer = isDealer(c);
+        if (tankK && dealer) {
+          if (TANKBUSTER.has(c.id)) { const v = Math.min(10, 3 + 2.5 * tankK); s += v; reasons.push({ t: "탱커 녹이기", d: `상대 앞라인 ${theirFront.length}명(${frontTxt}) → 체력 비례·지속딜`, v }); }
+          else if (weakVsTanks(c)) { const v = 2 + 2 * tankK; s -= v; reasons.push({ t: "탱커에 약함", d: `상대 앞라인 ${theirFront.length}명(${frontTxt}) → 순간딜·포킹으로는 못 녹임`, v: -v }); }
+        }
+        // 딜러가 모자라면: 딜러는 올리고, 이 픽 뒤 남은 칸으로 딜러 2명을 못 채우면 딜러 아닌 챔프는 내린다
+        if (mine.length >= 2 && dealers.length <= 1) {
+          if (dealer) { s += 5; reasons.push({ t: "딜러 보강", d: `지금 딜러 ${dealers.length}명${dealers.length ? `(${ko(dealers[0].champ)})` : ""}`, v: 5 }); }
+          else if (dealers.length + open.length - 1 < 2) { s -= 6; reasons.push({ t: "딜 부족", d: `이 픽까지 탱커면 딜러가 ${dealers.length + open.length - 1}명뿐`, v: -6 }); }
+        }
         if (mine.length >= 2 && ad >= 2 && ap === 0 && (c.dmg === "AP" || c.dmg === "MX")) { s += 4; reasons.push({ t: "AP 딜 보강", d: "물리 딜만 있음", v: 4 }); }
         if (mine.length >= 2 && ap >= 2 && ad === 0 && (c.dmg === "AD" || c.dmg === "MX")) { s += 4; reasons.push({ t: "AD 딜 보강", d: "마법 딜만 있음", v: 4 }); }
         for (const t of theirs) {
@@ -706,6 +730,8 @@ window.Engine = (function () {
       else if (x.t === "궁 뺏기") good.push("상대 궁 뺏어 쓰기");
       else if (x.t === "앞라인 보강") good.push("앞라인 보강");
       else if (x.t === "AP 딜 보강" || x.t === "AD 딜 보강") good.push(x.t);
+      else if (x.t === "탱커 녹이기") good.push("탱커 녹이기");
+      else if (x.t === "딜러 보강") good.push("딜러 보강");
       else if (x.t === "갱 대비") good.push("갱 버팀");
       else if (x.t === "요주의 대비") good.push(x.d.replace(/^상대 \S+ /, "").replace(" 상대로 유리", " 상대 강함"));
       else if (x.t === "상대 주력 뺏기") good.push("상대 주력 뺏기");
@@ -714,6 +740,8 @@ window.Engine = (function () {
       else if (x.t === "맞대응 차례") good.push(x.d.replace(/ \S+ 공개 → 맞대응$/, " 맞대응"));
     });
     best.reasons.forEach((x) => { if (x.t === "주의") bad.push(x.d.replace(" 상대로 불리", " 상대 불리")); });
+    const tk = best.reasons.find((x) => x.t === "탱커에 약함" || x.t === "딜 부족");
+    if (tk) bad.unshift(tk.t === "딜 부족" ? "딜러 부족" : "탱커 많은 상대에 딜 부족");
     const sy = best.reasons.find((x) => x.t === "사일러스 주의" && x.v <= -3);
     const sylas = !!sy;
     if (sy) bad.unshift(sy.banFix ? "사일러스 밴 필요(궁 뺏김)" : "사일러스에 궁 뺏길 위험");
@@ -724,7 +752,7 @@ window.Engine = (function () {
       if (weak.length) bad.push(`${weak.slice(0, 2).join("·")} 조합에 약함`);
     }
     if (window.KB.SLIPPERY.includes(c.id) === false && c.st.includes("carry") && !c.st.includes("dive")) bad.push("돌진에 취약");
-    const rank = (g) => (/상대 강함/.test(g) ? 0 : /조합에 맞음|세트$/.test(g) ? 1 : g === "갱 버팀" ? 2 : g === "앞라인 보강" ? 3 : /딜 보강/.test(g) ? 4 : /팀 경기/.test(g) ? 5 : g === "상대 주력 뺏기" ? 6 : 7);
+    const rank = (g) => (/상대 강함/.test(g) ? 0 : /조합에 맞음|세트$|탱커 녹이기/.test(g) ? 1 : g === "갱 버팀" ? 2 : g === "앞라인 보강" ? 3 : /딜 보강/.test(g) ? 4 : /팀 경기/.test(g) ? 5 : g === "상대 주력 뺏기" ? 6 : 7);
     return { good: [...new Set(good)].sort((a, b) => rank(a) - rank(b)).slice(0, 2), bad: [...new Set(bad)].slice(0, sylas ? 2 : 1) };
   }
 

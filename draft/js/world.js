@@ -56,7 +56,7 @@
     const flip = sc.red ? RED : (p) => p;
     const add = {};
     ["us", "them"].forEach((side) => Object.entries(P[side]).forEach(([r, at]) => {
-      if (have[side].has(r)) return;
+      if (have[side].has(r) || (sc.gone || []).includes(`${side}:${r}`)) return;   // gone = 귀환·사망 등으로 맵에 없음
       add[`ctx-${side}-${r}`] = { c: CAST[side][r], s: side, at: flip(at), ctx: 1, role: r };
     }));
     return { add, vis: [] };
