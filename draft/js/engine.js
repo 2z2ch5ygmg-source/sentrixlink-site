@@ -332,9 +332,22 @@ window.Engine = (function () {
     if ((m = d.match(/^우리 (\S+) 조합 받아치기/))) return { t: `${m[1]} 받아치기`, c: threat ? "bad" : "good" };
     if ((m = d.match(/^상대가 (.+?) 방향$/))) return { t: `${m[1].replace(/ 조합$/, "")} 조합 핵심`, c: "info" };
     if (/사일러스가|사일러스 궁|궁을 뺏길/.test(d)) return { t: "사일러스 궁 주의", c: "bad" };
+    if ((m = d.match(/^상대 (.+?) 궁을 뺏어 씀/))) return { t: `${m[1]} 궁 뺏기`, c: threat ? "bad" : "good" };
+    if ((m = d.match(/^(.+?)가 (진입|돌진|그랩)을 막음$/))) return { t: `${m[1]} ${m[2]} 차단`, c: threat ? "good" : "bad" };
+    if ((m = d.match(/^상대 \S+ (.+?) 상대로 유리$/))) return { t: `${m[1]} 상대 유리`, c: threat ? "bad" : "good" };
     if ((m = d.match(/^(.+?)에 맞음$/))) return { t: m[1], c: "info" };
     if ((m = d.match(/^상대 정글 (\S+) 갱 버팀/))) return { t: `${m[1]} 갱 버팀`, c: "good" };
-    return { t: d.length > 12 ? d.slice(0, 12) + "…" : d, c: "" };
+    return null;   // 짧게 못 줄이는 문장은 근거 이름(t)으로
+  }
+  // 근거 하나 → 알약(문장을 자르지 않는다: 줄일 수 있으면 줄이고, 아니면 근거 이름)
+  const SHORT_T = { "앞라인 보강": "good", "딜러 보강": "good", "AP 딜 보강": "good", "AD 딜 보강": "good", "탱커 녹이기": "good", "갱 대비": "good",
+    "탱커에 약함": "bad", "딜 부족": "bad", "궁 보호 밴": "info", "사일러스 주의": "bad" };
+  function shortR(r, threat) {
+    const p = r.d ? shortNow(r.d, threat) : null;
+    if (p) return p;
+    if (!r.t) return null;
+    const c = SHORT_T[r.t] || (/조합/.test(r.t) ? "info" : "");
+    return { t: r.t, c: threat && (c === "good" || c === "bad") ? (c === "good" ? "bad" : "good") : c };
   }
   function cardPills(team, role, id, reasons, threat) {
     const out = [];
@@ -350,12 +363,16 @@ window.Engine = (function () {
     const mi = metaInfo(id, role);
     if (mi && mi.prio >= 5) out.push({ t: `대회 ${Math.round(mi.prio)}%`, c: "" });
     // 지금 판: 기록 근거는 위에서 이미 보였으니 빼고, 카운터는 한 알약으로 모은다
-    const now = (reasons || []).filter((r) => (r.v == null || r.v !== 0) && !r.order && !RECORD_T.test(r.t || "") && r.d).map((r) => shortNow(r.d, threat));
+    const now = (reasons || []).filter((r) => (r.v == null || r.v !== 0) && !r.order && !RECORD_T.test(r.t || "") && r.t !== "큰 그림" && (r.d || r.t)).map((r) => shortR(r, threat)).filter(Boolean);
     const ctr = now.filter((p) => p.ctr).map((p) => p.ctr);
     const rest = now.filter((p) => !p.ctr);
     if (ctr.length) out.push({ t: `${[...new Set(ctr)].slice(0, 2).join("·")} 카운터`, c: threat ? "bad" : "good" });
-    rest.slice(0, 2).forEach((p) => { if (!out.some((o) => o.t === p.t)) out.push(p); });
-    return out.slice(0, 6);
+    // 경고(빨강)는 꼭 보이게 앞에, 나머지는 2개까지
+    const warn = rest.filter((p) => p.c === "bad"), other = rest.filter((p) => p.c !== "bad");
+    const extra = warn.slice(0, 2).concat(other.slice(0, Math.max(0, 2 - Math.min(2, warn.length)) || 1));
+    extra.forEach((p) => { if (!out.some((o) => o.t === p.t)) out.push(p); });
+    if (out.length > 6) { const keep = out.filter((p) => p.c === "bad"); return out.filter((p) => p.c !== "bad").slice(0, 6 - keep.length).concat(keep); }
+    return out;
   }
   function metaText(m) {
     if (!m) return "";
@@ -546,6 +563,25 @@ window.Engine = (function () {
     return Math.min(1, p);
   }
 
+  // 상대 픽 중 우리 진입·돌진을 막는 챔프: { eng:{sum, ids}, dive:{sum, ids} } (라인을 몰라도 조합 상성이라 그대로 적용)
+  function antiAgainst(state, who) {
+    const opp = who === "our" ? "enemy" : "our";
+    const AE = window.KB.ANTI_ENGAGE || {}, AD = window.KB.ANTI_DIVE || {}, AH = window.KB.ANTI_HOOK || {};
+    const out = { eng: { sum: 0, ids: [] }, dive: { sum: 0, ids: [] }, hook: { sum: 0, ids: [] } };
+    picks(state, opp).forEach((p) => {
+      if (AE[p.champ]) { out.eng.sum += AE[p.champ]; out.eng.ids.push(p.champ); }
+      if (AD[p.champ]) { out.dive.sum += AD[p.champ]; out.dive.ids.push(p.champ); }
+      if (AH[p.champ]) { out.hook.sum += AH[p.champ]; out.hook.ids.push(p.champ); }
+    });
+    return out;
+  }
+  // 이 챔프가 상대 차단 챔프에 막히는 정도(이니시·돌진 중 큰 쪽)
+  function blockedBy(c, anti) {
+    const e = c.st.includes("eng") ? anti.eng : null, d = c.st.includes("dive") ? anti.dive : null;
+    const h = (window.KB.HOOKS || []).includes(c.id) && anti.hook ? anti.hook : null;
+    const b = [e, d, h].filter((x) => x && x.sum).sort((a, z) => z.sum - a.sum)[0];
+    return b ? { sum: b.sum, ids: b.ids, kind: b === e ? "진입" : b === d ? "돌진" : "그랩" } : null;
+  }
   function direction(state, who) {
     const team = teamOf(state, who);
     const mine = picks(state, who).map((p) => p.champ);
@@ -559,7 +595,9 @@ window.Engine = (function () {
       const picked = mine.reduce((s, id) => s + fit(CH[id], k), 0);
       let pot = 0;
       if (hasPool) { const b = buildComp(team, k, excl, fixed); pot = b.fitScore * 0.35 + b.comfort * 0.6; }
-      const s = picked * 1.4 + pot;
+      const anti = antiAgainst(state, who);
+      const block = k === "eng" ? anti.eng.sum : k === "dive" ? anti.dive.sum : 0;   // 상대가 진입·돌진을 막는 챔프를 고르면 그 방향을 낮춘다
+      const s = picked * 1.4 + pot - block * 1.6;
       if (!best || s > best.s) best = { key: k, s, picked };
     }
     if (!hasPool && !mine.length) return null;
@@ -732,6 +770,7 @@ window.Engine = (function () {
     const frontTxt = theirFront.slice(0, 3).map((t) => ko(t.champ)).join("·") + (theirFront.length > 3 ? " 등" : "");
     const oppOpen = openRoles(state, opp);
     const sy = sylasRisk(state, who);
+    const anti = antiAgainst(state, who);
     // 우리 밴이 남아 있으면(2차 밴) 사일러스를 밴해서 막을 수 있으니 감점을 줄이고 밴을 권한다
     // 고른 큰 그림 시나리오: 그 칸의 주 픽·대체 픽을 앞으로
     const scen = who === "our" && state.ui && state.ui.scen ? (scenarios(state, who) || []).find((x) => x.key === state.ui.scen) : null;
@@ -779,6 +818,9 @@ window.Engine = (function () {
           if (f >= 2) { s += f * 2.5; reasons.push({ t: `${COMPS[dir].short} 조합`, d: `${COMPS[dir].name}에 맞음`, v: f * 2.5, comp: true }); }
         }
         if (!hasFront && c.st.includes("front") && "TJS".includes(r)) { s += 5; reasons.push({ t: "앞라인 보강", d: "아직 탱커가 없음", v: 5 }); }
+        const blk = blockedBy(c, anti);
+        // 원딜은 앞라인 뒤에서 칠 수 있어 돌진 차단 감점을 절반만
+        if (blk) { const v = Math.min(26, 5 * blk.sum) * (r === "A" && blk.kind === "돌진" ? 0.5 : 1); s -= v; reasons.push({ t: `${blk.kind} 차단 주의`, d: `${blk.ids.map(ko).join("·")}가 ${blk.kind}을 막음`, v: -v }); }
         const dealer = isDealer(c);
         if (tankK && dealer) {
           if (TANKBUSTER.has(c.id)) { const v = Math.min(10, 3 + 2.5 * tankK); s += v; reasons.push({ t: "탱커 녹이기", d: `상대 앞라인 ${theirFront.length}명(${frontTxt}) → 체력 비례·지속딜`, v }); }
@@ -868,6 +910,8 @@ window.Engine = (function () {
       else if (x.t === "맞대응 차례") good.push(x.d.replace(/ \S+ 공개 → 맞대응$/, " 맞대응"));
     });
     best.reasons.forEach((x) => { if (x.t === "주의") bad.push(x.d.replace(" 상대로 불리", " 상대 불리")); });
+    const blkR = best.reasons.find((x) => /차단 주의$/.test(x.t));
+    if (blkR) bad.unshift(blkR.d.replace(/가 (진입|돌진|그랩)을 막음$/, " $1 차단"));
     const tk = best.reasons.find((x) => x.t === "탱커에 약함" || x.t === "딜 부족");
     if (tk) bad.unshift(tk.t === "딜 부족" ? "딜러 부족" : "탱커 많은 상대에 딜 부족");
     const sy = best.reasons.find((x) => x.t === "사일러스 주의" && x.v <= -3);
@@ -1065,6 +1109,7 @@ window.Engine = (function () {
     const avail = new Set(available(state, who).map((c) => c.id));
     const oppDir = theirs.length ? direction(state, opp) : null;
     const sy = sylasRisk(state, who);
+    const antiS = antiAgainst(state, who);
     const theirFront = theirs.filter((t) => isFront(CH[t.champ]));
     const tankK = theirFront.length >= 3 ? theirFront.length - 2 : 0;   // 상대 앞라인 3명 이상 → 지속딜 필요
     const lost = {};
@@ -1093,6 +1138,8 @@ window.Engine = (function () {
           const bp = mate && mate.id ? (r === "A" ? pairBonus(id, mate.id) : pairBonus(mate.id, id)) : null;
           if (bp) { v += bp.v * 0.3; notes.push(`${j(ko(mate.id), "과", "와")} 세트`); }
           if (ULT[id] && sy > 0) { v -= (ULT[id] === 3 ? 6 : 2) * sy; if (ULT[id] === 3 && sy >= 0.3) notes.push("사일러스 주의"); }
+          const blk = blockedBy(c, antiS);
+          if (blk) { v -= Math.min(8, 2 * blk.sum); notes.push(`${blk.ids.map(ko).join("·")} ${blk.kind} 차단`); }
           if (tankK && isDealer(c)) {
             if (TANKBUSTER.has(id)) { v += 2 + 1.5 * tankK; notes.push("탱커 녹이기"); }
             else if (weakVsTanks(c)) { v -= 1.5 + 1.5 * tankK; notes.push("탱커 상대 딜 부족"); }
@@ -1116,6 +1163,8 @@ window.Engine = (function () {
       let score = comfort * 3 + fitScore + mine.reduce((a, p) => a + fit(CH[p.champ], key), 0) * 1.5;
       if (oppDir && COMPS[key].beats.includes(oppDir)) { score += 8; why.push(`상대 ${COMPS[oppDir].short} 조합을 잡는 방향`); }
       if (oppDir && COMPS[oppDir].beats.includes(key)) { score -= 8; why.push(`상대 ${COMPS[oppDir].short} 조합에 약함 — 진입 순서 주의`); }
+      const blockC = key === "eng" ? antiS.eng : key === "dive" ? antiS.dive : null;
+      if (blockC && blockC.sum) { score -= blockC.sum * 5; why.push(`${blockC.ids.map(ko).join("·")}가 ${key === "eng" ? "진입" : "돌진"}을 막음`); }
       const thin = open.filter((r) => slots[r] && slots[r].id && !slots[r].alts.length);
       const empty = open.filter((r) => slots[r] && !slots[r].id);
       if (thin.length) why.push(`${thin.map((r) => ROLE_KO[r]).join("·")} 대체 픽 없음 → 먼저 확보`);

@@ -1939,9 +1939,13 @@
     else {
       // 누구의 챔프로 볼지: 우리 픽 차례이거나 우리 챔프폭에 있으면 우리 관점, 아니면 상대 관점
       const st = curStep();
-      const ourTurnPick = st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
-      const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
-      who = ourTurnPick || inOurPool ? "our" : "enemy";
+      const turn = E.whoOfSide(S, st[0]);
+      if (el.closest(".now-box")) who = st[1] === "pick" ? turn : turn === "our" ? "enemy" : "our";   // 추천·예상 카드: 픽 = 그 차례 팀 챔프, 밴 = 밴 당하는 팀 챔프
+      else {
+        const ourTurnPick = st[1] === "pick" && turn === "our";
+        const inOurPool = ROLES.some((r) => E.poolMap(E.teamOf(S, "our"), r)[id]);
+        who = ourTurnPick || inOurPool ? "our" : "enemy";
+      }
       role = (who === "our" && el.dataset.role) || E.guessRole(S, who, id);
     }
     if (!role) return;
@@ -1949,10 +1953,10 @@
     const labels = slot
       ? (who === "our"
         ? { bad: h.laner ? "상대 같은 라인(이미 픽)" : "상대 대응 픽 예상 · " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리 픽" }
-        : { bad: h.laner ? "우리 같은 라인(이미 픽)" : "우리 대응 픽 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대 픽" })
+        : { bad: h.laner ? "우리 같은 라인(이미 픽)" : "우리 대응 픽 · " + ROLE_KO[role], good: "상대가 같이 꺼낼 만한 챔프", tag: "상대 픽" })
       : who === "our"
-      ? { bad: h.laner ? "상대 같은 라인" : "카운터 위험 · 상대 " + ROLE_KO[role], good: "우리 팀 시너지", tag: "우리" }
-      : { bad: h.laner ? "우리 같은 라인" : "우리 카운터 후보 · " + ROLE_KO[role], good: "상대 시너지", tag: "상대" };
+      ? { bad: h.laner ? "상대 같은 라인" : `${E.j(CH[id].ko, "을", "를")} 카운터하는 상대 ${ROLE_KO[role]}`, good: "우리 팀 시너지", tag: "우리" }
+      : { bad: h.laner ? "우리 같은 라인" : `${E.j(CH[id].ko, "을", "를")} 카운터하는 우리 ${ROLE_KO[role]}`, good: "상대가 같이 꺼낼 만한 챔프", tag: "상대" };
     const row = (x) => `<li>${icon(x.id, "sm")}<span><b>${esc(CH[x.id].ko)}</b><small>${esc(x.d)}</small></span></li>`;
     hc.innerHTML = `<div class="hc-h">${icon(id, "sm")}<b>${esc(CH[id].ko)}</b><span class="pill">${labels.tag} ${ROLE_KO[role]}</span></div>
       <div class="hc-sec"><div class="hc-t ${who === "our" ? "bad" : "good"}">${labels.bad}</div>${h.threats.length ? `<ul>${h.threats.map(row).join("")}</ul>` : `<p class="help">뚜렷한 카운터 없음</p>`}</div>

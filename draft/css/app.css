@@ -221,7 +221,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .rec .nm .pos { font-size: 12px; font-weight: 700; color: var(--muted); }
 /* 짧은 알약: 색 = 뜻(금 = 연습·자기평가, 파랑 = 팀원과·조합, 초록 = 우리에게 좋음, 빨강 = 위협·불리) */
 .cpills { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
-.cp { font-size: 12px; font-weight: 700; line-height: 1.3; padding: 2px 7px; border-radius: 6px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+.cp { font-size: 12px; font-weight: 700; line-height: 1.3; padding: 2px 7px; border-radius: 6px; background: var(--panel2); color: var(--muted); max-width: 100%; overflow-wrap: anywhere; text-align: center; }
 .cp.gold { background: var(--gold-bg); color: var(--gold); }
 .cp.info { background: var(--blue-bg); color: var(--blue); }
 .cp.good { background: var(--good-bg); color: var(--good); }

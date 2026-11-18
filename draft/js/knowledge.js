@@ -213,5 +213,14 @@ window.KB = (function () {
   // 탱커 녹이기: 최대·잃은 체력 비례 피해, 고정 피해, 긴 지속딜로 앞라인이 두꺼운 상대를 녹이는 챔프 (사용자 요청 11-18)
   const TANKBUSTER = ["Vayne", "KogMaw", "Kaisa", "Gwen", "Cassiopeia", "Aphelios", "Fiora", "Brand", "Lillia", "Varus", "Kayle", "Twitch",
     "Darius", "Trundle", "Vi", "Belveth", "Camille", "Jax", "Smolder", "Kindred", "MasterYi", "Malzahar", "Olaf", "Yunara", "Mordekaiser"];
-  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS, TANKBUSTER, useOrder };
+  // 진입·돌진 차단(조합 상성, 사용자 요청 11-19): 상대에 있으면 우리 이니시(eng)·돌진(dive) 챔프와 그 조합 가치가 떨어진다. 값 = 막는 힘(1~3)
+  //  예) 뽀삐 W(돌진 차단), 잔나 Q·R(밀어내기), 탈리야 벽·지뢰, 브라움 E, 모르가나 E(CC 막기), 룰루 변이·궁, 벡스 공포(돌진 대상), 질리언 궁
+  const ANTI_ENGAGE = { Poppy: 3, Janna: 3, Braum: 2, Morgana: 2, Gragas: 2, Taliyah: 2, Lulu: 2, Anivia: 2, Azir: 2, Zilean: 2, Renata: 2, Milio: 2,
+    Alistar: 1, Trundle: 1, Rakan: 1, Thresh: 1, Vex: 2, Bard: 1 };
+  const ANTI_DIVE = { Poppy: 3, Janna: 3, Lulu: 3, Vex: 3, Taliyah: 2, Anivia: 2, Braum: 2, Zilean: 2, Lissandra: 2, Malzahar: 2, Milio: 2, Renata: 2,
+    Galio: 2, Rammus: 2, Morgana: 1, Soraka: 1, Jax: 1, Annie: 1, Azir: 2 };
+  // 그랩(투사체 끌기·CC 시작)을 막는 챔프: 모르가나 E(블랙 실드), 시비르 E(주문 보호막), 브라움 E(투사체 막기), 야스오 W(바람 장막)
+  const HOOKS = ["Blitzcrank", "Thresh", "Nautilus", "Pyke", "Morgana"];
+  const ANTI_HOOK = { Morgana: 3, Sivir: 1, Braum: 2, Yasuo: 1 };
+  return { ROLES, ROLE_KO, STYLE_KO, COMPS, COUNTERS, LEVEL_KO, ORDER, SLIPPERY, GANK, ULT_STEAL, DUO_PAIRS, TANKBUSTER, ANTI_ENGAGE, ANTI_DIVE, HOOKS, ANTI_HOOK, useOrder };
 })();
