@@ -226,6 +226,20 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .pred-seg button[disabled] { opacity: 0.35; cursor: not-allowed; text-decoration: line-through; }
 .pred-h { margin: -4px 0 10px; }
 .rec .why { font-size: 12px; color: var(--muted); line-height: 1.35; }
+/* 근거 줄: 분류 이름표 + 한 문장. 분류마다 이름표 색이 같아 전체·라인 칸에서 같은 뜻으로 읽힌다 */
+.rec .why.has-fx { align-self: stretch; text-align: left; }
+.fx { display: flex; flex-direction: column; gap: 3px; }
+.fx-r { display: block; }
+.fx-l { margin-right: 5px; font-size: 11px; font-weight: 800; color: var(--dim); white-space: nowrap; }
+.fx-t { color: var(--muted); overflow-wrap: anywhere; }
+.fx-self { color: var(--text); }
+.fx-recent { color: var(--gold); }
+.fx-team { color: var(--bad); }
+.fx-pro { color: var(--blue); }
+.fx-now { color: var(--good); }
+.fx-warn { color: var(--red); }
+.fx-r:has(.fx-now) .fx-t { color: var(--text); }
+.fx-r:has(.fx-warn) .fx-t { color: var(--red); }
 .rec .role { font-size: 12px; }
 .rec.muted { opacity: 0.75; }
 .empty-recs { color: var(--muted); font-size: 13px; padding: 8px 2px; }

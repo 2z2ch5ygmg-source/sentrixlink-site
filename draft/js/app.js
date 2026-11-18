@@ -275,15 +275,17 @@
     return `<section class="side ${side}"><div class="side-h"><span class="nm">${esc(t.name)}</span><span class="tag">${side === "B" ? "블루" : "레드"} · ${who === "our" ? "우리" : "상대"}</span></div><div class="bans">${bans}</div><div class="picks">${picks}</div></section>`;
   }
 
-  function recCard(r, type, muted, rank) {
+  // 근거 줄: 분류 이름표 + 한 문장 (전체·라인 칸 모두 같은 모양)
+  const factHtml = (lines) => `<span class="fx">${lines.map((x) => `<span class="fx-r"><span class="fx-l fx-${x.k}">${esc(x.l)}</span><span class="fx-t">${esc(x.t)}</span></span>`).join("")}</span>`;
+  function recCard(r, type, muted, rank, fx) {
     // 우리 픽: 무엇에 좋고 무엇에 약한지만 짧게. 밴·상대 예상: 근거 두 줄
     // 이름표와 같은 말(예: '한타 조합' + '한타 조합에 맞음')은 한 번만
     const goods = r.good ? r.good.filter((g) => !(r.label && / 조합$/.test(r.label) && g === r.label + "에 맞음")) : null;
-    const why = r.good ? `<span class="tgs">${goods.map((g) => tagHtml(g, true)).join("")}${r.bad.map((b) => tagHtml(b, false)).join("")}</span>`
+    const why = fx ? factHtml(fx) : r.good ? `<span class="tgs">${goods.map((g) => tagHtml(g, true)).join("")}${r.bad.map((b) => tagHtml(b, false)).join("")}</span>`
       : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
     return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 ? "first" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
       ${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span>${icon(r.id, "lg").replace(/ title="[^"]*"/, "")}<span class="cn">${esc(CH[r.id].ko)}</span>
-      ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why">${why}</span>
+      ${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}<span class="why${fx ? " has-fx" : ""}">${why}</span>
       ${r.answers && r.answers.length ? `<span class="ans">우리 대응 ${r.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`;
   }
 
@@ -315,11 +317,16 @@
       const p = et.players[pr];
       const act = who === "our" ? "우리 밴" : `상대 ${type === "ban" ? "밴" : "픽"}`;
       body = pl.length ? `<p class="help pred-h">상대 ${ROLE_KO[pr]} ${esc(nick(p.riot))} 선수가 꺼낼 수 있는 챔프 · 눌러서 ${act}으로 기록</p><div class="recs">${pl.map((x) => `<button class="rec muted pred" data-act="pick" data-id="${x.id}">
-        <span class="lab">${esc(x.label)}</span>${icon(x.id, "lg")}<span class="cn">${esc(CH[x.id].ko)}</span><span class="why">${esc(x.d)}${x.meta ? `<br>${esc(x.meta)}` : ""}</span>
-        ${x.vsOurs.length ? `<span class="vs-ours">${x.vsOurs.map(esc).join("<br>")}</span>` : ""}
+        <span class="lab">${esc(x.label)}</span>${icon(x.id, "lg")}<span class="cn">${esc(CH[x.id].ko)}</span><span class="why has-fx">${factHtml(E.facts(et, pr, x.id).concat(x.now))}</span>
         ${x.answers.length ? `<span class="ans">우리 대응 ${x.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`).join("")}</div>`
         : `<div class="empty-recs">상대 ${ROLE_KO[pr]} 예상 챔프가 없습니다.</div>`;
-    } else if (list.length) body = `<div class="recs">${list.map((r, i) => recCard(r, type, who === "enemy", who === "our" ? i + 1 : 0)).join("")}</div>`;
+    } else if (list.length) {
+      // 밴: 노리는 상대 선수(tgt)의 기록, 상대 픽 예상: 그 라인 상대 선수의 기록 — 라인 칸과 같은 줄 모양. 우리 픽은 장단점 태그 그대로
+      const opp = E.teamOf(S, who === "our" ? "enemy" : "our");
+      const fxOf = (r) => type === "ban" ? E.facts(opp, r.tgt, r.id).concat(E.nowFacts(r.reasons))
+        : who === "enemy" ? E.facts(t, r.role, r.id).concat(E.nowFacts(r.reasons)) : null;
+      body = `<div class="recs">${list.map((r, i) => recCard(r, type, who === "enemy", who === "our" ? i + 1 : 0, fxOf(r))).join("")}</div>`;
+    }
     else body = `<div class="empty-recs">${who === "enemy" && !E.teamHasPools(t) ? "상대 챔프폭이 비어 있어 예상이 어렵습니다. 「상대팀 분석」에서 챔프폭을 넣으면 예상이 나옵니다." : "추천할 챔프가 없습니다. 아래에서 직접 고르세요."}</div>`;
     return `<div class="now-box"><div class="now-h"><span class="what ${side}">${who === "our" ? "추천 순서" : "상대 예상"}</span><span class="step">${title}</span>${roleTabs}<span class="dir">${dirTxt}</span></div>${body}</div>`;
   }
@@ -373,8 +380,10 @@
 
   // 저장한 밴픽: 시리즈마다 접었다 펴기, 세트마다 우리·상대 밴과 픽(라인)
   function renderSaved() {
-    const list = loadSaved();
+    // 지금 고른 상대와 한 시리즈만(다른 상대 기록은 그 상대를 고르면 보임)
+    const all = loadSaved(), list = all.filter((x) => x.enemyTeam === S.enemyTeam);
     if (!list.length) return "";
+    const others = all.length - list.length;
     const chip = (id, extra) => CH[id] ? `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}${extra || ""}</span>` : "";
     const none = `<span class="help">없음</span>`;
     const side = (s) => (s === "B" ? "블루" : "레드");
@@ -396,7 +405,7 @@
     };
     const items = list.map((r) => { sid = r.sid; return `<details class="sv" ${S.ui.savedOpen === r.sid ? "open" : ""}><summary><b>${esc(r.at)}</b> · ${esc(r.ourName)} vs ${esc(r.enemyName)} · ${r.games.length}세트${score(r)}</summary>
       ${r.games.map(gameRow).join("")}<div class="dnav"><button class="btn sm ghost" data-act="savedDel" data-sid="${esc(r.sid)}">이 기록 지우기</button></div></details>`; }).join("");
-    return `<div class="card" style="margin-top:12px"><h3>저장한 밴픽 · ${list.length}개</h3><p class="help">이 브라우저에만 저장됩니다.</p>${items}</div>`;
+    return `<div class="card" style="margin-top:12px"><h3>저장한 밴픽 · ${esc(teamName(S.enemyTeam))} 상대 ${list.length}개</h3><p class="help">이 브라우저에만 저장됩니다.${others ? ` 다른 상대와 한 기록 ${others}개는 그 상대를 고르면 보입니다.` : ""}</p>${items}</div>`;
   }
 
   function renderStrategy() {

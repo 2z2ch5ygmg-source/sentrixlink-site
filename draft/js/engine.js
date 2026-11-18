@@ -291,6 +291,34 @@ window.Engine = (function () {
     const score = Math.min(1, prio / 60) * 0.6 + (sq ? TIER_SCORE[sq.tier] || 0.1 : 0.1) * 0.4;
     return { prio, rp: pro ? pro.rp : 0, games: pro ? pro.p + pro.b : 0, tier: sq ? sq.tier : null, br: sq ? sq.br : 0, wr: sq ? sq.wr : null, score };
   }
+  // 카드 근거 한 줄씩(분류 + 한 문장): 그 라인 선수의 이 챔프 기록. 라인·선수 이름은 카드 밖에서 보이므로 뺀다
+  //  k: self(자기평가) · season(시즌 전체) · recent(11/10 이후) · team(팀 경기) · pro(대회) · solo(솔랭)
+  function facts(team, role, id) {
+    const out = [];
+    const e = team && role ? poolMap(team, role)[id] : null;
+    if (e && e.manual) out.push({ k: "self", l: "자기평가", t: e.one ? "원챔" : `숙련도 ${LEVEL_KO[e.lv]}` });
+    if (e && e.g) out.push({ k: "season", l: "시즌 전체", t: `${e.g}판 승률 ${Math.round(e.wr)}%${!e.manual && e.one ? " · 원챔급 비중" : ""}` });
+    else if (e && e.mp && !e.manual) out.push({ k: "season", l: "숙련도", t: `${Math.round(e.mp / 1000)}k 점` });
+    const x = team && role ? practicePick(team, role, id) : null;
+    if (x) out.push({ k: "recent", l: `${sinceLabel()} 이후`, t: `${x.g}판 ${x.w}승 · KDA ${x.kda} · ${x.ready}${x.new ? ` · 새로 연습(${x.pre}→${x.g}판)` : ""}` });
+    else if (e && e.rg) out.push({ k: "recent", l: `${sinceLabel()} 이후`, t: `랭크 ${e.rg}판 ${e.rw}승` });
+    const tr = team && role ? stackChampRecord(team, role, id) : null;
+    if (tr) out.push({ k: "team", l: "팀 경기", t: `함께 한 ${tr.of}판 중 ${tr.g}판 (${tr.w}승)` });
+    const mi = metaInfo(id, role);
+    if (mi && mi.prio) out.push({ k: "pro", l: "대회", t: `밴픽 우선도 ${Math.round(mi.prio)}%` });
+    if (mi && mi.tier) out.push({ k: "solo", l: "솔랭", t: `${mi.tier}티어` });
+    if (!out.length && e) out.push({ k: "self", l: "챔프폭", t: LEVEL_KO[e.lv] || "기록 적음" });
+    return out;
+  }
+  const sinceLabel = () => { const R = window.RECENT; return R && R.since ? R.since.slice(5).replace("-", "/").replace(/^0/, "") : "11/10"; };
+  // 기록 말고 「지금 판」 때문에 붙은 근거(카운터·조합·세트·궁 보호·맞대응 등)만: 카드의 「지금」·「주의」 줄
+  const RECORD_T = /^(숙련도|상대 챔프폭|원챔 차단|고승률 차단|연습 중|함께 한 경기 픽|메타 강세|팀 경기 기록|상대 주력 뺏기|챔프폭|원챔|고승률|메타 픽|.+ 기본 픽|픽 순서|나중에)/;
+  function nowFacts(reasons) {
+    const rs = reasons || [];
+    const pos = rs.filter((x) => x.v > 0 && !x.order && !RECORD_T.test(x.t)).slice(0, 2).map((x) => ({ k: "now", l: "지금", t: x.d }));
+    const neg = rs.filter((x) => x.v < 0 && (x.t === "주의" || x.t === "사일러스 주의")).slice(0, 1).map((x) => ({ k: "warn", l: "주의", t: x.d }));
+    return pos.concat(neg);
+  }
   function metaText(m) {
     if (!m) return "";
     const a = [];
@@ -1177,10 +1205,10 @@ window.Engine = (function () {
     return list.sort((a, b) => b.s - a.s).slice(0, 8).map((x) => {
       const answers = myPool.filter(([id]) => lanesCounter(id, x.id)).sort((a, b) => lvScore(b[1]) - lvScore(a[1])).slice(0, 3).map(([id]) => id);
       const counterTag = x.adj.find((a) => a.t === "카운터 픽");
-      if (x.tr) x.adj.unshift({ t: "", d: `팀원과 함께 한 ${x.tr.of}판 중 ${x.tr.g}판 (${x.tr.w}승)` });
       const label = counterTag ? "카운터 픽" : x.bp ? "바텀 세트" : x.tr ? "함께 한 경기 픽" : x.e && x.e.one ? "원챔" : x.e && x.e.score >= 0.6 ? "숙련도 높음" : x.e && x.e.g >= 15 && x.e.wr >= 60 ? "고승률" : x.src === "meta" ? "메타 픽" : "챔프폭";
       const d = x.e ? statText(x.e) : x.mi ? metaText(x.mi) : "챔프폭 기록 없음";
-      return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers: ourLaner ? [] : answers, vsOurs: x.adj.map((a) => a.d) };
+      return { id: x.id, label, d, meta: x.mi && x.e ? metaText(x.mi) : "", answers: ourLaner ? [] : answers, vsOurs: x.adj.map((a) => a.d),
+        now: x.adj.map((a) => ({ k: /불리/.test(a.d) ? "warn" : "now", l: /불리/.test(a.d) ? "주의" : "지금", t: a.d })) };
     });
   }
 
@@ -1411,6 +1439,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
-    recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
+    facts, nowFacts, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };
 })();
