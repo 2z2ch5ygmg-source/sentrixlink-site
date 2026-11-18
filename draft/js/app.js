@@ -66,11 +66,53 @@
   S.ui.sheet = false;
   S.ui.predRole = "";
   S.ui.ourRole = "";
+  S.ui.endAsk = false;
   if (S.ui.tut && S.ui.tut.k != null) S.ui.tut.pk = S.ui.tut.k;
   S.ui.ans = {};   // 새로 열면 문제는 처음부터 다시 푼다(맞힌 기록 dScore는 진행률로 남김)
   if (S.ui.tut && S.ui.tut.step === "quiz") S.ui.tut = { ...S.ui.tut, k: 0 };   // 새로 열면 장면은 마지막 모습으로(다시 보기로 재생)
   if (S.ui.tut && S.ui.tut.u && !(window.VISION && window.VISION.units.some((u) => u.id === S.ui.tut.u && u.scenes))) S.ui.tut = {};
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
+
+  // ---------- 밴픽 저장(버튼으로만) ----------
+  // 저장 목록은 따로 두어 「처음 상태로」·「시리즈 초기화」가 지우지 않는다. 같은 시리즈를 다시 저장하면 그 칸을 덮어쓴다.
+  const KEY_SAVED = "sentrix-draft.saved.v1";
+  function loadSaved() { try { const v = JSON.parse(localStorage.getItem(KEY_SAVED) || "[]"); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function writeSaved(list) { try { localStorage.setItem(KEY_SAVED, JSON.stringify(list)); return true; } catch (e) { return false; } }
+  const teamName = (id) => { const t = S.teams.find((x) => x.id === id); return t ? t.name : id; };
+  const nowKST = () => new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+  // 지금 판(진행 중이어도) 전체 순서: 진영·밴/픽·챔프·라인
+  function gameRecord(game) {
+    return { game, ourSide: S.draft.ourSide, enemyTeam: S.enemyTeam, kind: ORDER.kind,
+      steps: ORDER.map((o, i) => { const s = S.draft.steps[i] || {}; return { side: o[0], t: o[1], champ: s.champ || null, role: s.role || null, skip: !!s.skip }; }) };
+  }
+  const hasSteps = (g) => g.steps.some((s) => s.champ);
+  // 끝난 세트는 다음 세트로 넘길 때 남긴 기록, 그 기능 전에 넘긴 세트는 피어리스 잠금(픽만)으로
+  function seriesRecord() {
+    const done = S.series.games || [];
+    const games = [];
+    for (let g = 1; g < S.series.game; g++) {
+      const full = done.find((x) => x.game === g);
+      if (full) games.push(full);
+      else { const ps = S.series.locked.filter((x) => x.game === g); if (ps.length) games.push({ game: g, partial: true, picks: ps.map((x) => ({ id: x.id, who: x.who })) }); }
+    }
+    const cur = gameRecord(S.series.game);
+    if (hasSteps(cur)) games.push(Object.assign(cur, S.draft.idx < ORDER.length ? { live: true } : {}));
+    return games;
+  }
+  function saveSeries() {
+    const games = seriesRecord();
+    if (!games.length) { alert("저장할 밴픽이 없습니다."); return; }
+    if (!S.series.sid) S.series.sid = "s" + Date.now().toString(36);
+    const rec = { sid: S.series.sid, at: nowKST(), ourTeam: S.ourTeam, ourName: teamName(S.ourTeam), enemyTeam: S.enemyTeam, enemyName: teamName(S.enemyTeam), mode: S.series.mode, games };
+    games.forEach((g) => { if (g.enemyTeam) g.enemyName = teamName(g.enemyTeam); });
+    const prev = loadSaved().find((x) => x.sid === rec.sid);   // 저장 목록에서 고른 승·패는 다시 저장해도 유지
+    if (prev) games.forEach((g) => { const o = prev.games.find((x) => x.game === g.game); if (!g.result && o && o.result) g.result = o.result; });
+    const list = loadSaved().filter((x) => x.sid !== rec.sid);
+    list.unshift(rec);
+    if (!writeSaved(list.slice(0, 200))) { alert("이 브라우저 저장소에 쓰지 못했습니다."); return; }
+    save(); S.ui.savedOpen = rec.sid; render();
+    alert(`${games.length}세트 밴픽을 저장했습니다. 아래 「저장한 밴픽」에서 볼 수 있습니다.`);
+  }
 
   // ---------- helpers ----------
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -329,6 +371,34 @@
     return `<div class="card" style="margin-top:12px"><h3>피어리스 잠금 · ${S.series.mode === "hard" ? "양 팀 모두 사용 불가" : S.series.mode === "soft" ? "자기 팀만 사용 불가" : "꺼짐"}</h3><div class="fearless">${rows}</div></div>`;
   }
 
+  // 저장한 밴픽: 시리즈마다 접었다 펴기, 세트마다 우리·상대 밴과 픽(라인)
+  function renderSaved() {
+    const list = loadSaved();
+    if (!list.length) return "";
+    const chip = (id, extra) => CH[id] ? `<span class="chip">${icon(id, "sm")}${esc(CH[id].ko)}${extra || ""}</span>` : "";
+    const none = `<span class="help">없음</span>`;
+    const side = (s) => (s === "B" ? "블루" : "레드");
+    let sid = "";   // gameRow가 쓰는 지금 시리즈 id
+    const res = (g) => `<span class="seg sv-res" role="group" aria-label="${g.game}세트 결과">${[["W", "승"], ["L", "패"]].map(([v, n]) => `<button class="res-${v.toLowerCase()}" data-act="savedRes" data-sid="${esc(sid)}" data-g="${g.game}" data-v="${v}" aria-pressed="${g.result === v}">${n}</button>`).join("")}</span>`;
+    const score = (r) => { const w = r.games.filter((g) => g.result === "W").length, l = r.games.filter((g) => g.result === "L").length; return w || l ? ` · ${w}승 ${l}패` : ""; };
+    const gameRow = (g) => {
+      if (g.partial) {
+        const p = (w) => g.picks.filter((x) => x.who === w).map((x) => chip(x.id)).join("") || none;
+        return `<div class="sv-g"><div class="sv-h"><b>${g.game}세트</b>${res(g)}<span class="help">밴·라인 기록 없음(저장 기능 전에 넘긴 세트, 픽만)</span></div>
+          <div class="sv-r"><span class="sv-l">우리 픽</span>${p("our")}</div><div class="sv-r"><span class="sv-l">상대 픽</span>${p("enemy")}</div></div>`;
+      }
+      const of = (who, t) => g.steps.filter((s) => s.t === t && (s.side === g.ourSide) === (who === "our"));
+      const bans = (who) => of(who, "ban").map((s) => (s.champ ? chip(s.champ) : s.skip ? `<span class="chip">밴 없음</span>` : "")).join("") || none;
+      const picks = (who) => of(who, "pick").filter((s) => s.champ).map((s) => chip(s.champ, s.role ? `<span class="lv lvone">${esc(ROLE_KO[s.role])}</span>` : "")).join("") || none;
+      return `<div class="sv-g"><div class="sv-h"><b>${g.game}세트</b>${res(g)}<span class="help">우리 ${side(g.ourSide)}${g.enemyName ? ` · 상대 ${esc(g.enemyName)}` : ""}${g.live ? " · 진행 중에 저장" : ""}</span></div>
+        <div class="sv-r"><span class="sv-l">우리 밴</span>${bans("our")}</div><div class="sv-r"><span class="sv-l">상대 밴</span>${bans("enemy")}</div>
+        <div class="sv-r"><span class="sv-l">우리 픽</span>${picks("our")}</div><div class="sv-r"><span class="sv-l">상대 픽</span>${picks("enemy")}</div></div>`;
+    };
+    const items = list.map((r) => { sid = r.sid; return `<details class="sv" ${S.ui.savedOpen === r.sid ? "open" : ""}><summary><b>${esc(r.at)}</b> · ${esc(r.ourName)} vs ${esc(r.enemyName)} · ${r.games.length}세트${score(r)}</summary>
+      ${r.games.map(gameRow).join("")}<div class="dnav"><button class="btn sm ghost" data-act="savedDel" data-sid="${esc(r.sid)}">이 기록 지우기</button></div></details>`; }).join("");
+    return `<div class="card" style="margin-top:12px"><h3>저장한 밴픽 · ${list.length}개</h3><p class="help">이 브라우저에만 저장됩니다.</p>${items}</div>`;
+  }
+
   function renderStrategy() {
     if (E.picks(S, "our").length < 5 || E.picks(S, "enemy").length < 5) return "";
     const g = E.buildStrategy(S);
@@ -517,8 +587,11 @@
       <span class="sel"><span class="sel-l">피어리스</span> ${seg("mode", S.series.mode, [["hard", "하드"], ["soft", "소프트"], ["off", "끔"]])}</span>
       <span class="spacer"></span>
       <button class="btn sm" data-act="resetGame">이번 세트 다시</button>
-      <button class="btn sm primary" data-act="nextGame">세트 종료 → 다음 세트</button>
-      ${S.series.locked.length ? `<button class="btn sm ghost" data-act="resetSeries">시리즈 초기화</button>` : ""}
+      ${S.ui.endAsk ? `<span class="end-ask" role="group" aria-label="${S.series.game}세트 결과"><span class="sel-l">${S.series.game}세트 결과</span>
+        <button class="btn sm res-w" data-act="endGame" data-v="W">승</button><button class="btn sm res-l" data-act="endGame" data-v="L">패</button><button class="btn sm ghost" data-act="endCancel">취소</button></span>`
+      : `<button class="btn sm primary" data-act="nextGame">세트 종료 → 다음 세트</button>`}
+      <button class="btn sm" data-act="saveSeries">밴픽 저장</button>
+      <button class="btn sm ghost" data-act="resetSeries">시리즈 초기화</button>
     </div>
     ${renderStatus("dstat-m")}
     <div class="board">
@@ -527,7 +600,7 @@
       <aside class="col-grid ${S.ui.sheet ? "open" : ""}">${renderGrid()}</aside>
     </div>
     ${S.ui.sheet ? `<div class="sheet-bg m-only" data-act="sheet"></div>` : ""}
-    ${renderFearless()}${renderStrategy()}`;
+    ${renderFearless()}${renderSaved()}${renderStrategy()}`;
   }
 
   // ---------- our team ----------
@@ -1276,14 +1349,24 @@
       case "skip": { const st = curStep(); if (st && st[1] === "ban") { S.draft.steps[S.draft.idx].skip = true; S.draft.idx++; save(); render(); } break; }
       case "undo": if (S.draft.idx > 0) { S.draft.idx--; S.draft.steps[S.draft.idx] = { champ: null, role: null, skip: false }; save(); render(); } break;
       case "resetGame": if (confirm("이번 세트 밴픽을 지울까요?")) { S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
-      case "nextGame": {
+      case "nextGame":   // 결과(승·패)를 고르면 넘어감
+        if (!["our", "enemy"].some((w) => E.picks(S, w).length)) { alert("이번 세트에 픽이 없습니다."); break; }
+        S.ui.endAsk = true; render(); break;
+      case "endCancel": S.ui.endAsk = false; render(); break;
+      case "endGame": {
         const ps = ["our", "enemy"].flatMap((w) => E.picks(S, w).map((p) => ({ id: p.champ, who: w, game: S.series.game })));
-        if (!ps.length) { alert("이번 세트에 픽이 없습니다."); break; }
-        if (!confirm(`${S.series.game}세트 픽 ${ps.length}개를 피어리스 잠금에 넣고 다음 세트로 갈까요?`)) break;
+        S.ui.endAsk = false;
+        if (!ps.length) { render(); break; }
+        S.series.games = (S.series.games || []).filter((g) => g.game !== S.series.game).concat([Object.assign(gameRecord(S.series.game), { result: el.dataset.v })]);
         S.series.locked = S.series.locked.concat(ps); S.series.game++;
         S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); window.scrollTo(0, 0); break;
       }
-      case "resetSeries": if (confirm("피어리스 잠금과 세트 번호를 모두 초기화할까요?")) { S.series = { game: 1, mode: S.series.mode, locked: [] }; S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
+      case "savedRes": { const list = loadSaved(), r = list.find((x) => x.sid === el.dataset.sid), g = r && r.games.find((x) => String(x.game) === el.dataset.g);
+        if (g) { g.result = g.result === el.dataset.v ? null : el.dataset.v; writeSaved(list); S.ui.savedOpen = r.sid; render(); } break; }
+      case "saveSeries": saveSeries(); break;
+      case "savedDel": { const list = loadSaved(), r = list.find((x) => x.sid === el.dataset.sid);
+        if (r && confirm(`${r.at} · ${r.enemyName} 상대 ${r.games.length}세트 기록을 지울까요?`)) { writeSaved(list.filter((x) => x.sid !== r.sid)); render(); } break; }
+      case "resetSeries": if (confirm("시리즈를 초기화할까요? 피어리스 잠금·세트 번호·이번 세트 밴픽이 지워지고, 「밴픽 저장」을 누르지 않은 내용은 남지 않습니다.")) { S.series = { game: 1, mode: S.series.mode, locked: [] }; S.draft.steps = emptySteps(); S.draft.idx = 0; save(); render(); } break;
       case "side": if (S.draft.ourSide !== el.dataset.v) {
         if (S.draft.idx > 0 && !confirm("진영을 바꾸면 이번 세트 밴픽이 지워집니다. 바꿀까요?")) break;
         S.draft.ourSide = el.dataset.v; if (ORDER.kind === "ranked") window.KB.useOrder("ranked", S.draft.ourSide);   // 솔랭·자랭: 우리 밴이 먼저
