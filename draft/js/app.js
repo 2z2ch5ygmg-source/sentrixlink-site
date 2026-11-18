@@ -856,7 +856,7 @@
     root.innerHTML = `<div class="modal-bg" data-act="close"><div class="modal" role="dialog" aria-modal="true" aria-label="챔프폭 편집">
       <div class="modal-h"><h2>${esc(t.name)} · ${t.id === S.ourTeam ? "자기평가 입력" : "챔프폭 편집"}</h2><button class="btn sm" data-act="close">닫기</button></div>
       <p class="help">${t.id === S.ourTeam ? "<b>대회에서 실제로 꺼낼 수 있는 챔프</b>만 넣고 자신감을 고르세요. 본인 평가가 있는 선수는 이 목록만 추천에 쓰고, 전적은 참고로만 붙습니다. " : ""}${t.id === S.ourTeam ? "" : "여기 넣은 챔프는 전적 추천에 <b>더해집니다</b>(전적 챔프는 그대로 남음). "}칩을 누르면 상 → 중 → 하 → 원챔 순서로 바뀝니다. ×는 삭제.</p>
-      <p class="help" id="shareNote" aria-live="polite">${t.solo ? "개인(솔랭) 상대는 이 브라우저에만 저장됩니다." : shareNote()}</p>
+      <p class="help" id="shareNote" aria-live="polite">${t.solo ? "개인(솔랭) 상대는 이 브라우저에만 저장됩니다." : shareNote()}</p>${t.solo || !SH.url ? "" : shareRoles(t)}
       ${roles}</div></div>`;
   }
   function addChamp(r) {
@@ -1543,6 +1543,13 @@
         if (SH.pending[t.id + "|" + r]) return;   // 내가 방금 바꾼 칸은 저장이 끝날 때까지 그대로
         const v = d.teams && d.teams[t.id] && d.teams[t.id][r], p = t.players[r];
         if (!v) { if (editedLocally(t.id, r)) shareChanged(t.id, r); return; }   // 공유 전에 이 브라우저에만 넣어 둔 입력은 올린다
+        // 한 번도 올리지 못한 이 브라우저 입력이 있는데 다른 사람이 먼저 올렸으면 덮지 않고 합쳐서 다시 올린다
+        if (!p.sharedAt && editedLocally(t.id, r)) {
+          const mine = normPool(p.pool), seen = new Set(v.pool.map((e) => e[0]));
+          const merged = v.pool.concat(mine.filter((e) => !seen.has(e[0])));
+          const tier = (p.tier || "") !== (seedP(t.id, r).tier || "") ? p.tier : v.tier || seedP(t.id, r).tier || p.tier;
+          if (!sameJ(merged, v.pool) || (v.tier || "") !== (tier !== seedP(t.id, r).tier ? tier : "")) { p.pool = merged; p.tier = tier; p.sharedAt = v.at; changed = true; shareChanged(t.id, r); return; }
+        }
         const tier = v.tier || seedP(t.id, r).tier || p.tier;
         if (!sameJ(normPool(p.pool), v.pool) || p.tier !== tier) { p.pool = v.pool; p.tier = tier; changed = true; }
         p.sharedAt = v.at;
@@ -1561,6 +1568,11 @@
     if (SH.status === "error") return `<b>팀 공유 저장 실패</b>(${esc(SH.err)}) — 이 브라우저에는 저장됐고, 다시 바꾸면 또 올립니다.`;
     if (Object.keys(SH.pending).length) return "팀 공유 저장 중…";
     return `입력하면 링크를 받은 팀원 모두에게 공유됩니다${SH.at ? ` · 마지막 저장 ${esc(SH.at)}` : ""}.`;
+  }
+  // 라인마다 팀 공유 저장소에 올라간 때(없으면 「아직 안 올라옴」)
+  function shareRoles(t) {
+    const on = ROLES.filter((r) => t.players[r].sharedAt), off = ROLES.filter((r) => !t.players[r].sharedAt);
+    return `<p class="help">${on.length ? `공유됨: ${on.map((r) => `${ROLE_KO[r]} ${esc(t.players[r].sharedAt.slice(5))}`).join(" · ")}` : "아직 공유된 라인 없음"}${on.length && off.length ? ` · 아직 안 올라옴: ${off.map((r) => ROLE_KO[r]).join("·")}` : ""}</p>`;
   }
   function shareNoteUpdate() { const n = document.getElementById("shareNote"); if (n) n.innerHTML = shareNote(); }
   if (SH.url) {
