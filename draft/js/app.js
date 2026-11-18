@@ -792,7 +792,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=56" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=58" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -821,6 +821,11 @@
     return head + (mode === "drill" ? renderDrill(V) : mode === "spots" ? renderSummary(V) : renderLearn(V));
   }
   const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+  // 운영 문제 출처(2026 자료): 영상은 챕터 시각으로, 글은 그대로
+  const refLinks = (V, refs) => `<span class="drefs">${refs.map(([k, at]) => { const r = (V.macroRefs || {})[k]; if (!r) return ""; const vid = !/^https?:/.test(r[1]);
+    const sec = at ? at.split(":").reduce((a, b) => a * 60 + Number(b), 0) : 0;
+    const href = vid ? `https://www.youtube.com/watch?v=${r[1]}${sec ? `&t=${sec}s` : ""}` : r[1];
+    return `<a class="vlink" href="${href}" target="_blank" rel="noopener" title="${esc(r[0])}${at ? " " + at : ""}">${ico("eye")}${esc(r[0])}${at ? " " + at : ""}</a>`; }).join("")}</span>`;
   const vlink = (V, t) => `<a class="vlink" href="${V.source.url}&t=${t}s" target="_blank" rel="noopener" title="${esc(V.source.title)} ${mmss(t)} 장면 열기">${ico("eye")}영상 ${mmss(t)}</a>`;
 
   // ----- 장면 무대: 실제 미니맵 위에 챔프·와드·시야·화살표를 그리고, 이전 장면에서 움직임을 애니메이션으로 이어 준다 -----
@@ -892,7 +897,7 @@
     const waveHtml = wv.map((q) => { const seeThem = q.them > 0 && inSight(q.themAt), at0 = q.us > 0 ? q.usAt : q.themAt;
       const tip = `${q.ko} 웨이브 — 우리 ${q.us}마리 · 상대 ${q.them > 0 ? (seeThem ? q.them + "마리" : "시야 밖") : "없음"}${q.note ? " · " + q.note : ""}`;
       return `<span class="sc-wv" style="${pct(at0)}" title="${esc(tip)}" aria-label="${esc(tip)}"><b class="s-${side("us")}">${q.us}</b><b class="${q.them > 0 && !seeThem ? "unk" : "s-" + side("them")}">${q.them > 0 ? (seeThem ? q.them : "?") : 0}</b></span>`
-        + (q.note ? `<span class="sc-lab wvl" style="left:${at0[0]}%;top:${at0[1] + 2.4}%;transform:translate(${at0[0] > 82 ? -92 : at0[0] < 18 ? -8 : -50}%,-50%)">${esc(q.note)}</span>` : ""); }).join("");
+        + (q.note ? `<span class="sc-lab wvl" style="left:${at0[0]}%;top:${at0[1] + (at0[1] > 82 ? -2.8 : 2.4)}%;transform:translate(${at0[0] > 82 ? -92 : at0[0] < 18 ? -8 : -50}%,-50%)">${esc(q.note)}</span>` : ""); }).join("");
     const towerHtml = towers.map((t) => `<span class="sc-tower s-${t.side} ${t.side === ourSide ? "us" : "them"}" style="${pct(t.at)}" title="${t.side === ourSide ? "우리" : "상대"} 포탑 · ${esc(t.kind)}"></span>`).join("");
     // 다른 시야 출처(우리 라인 미니언 등): 작은 표시 + 이름
     const vsrc = (sc.vis || []).map((v) => `<span class="sc-vsrc" style="${pct(v)}" title="${esc(v[3] || "우리 시야")}"></span><span class="sc-lab vsrc" style="left:${v[0]}%;top:${v[1] + 2.2}%">${esc(v[3] || "우리 시야")}</span>`).join("")
@@ -914,7 +919,7 @@
     const base = red ? `<span class="sc-base r" style="right:8px;bottom:8px">우리 = 레드</span>` : "";
     // 보기 핀(버튼)이 들어 있으면 그림(role=img)이 아니라 묶음(group)이어야 버튼을 누를 수 있다
     const role = extra && extra.pins ? `role="group" aria-label="${esc(sc.cap || "맵에서 보기 고르기")}"` : `role="img" aria-label="${esc(sc.cap || "맵 그림")}"`;
-    const zoomBar = `<div class="sc-zoom" role="group" aria-label="미니맵 확대·축소"><button type="button" data-act="mzoom" data-v="in" aria-label="확대">＋</button><button type="button" data-act="mzoom" data-v="out" aria-label="축소">−</button><button type="button" data-act="mapmode" data-v="full" aria-pressed="${!focusMode}">전체</button><button type="button" data-act="mapmode" data-v="focus" aria-pressed="${focusMode}">장면 확대</button></div>`;
+    const zoomBar = `<div class="sc-zoom" role="group" aria-label="미니맵 확대·축소"><button type="button" data-act="mzoom" data-v="in" aria-label="확대">＋</button><button type="button" data-act="mzoom" data-v="out" aria-label="축소">−</button><button type="button" data-act="mapmode" data-v="full" aria-pressed="${!focusMode}">전체</button><button type="button" data-act="mapmode" data-v="focus" aria-pressed="${focusMode}" aria-label="장면 확대"><span class="zl">장면 확대</span><span class="zs" aria-hidden="true">확대</span></button></div>`;
     return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""} ${viewCam[2] < 99.9 ? "zoomed" : ""}" ${role} data-cam='${JSON.stringify(viewCam)}' data-focus='${JSON.stringify(sc.cam)}'>${zoomBar}
       <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${towerHtml}${waveHtml}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
       ${base}${sc.approx ? `<span class="sc-approx">대략 자리 · 정확한 자리는 영상</span>` : ""}</div>`;
@@ -984,9 +989,11 @@
   // 마우스 휠(트랙패드 두 손가락)로 확대·축소 — 커서 아래 지점을 고정한 채로
   let zoomUsed = false;
   function zoomHintDone() { if (zoomUsed) return; zoomUsed = true; document.querySelectorAll(".sc-hint").forEach((h) => { h.classList.add("out"); setTimeout(() => h.remove(), 400); }); }
+  let hintShown = false;   // 처음 보이는 그림 한 번만
   function addZoomHint(root) {
-    if (zoomUsed || !root) return;
+    if (zoomUsed || hintShown || !root) return;
     const st = root.querySelector(".sc-stage"); if (!st) return;
+    hintShown = true;
     st.insertAdjacentHTML("beforeend", `<div class="sc-hint" aria-hidden="true"><span class="sc-hint-b"><b class="hint-wheel">마우스 스크롤로 확대·축소할 수 있습니다</b><b class="hint-touch">＋ − 버튼으로 확대·축소할 수 있습니다</b><small>확대한 뒤에는 끌어서 옮기기 · 「전체」로 돌아오기</small></span></div>`);
   }
   document.addEventListener("wheel", (ev) => {
@@ -1061,7 +1068,7 @@
       const dots = un.scenes.map((_, i) => `<button class="sc-dot ${i === k ? "on" : i < k ? "seen" : ""}" data-act="tscene" data-k="${i}" aria-label="장면 ${i + 1}" ${i === k ? 'aria-current="step"' : ""}></button>`).join("");
       body = `<div class="sc-wrap">${stageHtml({ ...sc, ph: sc.ph != null ? sc.ph : un.ph, waves: sc.waves || un.waves }, prev ? { ...prev, ph: prev.ph != null ? prev.ph : un.ph, waves: prev.waves || un.waves } : prev)}
         <div class="sc-cap"><div class="sc-cap-h"><span class="sc-n">${k + 1} / ${n}</span><b>${esc(sc.cap)}</b></div><p>${esc(sc.say)}</p>
-          <div class="sc-meta">${sc.t != null ? vlink(V, sc.t) : `<span class="dim">영상 밖 기본 원칙</span>`}${sc.approx ? `<span class="dim">그림 자리는 대략 — 정확한 자리는 영상에서</span>` : ""}</div>
+          <div class="sc-meta">${sc.t != null ? vlink(V, sc.t) : sc.refs ? refLinks(V, sc.refs) : `<span class="dim">영상 밖 기본 원칙</span>`}${sc.approx ? `<span class="dim">그림 자리는 대략 — 정확한 자리는 영상에서</span>` : ""}</div>
           <div class="sc-dots" role="group" aria-label="장면">${dots}</div>
           <div class="dnav"><button class="btn sm ghost" data-act="tscene" data-k="${k - 1}" ${k ? "" : "disabled"}>이전</button><button class="btn sm ghost" data-act="treplay">다시 보기</button>${k < n - 1 ? `<button class="btn sm primary" data-act="tscene" data-k="${k + 1}">다음 장면</button>` : `<button class="btn sm primary" data-act="tstart">문제 풀기 (${un.drills.length}문제)</button>`}</div></div></div>`;
     } else if (T.step === "quiz") {
@@ -1128,7 +1135,7 @@
         const af = d.opts[ans].after; const a = { ...base.a };
         Object.entries(af.a || {}).forEach(([id, t]) => { a[id] = { ...(a[id] || {}), ...t }; });
         const w = { ...base.w }; Object.entries(af.w || {}).forEach(([id, t]) => { w[id] = t; });
-        sc = { ...base, a, w, p: af.p, hit: af.hit, l: af.l || base.l, z: [...(base.z || []), ...(af.z || [])] };
+        sc = { ...base, a, w, p: af.p, hit: af.hit, l: af.l || base.l, z: [...(base.z || []), ...(af.z || [])], waves: af.waves ? { ...(base.waves || {}), ...af.waves } : base.waves };
         prev = base;
       }
       const pins = pinned ? d.opts.map((o, i) => `<button class="dpin sc-pin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button>`).join("") : "";
@@ -1156,7 +1163,7 @@
     const verdict = done ? (d.opts[ans].ok ? `<p class="dres ok">맞음 — ${esc(d.opts[ans].why)}</p>` : `<p class="dres no">아쉬움 — 정답은 ${"ABCD"[d.opts.findIndex((o) => o.ok)]}. ${esc(d.opts.find((o) => o.ok).why)}</p>`) : "";
     const red = d.side === "R";
     const sides = d.kind === "map" ? `<span class="dside ${red ? "r" : "b"}">우리 = ${red ? "레드(오른쪽 위)" : "블루(왼쪽 아래)"}</span><span class="dside ${red ? "b" : "r"}">상대 = ${red ? "블루(왼쪽 아래)" : "레드(오른쪽 위)"}</span>` : "";
-    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)}${d.obj ? " · " + esc(d.obj) : ""}</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
+    return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)}${d.obj ? " · " + esc(d.obj) : ""}</span>${d.src != null ? vlink(V, d.src) : d.refs ? refLinks(V, d.refs) : `<span class="dim">기본 원칙</span>`}</div>
       <div class="dsides">${sides}${d.when ? `<span class="dwhen"><b>언제</b> ${esc(d.when)}</span>` : ""}</div>
       <div class="dteams"><div><span class="dt-l ${red ? "r" : "b"}">우리${d.kind === "map" ? " · " + (red ? "레드" : "블루") : ""}</span>${teamRow(d.us, "us")}</div><div><span class="dt-l ${red ? "b" : "r"}">상대${d.kind === "map" ? " · " + (red ? "블루" : "레드") : ""}</span>${teamRow(d.them, "them")}</div></div>
       ${d.note ? `<div class="dnote" role="note"><b class="dnote-h">상황</b>${Array.isArray(d.note) ? `<ul>${d.note.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : `<p>${esc(d.note)}</p>`}</div>` : ""}
@@ -1165,7 +1172,8 @@
   // 문제 모음: 종류별로 차례대로
   // 문제 종류: 와드·한타·포지셔닝·운영(조합별·불리·유리·오브젝트)
   const DCATS = [["와드", "와드·시야", "어디에 박고, 왜 거기인가"], ["한타", "한타", "싸울지·피할지, 숫자와 체력"], ["포지셔닝", "포지셔닝", "실제 거리로 서는 자리"],
-    ["운영:조합", "운영 · 조합별", "사이드 조합·한타 조합의 운영"], ["운영:불리", "운영 · 불리할 때", "버티고 바꿔 먹는 선택"], ["운영:유리", "운영 · 유리할 때", "이득을 굴려 끝내는 선택"], ["운영:오브젝트", "운영 · 오브젝트", "유충·전령·용·바론 판단"]];
+    ["운영:조합", "운영 · 조합별", "사이드 조합·한타 조합의 운영"], ["운영:불리", "운영 · 불리할 때", "버티고 바꿔 먹는 선택"], ["운영:유리", "운영 · 유리할 때", "이득을 굴려 끝내는 선택"], ["운영:오브젝트", "운영 · 오브젝트", "유충·전령·용·바론 판단"],
+    ["운영:라인", "운영 · 쌓여도 밀면 안 될 때", "정보·점멸·오브젝트·인원을 보고 참기"], ["운영:모름", "운영 · 적 위치를 모를 때", "안 보이는 적은 우리 쪽으로 온다고 가정"]];
   const dcatOf = (d) => (d.cat === "운영" ? `운영:${d.sub}` : d.cat);
   function renderDrill(V) {
     const D = allDrills(), u = S.ui, score = u.dScore || {};

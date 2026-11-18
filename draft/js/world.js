@@ -18,7 +18,8 @@
   // 이 자료의 고정 출전 명단(문제·장면에 나오는 챔프)
   const CAST = { us: { T: "Malphite", J: "Nunu", M: "Orianna", A: "Kaisa", S: "Nautilus" }, them: { T: "Rumble", J: "MonkeyKing", M: "Hwei", A: "Xayah", S: "Lulu" } };
   const ROLE = { Malphite: "T", Nunu: "J", Orianna: "M", Kaisa: "A", Nautilus: "S", Blitzcrank: "S", Leona: "S",
-    Rumble: "T", MonkeyKing: "J", Hwei: "M", Xayah: "A", Zeri: "A", Lulu: "S" };
+    Rumble: "T", MonkeyKing: "J", Hwei: "M", Xayah: "A", Zeri: "A", Lulu: "S",
+    Fiora: "T", Gwen: "T", Jayce: "T", Kayle: "T", Zac: "J", Kassadin: "M", Zed: "M", Varus: "A", Lux: "S" };
   // 블루(우리) 기준 시점별 자리. 상대 정글은 넣지 않는다(위치를 모른다).
   // start = 게임 시작 직후(라인으로 걸어가는 중), lane = 라인전 중(웨이브는 라인 가운데쯤)
   // 라이너 자리는 라인 선 위(lanePt)에서 정한다. 정글은 고정 자리. 상대 정글은 넣지 않는다(위치를 모른다).
@@ -76,5 +77,18 @@
     if (/라인전 중|첫 귀환|라인전$/.test(t)) return "lane";
     return "";
   }
-  window.WORLD = { towers, fill, phaseOf, CAST, ROLE, LANES, lanePt, waves };
+  // 가장 가까운 걸을 수 있는 칸(벽이 아닌 칸)의 가운데로 — 손으로 잡은 자리가 벽에 걸리지 않게
+  let grid = null;
+  function snap(p) {
+    const G = window.VGRID; if (!G) return p;
+    if (!grid) { grid = new Uint8Array(G.w * G.h); let k = 0; for (const s of G.rle.split(",")) { const [v, n] = s.split("*"); const c = n ? parseInt(n, 16) : 1; grid.fill(parseInt(v, 16), k, k + c); k += c; } }
+    const i0 = Math.floor((p[0] / 100) * G.w), j0 = Math.floor((p[1] / 100) * G.h);
+    const ok = (i, j) => i >= 0 && j >= 0 && i < G.w && j < G.h && grid[j * G.w + i] !== 1;
+    if (ok(i0, j0)) return p;
+    for (let r = 1; r < 40; r++) { let best = null, bd = 1e9;
+      for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) { if (Math.max(Math.abs(di), Math.abs(dj)) !== r || !ok(i0 + di, j0 + dj)) continue; const d = di * di + dj * dj; if (d < bd) { bd = d; best = [i0 + di, j0 + dj]; } }
+      if (best) return [Math.round(((best[0] + 0.5) / G.w) * 1000) / 10, Math.round(((best[1] + 0.5) / G.h) * 1000) / 10]; }
+    return p;
+  }
+  window.WORLD = { towers, fill, phaseOf, CAST, ROLE, LANES, lanePt, waves, snap };
 })();

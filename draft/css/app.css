@@ -748,7 +748,13 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sc-stage.zoomed { cursor: grab; touch-action: none; }
 .sc-stage.zoomed:active { cursor: grabbing; }
 .sc-world > .dpin-l { position: absolute; transform: translate(-50%, 19px); font-size: 12px; font-weight: 800; color: #fff; background: rgba(11, 14, 20, 0.7); padding: 1px 6px; border-radius: 6px; white-space: nowrap; pointer-events: none; z-index: 6; }
-@media (max-width: 760px) { .sc-zoom button { min-width: 44px; height: 44px; } }
+.sc-zoom .zs { display: none; }
+@media (max-width: 760px) {
+  /* 휴대폰: 2×2 묶음을 오른쪽 위(상대 기지 쪽, 덜 중요한 곳)에 — 탑 라인을 가리지 않게 */
+  .sc-zoom { display: grid; grid-template-columns: repeat(2, 44px); gap: 4px; right: 6px; top: 6px; max-width: none; }
+  .sc-zoom button { min-width: 44px; width: 44px; height: 44px; padding: 0; font-size: 12px; }
+  .sc-zoom .zl { display: none; } .sc-zoom .zs { display: inline; }
+}
 /* 첫 그림에만: 화면이 어두워졌다 밝아지며 확대·축소 방법을 알려 준다(한 번 쓰면 사라짐) */
 .sc-hint { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; pointer-events: none; background: rgba(5, 7, 12, 0.7); animation: hint-pulse 1.1s ease-in-out 7 alternate forwards; transition: opacity 0.35s ease; }
 .sc-hint.out { opacity: 0; }
@@ -772,3 +778,4 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sc-world > .sc-wv .s-b { background: var(--blue); } .sc-world > .sc-wv .s-r { background: var(--red); }
 .sc-world > .sc-wv .unk { background: #3a3f4b; color: #c9ced8; }
 .sc-world > .sc-lab.wvl { font-size: 11px; z-index: 4; }
+.drefs { display: inline-flex; flex-wrap: wrap; gap: 4px; }
