@@ -433,7 +433,7 @@
       <span class="t"><span class="pill ${l.sc > 0 ? "good" : l.sc < 0 ? "bad" : ""}">${l.tone === "good" ? "유리" : l.tone === "bad" ? "불리" : l.sc > 0 ? "약간 유리" : l.sc < 0 ? "약간 불리" : "비슷"}</span> ${esc(l.t)}${l.plan ? ` — ${esc(l.plan)}` : ""}</span></div>`).join("");
     return `<div class="section-title"><h2>운영 전략 · 시나리오</h2><p>${S.series.game}세트 밴픽 결과 기준</p></div>
     <div class="strat">
-      <div class="banner ${g.matchup.tone} wide">우리 ${esc(g.O.name)} vs 상대 ${esc(g.E.name)} — ${esc(g.matchup.t)}${g.answer ? `<div style="font-weight:500;margin-top:6px">대처: ${esc(g.answer)}</div>` : ""}</div>
+      <div class="banner ${g.matchup.tone} wide">우리 ${esc(g.O.name)} vs 상대 ${esc(g.E.name)} — ${esc(g.matchup.t)}${g.answer ? `<div style="font-weight:500;margin-top:6px">대처: ${esc(g.answer)}</div>` : ""}${g.alt ? `<div style="font-weight:500;margin-top:6px">다른 방향: ${esc(g.alt.name)} — ${esc(g.alt.win)}</div>` : ""}</div>
       <div class="card plan"><h3>우리 승리 플랜</h3><dl>
         <dt>승리 조건</dt><dd>${esc(g.O.win)}</dd>
         <dt>초반 (0~14분)</dt><dd>${esc(g.O.early)}</dd>
@@ -501,6 +501,8 @@
     const list = E.liveComps(S).slice(0, 4);
     if (!list.length) return "";
     const n = E.picks(S, "our").length;
+    if (n >= 5) return `<section class="live-comps"><div class="section-title"><h2>우리 조합</h2><p>픽 완료 · 운영 방향은 「운영 전략」 탭</p></div>
+      <div class="comps">${compCard(list[0], null, `<span class="pill gold">확정</span>`)}</div></section>`;
     return `<section class="live-comps"><div class="section-title"><h2>추천 조합</h2><p>${n ? `우리 픽 ${n}개 고정 · ` : ""}밴·픽·피어리스 잠금을 뺀 남은 챔프로 다시 짠 조합 · 픽마다 갱신</p></div>
       <div class="comps">${list.map((c, i) => compCard(c, null, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>`)).join("")}</div></section>`;
   }

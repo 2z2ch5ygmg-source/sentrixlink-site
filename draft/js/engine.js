@@ -416,8 +416,14 @@ window.Engine = (function () {
     picks(state, "our").forEach((p) => { if (p.role && !fixed[p.role]) fixed[p.role] = p.champ; });
     const all = COMP_KEYS.map((k) => buildComp(team, k, exclude, fixed));
     const rank = (c) => c.comfort * 3 + c.fitScore;
-    const ok = all.filter((c) => c.identity === c.key || c.fitScore >= 9).sort((a, b) => rank(b) - rank(a));
-    return ok.length ? ok : all.sort((a, b) => rank(b) - rank(a)).slice(0, 1);
+    // 같은 다섯 챔프로 이름만 다른 조합은 하나만(가장 잘 맞는 유형). 픽이 다 끝나면 조합은 하나 — 방향이 둘이면 운영 전략에서 다룬다
+    const sig = (c) => ROLES.map((r) => (c.slots[r] && c.slots[r].id) || "").join(",");
+    const byFit = (a, b) => (b.identity === b.key) - (a.identity === a.key) || b.fitScore - a.fitScore;
+    const best = {};
+    all.forEach((c) => { const k = sig(c); if (!best[k] || byFit(c, best[k]) < 0) best[k] = c; });
+    const uniq = Object.values(best);
+    const ok = uniq.filter((c) => c.identity === c.key || c.fitScore >= 9).sort((a, b) => rank(b) - rank(a));
+    return ok.length ? ok : uniq.sort((a, b) => rank(b) - rank(a)).slice(0, 1);
   }
   function teamComps(team, exclude) {
     return COMP_KEYS.map((k) => buildComp(team, k, exclude))
@@ -1396,7 +1402,9 @@ window.Engine = (function () {
       { t: "한타 순서", d: `${engagers.length ? j(engagers.join("·"), "이", "가") + " 진입 → " : ""}${peelers.length ? j(peelers.join("·"), "은", "는") + " 우리 딜러 보호 → " : ""}목표는 ${ko(enCarry.champ)}. 상대 ${threats[0] ? threats[0].replace(/ \(.*$/, "") + "의 주요 스킬" : "핵심 스킬"}이 빠진 뒤 싸웁니다.` },
     ];
     const jungle = jungleGuide(state, lanes, ok, cO, cE);
-    return { ok, ek, O, E, matchup, lanes, jg, threats, timing, answer, scenarios, enCarry, jungle };
+    // 두 번째 방향: 같은 다섯 챔프로 거의 비슷하게 맞는 다른 조합 유형(운영 전략에서 선택지로)
+    const alt = oc[1] && oc[1].score > 0 && oc[1].score >= oc[0].score * 0.75 ? COMPS[oc[1].key] : null;
+    return { ok, ek, O, E, alt, matchup, lanes, jg, threats, timing, answer, scenarios, enCarry, jungle };
   }
 
   // ---- 정글 기준: 어느 라인을 풀어 줄지, 언제 어떻게 힘을 뿌릴지 ----
