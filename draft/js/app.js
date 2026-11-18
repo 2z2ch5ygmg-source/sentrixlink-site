@@ -64,7 +64,9 @@
   if (isSolo(S.enemyTeam)) window.KB.useOrder("ranked", S.draft.ourSide);
   S.ui.sheet = false;
   S.ui.predRole = "";
-  if (S.ui.tut && S.ui.tut.k != null) S.ui.tut.pk = S.ui.tut.k;   // 새로 열면 장면은 마지막 모습으로(다시 보기로 재생)
+  if (S.ui.tut && S.ui.tut.k != null) S.ui.tut.pk = S.ui.tut.k;
+  S.ui.ans = {};   // 새로 열면 문제는 처음부터 다시 푼다(맞힌 기록 dScore는 진행률로 남김)
+  if (S.ui.tut && S.ui.tut.step === "quiz") S.ui.tut = { ...S.ui.tut, k: 0 };   // 새로 열면 장면은 마지막 모습으로(다시 보기로 재생)
   if (S.ui.tut && S.ui.tut.u && !(window.VISION && window.VISION.units.some((u) => u.id === S.ui.tut.u && u.scenes))) S.ui.tut = {};
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 무시 */ } }
 
@@ -744,7 +746,7 @@
 
   // ---------- 시야 공부: 배우기(애니메이션 장면) · 한눈에 보기(자리 요약) · 문제 모음 ----------
   // 맵 그림: 공식 미니맵 + 부쉬(img/map-sr.webp, 만드는 법 tools/map-bushes/)
-  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=46" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
+  const MAP_IMG = () => (window.VISION && window.VISION.map ? window.VISION.map + "?v=47" : `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/map/map11.png`);
   const vseg = (act, cur, items, label) => `<div class="seg" role="group" aria-label="${label}">${items.map(([v, n]) => `<button data-act="${act}" data-v="${v}" aria-pressed="${cur === v}">${n}</button>`).join("")}</div>`;
   // 레드 진영 좌표: 강을 기준으로 뒤집되, 뒤집으면 강·벽에 걸리는 자리는 따로 잰 rx·ry
   function redXY(x, y) {
@@ -769,7 +771,7 @@
     const V = window.VISION;
     if (!V) return `<div class="card">시야 자료를 불러오지 못했습니다.</div>`;
     const mode = S.ui.vMode || "learn";
-    const head = `<div class="vmode">${vseg("vmode", mode, [["learn", "배우기"], ["spots", "한눈에 보기"], ["drill", "문제 모음"]], "시야 공부 보기")}</div>`;
+    const head = `<div class="vmode">${vseg("vmode", mode, [["learn", "배우기"], ["drill", "문제 모음"], ["spots", "시야 한눈에 보기"]], "공부 보기")}</div>`;
     return head + (mode === "drill" ? renderDrill(V) : mode === "spots" ? renderSummary(V) : renderLearn(V));
   }
   const mmss = (t) => `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
@@ -781,7 +783,23 @@
   const camCss = (b) => `width:${b.w}%;transform:translate(${b.tx}%,${b.ty}%)`;
   const dataA = (o) => ` data-a='${JSON.stringify(o)}'`;
   const pct = ([x, y]) => `left:${x}%;top:${y}%`;
-  function stageHtml(sc, prev, extra) {
+  // 카메라 맞추기: 장면 안의 챔프·와드·화살표·글씨가 모두 보이도록(정해 둔 카메라보다 좁히지는 않음)
+  function fitCam(sc) {
+    const pts = [];
+    Object.values(sc.a || {}).forEach((t) => { if (t.at) pts.push(t.at); (t.via || []).forEach((q) => pts.push(q)); });
+    Object.values(sc.w || {}).forEach((w) => pts.push(w.at));
+    (sc.p || []).forEach((p) => p.pts.forEach((q) => pts.push(q)));
+    (sc.hit || []).forEach((h) => pts.push(h.at)); (sc.l || []).forEach((l) => pts.push(l.at));
+    const [cx, cy, s] = sc.cam;
+    if (!pts.length) return sc.cam;
+    const m = 3;   // 가장자리 여유(맵 %)
+    const x0 = Math.min(cx - s / 2, ...pts.map((q) => q[0] - m)), x1 = Math.max(cx + s / 2, ...pts.map((q) => q[0] + m));
+    const y0 = Math.min(cy - s / 2, ...pts.map((q) => q[1] - m)), y1 = Math.max(cy + s / 2, ...pts.map((q) => q[1] + m));
+    const ns = Math.min(100, Math.max(x1 - x0, y1 - y0));
+    return ns <= s + 0.01 ? sc.cam : [(x0 + x1) / 2, (y0 + y1) / 2, ns];
+  }
+  function stageHtml(sc0, prev0, extra) {
+    const sc = sc0 && sc0.cam ? { ...sc0, cam: fitCam(sc0) } : sc0, prev = prev0 && prev0.cam ? { ...prev0, cam: fitCam(prev0) } : prev0;
     const red = !!sc.red;
     const side = (s) => (s === "us") !== red ? "b" : "r";   // 테두리 색 = 그 팀 진영 색
     const cam = camBox(sc.cam), pcam = prev && prev.cam ? camBox(prev.cam) : null;
@@ -888,9 +906,15 @@
     const units = V.units;
     const unitScore = (un) => { const sc = (S.ui.dScore || {}); const ok = un.drills.filter((id) => sc[id]).length; return { ok, n: un.drills.length }; };
     if (!T.u) {
-      const cards = units.map((un, i) => { const sc = unitScore(un); const fin = (S.ui.tutDone || {})[un.id];
-        return `<button class="lu ${fin ? "fin" : ""}" data-act="tunit" data-v="${un.id}"><span class="lu-n">${fin ? ico("shield") : i + 1}</span><span class="lu-b"><b>${esc(un.title)}</b><span>${esc(un.goal)}</span><span class="lu-p"><i style="width:${(sc.ok / sc.n) * 100}%"></i></span><small>${fin ? "완료" : `장면 ${un.scenes.length}개 · 문제 ${sc.n}개 · 맞힘 ${sc.ok}`}</small></span></button>`; }).join("");
-      return `<section class="card vbox"><div class="now-h"><span class="what">배우기</span><span class="step">단원을 고르면 맵 위 애니메이션으로 한 장면씩 → 확인 문제 → 정리 · 와드는 ${esc(V.source.author)} 강의 기준</span></div><div class="lus">${cards}</div></section>`;
+      // 포지션별 배우기: 라인마다 해야 할 행동을 단원으로. 단원의 pos = 해당 포지션들
+      const POS = [["T", "탑"], ["J", "정글"], ["M", "미드"], ["A", "원딜"], ["S", "서폿"]];
+      const pos = POS.some(([k]) => k === S.ui.lPos) ? S.ui.lPos : "T";
+      const list = units.filter((un) => (un.pos || []).includes(pos));
+      const cards = list.map((un, i) => { const sc = unitScore(un); const fin = (S.ui.tutDone || {})[un.id];
+        return `<button class="lu ${fin ? "fin" : ""}" data-act="tunit" data-v="${un.id}"><span class="lu-n">${fin ? ico("shield") : i + 1}</span><span class="lu-b"><b>${esc(un.title)}</b><span>${esc(un.goal)}</span><span class="lu-p"><i style="width:${sc.n ? (sc.ok / sc.n) * 100 : 0}%"></i></span><small>${fin ? "완료" : `장면 ${un.scenes.length}개 · 문제 ${sc.n}개 · 맞힘 ${sc.ok}`}${un.src ? ` · ${esc(un.src)}` : ""}</small></span></button>`; }).join("");
+      return `<section class="card vbox"><div class="now-h"><span class="what">배우기</span><span class="step">포지션을 고르고 단원을 누르면 맵 위 애니메이션으로 한 장면씩 → 확인 문제 → 정리</span></div>
+        <div class="vctl">${vseg("lpos", pos, POS, "포지션")}</div>
+        <div class="lus">${cards || `<p class="dim">이 포지션 단원이 아직 없습니다.</p>`}</div></section>`;
     }
     const un = units.find((x) => x.id === T.u);
     const steps = [["learn", "① 장면 보기"], ["quiz", "② 문제"], ["review", "③ 정리"]];
@@ -999,8 +1023,12 @@
       const okO = d.opts.find((o) => o.ok);
       const vis = !done ? "" : vgrid() ? visCanvas("dvcan", `width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%`, { x: okO.x, y: okO.y, r: 900, s: "b" })
         : `<span class="dvis" style="left:${px(okO.x, vx)}%;top:${px(okO.y, vy)}%;width:${(6 / vs) * 200}%"></span>`;
+      // 이미 박혀 있는 와드(상대 핑크 등): 아이콘 + 이름표 + 그 와드의 실제 시야(상대 = 빨강)
+      const zoomStyle = `width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%`;
+      const placed = (d.wards || []).map((w) => { const l = px(w.at[0], vx), t = px(w.at[1], vy), sd = w.s === "them" ? "r" : "b";
+        return visCanvas(`dvcan s-${sd}`, zoomStyle, { x: w.at[0], y: w.at[1], r: 900, s: sd }) + `<span class="dmk sc-ward ${w.k === "ctrl" ? "k-ctrl" : "k-ward"} s-${sd}" style="left:${l}%;top:${t}%" title="${esc(w.t)}"><i></i></span><span class="dmk-l ${sd}" style="left:${l}%;top:${t}%">${esc(w.t)}</span>`; }).join("");
       const pins = d.opts.map((o, i) => { const l = px(o.x, vx), t = px(o.y, vy); return `<button class="dpin ${optCls(o, i)}" style="left:${l}%;top:${t}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button><span class="dpin-l" style="left:${l}%;top:${t}%" aria-hidden="true">${esc(o.t)}</span>`; }).join("");
-      body = `<div class="dgrid"><div class="vmap dmap map">${zoomBg}${baseTag}${vis}${champs}${pins}</div>${optList(false)}</div>`;
+      body = `<div class="dgrid"><div class="vmap dmap map">${zoomBg}${baseTag}${placed}${vis}${champs}${pins}</div>${optList(false)}</div>${d.wards && d.wards.length ? `<p class="help sc-note">빨간 영역 = 이미 박힌 상대 와드가 보는 곳(게임 격자로 계산)</p>` : ""}`;
     } else {
       body = optList(true);
     }
@@ -1010,23 +1038,31 @@
     return `<div class="dhead"><span class="pill">${esc(d.cat)}</span><b>${numLabel ? esc(numLabel) + " " : ""}${esc(d.title)}</b><span class="dmeta">${ico("eye")}${esc(d.time)}${d.obj ? " · " + esc(d.obj) : ""}</span>${d.src != null ? vlink(V, d.src) : `<span class="dim">기본 원칙</span>`}</div>
       <div class="dsides">${sides}${d.when ? `<span class="dwhen"><b>언제</b> ${esc(d.when)}</span>` : ""}</div>
       <div class="dteams"><div><span class="dt-l ${red ? "r" : "b"}">우리${d.kind === "map" ? " · " + (red ? "레드" : "블루") : ""}</span>${teamRow(d.us, "us")}</div><div><span class="dt-l ${red ? "b" : "r"}">상대${d.kind === "map" ? " · " + (red ? "블루" : "레드") : ""}</span>${teamRow(d.them, "them")}</div></div>
-      ${d.note ? `<p class="dnote">${esc(d.note)}</p>` : ""}
+      ${d.note ? `<div class="dnote" role="note"><b class="dnote-h">상황</b>${Array.isArray(d.note) ? `<ul>${d.note.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>` : `<p>${esc(d.note)}</p>`}</div>` : ""}
       <p class="dq">${esc(d.q)}</p>${body}${verdict}`;
   }
   // 문제 모음: 종류별로 차례대로
+  // 문제 종류: 와드·한타·포지셔닝·운영(조합별·불리·유리·오브젝트)
+  const DCATS = [["와드", "와드·시야", "어디에 박고, 왜 거기인가"], ["한타", "한타", "싸울지·피할지, 숫자와 체력"], ["포지셔닝", "포지셔닝", "실제 거리로 서는 자리"],
+    ["운영:조합", "운영 · 조합별", "사이드 조합·한타 조합의 운영"], ["운영:불리", "운영 · 불리할 때", "버티고 바꿔 먹는 선택"], ["운영:유리", "운영 · 유리할 때", "이득을 굴려 끝내는 선택"], ["운영:오브젝트", "운영 · 오브젝트", "유충·전령·용·바론 판단"]];
+  const dcatOf = (d) => (d.cat === "운영" ? `운영:${d.sub}` : d.cat);
   function renderDrill(V) {
-    const D = allDrills(), u = S.ui;
-    const cats = ["전체", ...new Set(D.map((d) => d.cat))];
-    const cat = u.dCat || "전체";
-    const pool = D.filter((d) => cat === "전체" || d.cat === cat);
-    const k = Math.min(u.dIdx || 0, pool.length - 1);
-    const d = pool[k];
-    const score = u.dScore || {};
-    const right = Object.values(score).filter(Boolean).length, tried = Object.keys(score).length;
+    const D = allDrills(), u = S.ui, score = u.dScore || {};
+    const cat = DCATS.some(([k]) => k === u.dCat) ? u.dCat : "";
+    if (!cat) {
+      const cards = DCATS.map(([k, n, g], i) => { const ds = D.filter((d) => dcatOf(d) === k); if (!ds.length) return ""; const ok = ds.filter((d) => score[d.id]).length;
+        return `<button class="lu" data-act="dcat" data-v="${k}"><span class="lu-n">${i + 1}</span><span class="lu-b"><b>${esc(n)}</b><span>${esc(g)}</span><span class="lu-p"><i style="width:${(ok / ds.length) * 100}%"></i></span><small>문제 ${ds.length}개 · 맞힘 ${ok}</small></span></button>`; }).join("");
+      const right = Object.values(score).filter(Boolean).length;
+      return `<section class="card vbox"><div class="now-h"><span class="what">문제 모음</span><span class="step">종류를 고르면 미니맵과 상황을 보고 선택 · 고른 뒤 그 선택으로 벌어지는 일이 움직입니다 · 맞힘 ${right} / ${D.length}</span></div>
+        <div class="lus">${cards}</div>${Object.keys(score).length ? `<div class="dnav" style="margin-top:12px"><button class="btn sm ghost" data-act="dreset">점수 지우기</button></div>` : ""}</section>`;
+    }
+    const pool = D.filter((d) => dcatOf(d) === cat);
+    const k = Math.min(u.dIdx || 0, pool.length - 1), d = pool[k];
+    const name = DCATS.find(([x]) => x === cat)[1];
     return `<section class="card vbox drill">
-      <div class="dtop">${vseg("dcat", cat, cats.map((c) => [c, c]), "문제 종류")}<span class="dsc">맞힘 ${right} / 푼 문제 ${tried} · 전체 ${D.length}</span></div>
+      <div class="lhead"><button class="btn sm ghost" data-act="dcat" data-v="">← 문제 종류</button><b>${esc(name)}</b><span class="dim">${k + 1} / ${pool.length}</span></div>
       ${drillCard(V, d, `${k + 1}.`)}
-      <div class="dnav"><button class="btn sm" data-act="dprev" ${k ? "" : "disabled"}>이전</button><button class="btn sm primary" data-act="dnext" ${k < pool.length - 1 ? "" : "disabled"}>다음 문제</button>${(u.ans && u.ans[d.id] != null) ? `<button class="btn sm ghost" data-act="dretry" data-id="${d.id}">다시 풀기</button>` : ""}${tried ? `<button class="btn sm ghost" data-act="dreset">점수 지우기</button>` : ""}</div>
+      <div class="dnav"><button class="btn sm" data-act="dprev" ${k ? "" : "disabled"}>이전</button>${k < pool.length - 1 ? `<button class="btn sm primary" data-act="dnext">다음 문제</button>` : `<button class="btn sm primary" data-act="dcat" data-v="">종류 목록으로</button>`}${(u.ans && u.ans[d.id] != null) ? `<button class="btn sm ghost" data-act="dretry" data-id="${d.id}">다시 풀기</button>` : ""}</div>
     </section>`;
   }
 
@@ -1079,7 +1115,8 @@
       case "vrole": S.ui.vRole = el.dataset.v; save(); render(); break;
       case "vmode": S.ui.vMode = el.dataset.v; save(); render(); break;
       case "vpurp": S.ui.vPurp = S.ui.vPurp === el.dataset.v ? "" : el.dataset.v; S.ui.vSpot = null; save(); render(); break;
-      case "dcat": S.ui.dCat = el.dataset.v; S.ui.dIdx = 0; S.ui.dAns = null; save(); render(); break;
+      case "dcat": S.ui.dCat = el.dataset.v; S.ui.dIdx = 0; S.ui.dAns = null; save(); render(); window.scrollTo(0, 0); break;
+      case "lpos": S.ui.lPos = el.dataset.v; save(); render(); break;
       case "dans": { const d = drillById(el.dataset.id); if (!d) break; const i = Number(el.dataset.i);
         S.ui.ans = { ...(S.ui.ans || {}), [d.id]: i }; S.ui.dScore = { ...(S.ui.dScore || {}), [d.id]: !!d.opts[i].ok }; save(); render(); break; }
       case "dretry": { const a = { ...(S.ui.ans || {}) }; delete a[el.dataset.id]; S.ui.ans = a; save(); render(); break; }
