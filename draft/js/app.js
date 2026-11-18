@@ -539,15 +539,19 @@
     if (!t || t.solo) return "";
     const R = window.RECENT;
     const P = E.practiceOf(t);
+    const ps = S.ui.pState && S.ui.pState.team === t.id ? S.ui.pState : {};
+    const canLive = !!window.RECENT_LIVE_URL && !!window.Practice && R && R.status === "ok";
+    const btn = canLive ? `<div class="g-refresh"><button class="btn sm primary g-btn${prefreshing ? " busy" : ""}" data-act="prefresh" ${prefreshing ? "disabled" : ""}>${REFRESH_ICO}${prefreshing ? "갱신 중…" : "갱신하기"}</button>
+      <span class="help" role="status">${esc(ps.msg || (P && P.live ? `Riot에서 바로 가져옴 · ${P.live.at}` : "누르면 상대 경기를 Riot에서 바로 가져와 다시 분석합니다"))}</span></div>` : "";
     const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>`;
-    if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p></section>`;
+    if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p>${btn}</section>`;
     const tg = P.teamGames || {};
     const since = R.since ? R.since.slice(5).replace("-", "/") : "11/10";
-    const sub = `${esc(t.name)} · ${since}~ 팀 경기 ${tg.n || 0}판${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · 수집 ${esc(R.at)}`;
+    const sub = `${esc(t.name)} · ${since}~ 팀 경기 ${tg.n || 0}판${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · ${P.live ? `실시간 ${esc(P.live.at)}` : `수집 ${esc(R.at)}`}`;
     const days = (R.practiceRule && R.practiceRule.recentDays) || 3;
     const help = `<details class="prac-help"><summary>기준·한계</summary><ul class="plain">
       <li>함께 한 경기(같은 팀 2명 이상 같은 편)를 더 크게 봅니다: 사용자 설정(내전·스크림) &gt; 자유랭 5인 &gt; 3·4인 &gt; 2인 &gt; 혼자.</li>
-      <li>수집 시각 기준 최근 ${days}일 경기는 1.5배. 「새로」 = 이전 랭크·숙련도에 거의 없던 챔프를 ${since} 이후 3판 이상.</li>
+      <li>${P.live ? "갱신한" : "수집"} 시각 기준 최근 ${days}일 경기는 1.5배. 「새로」 = 이전 랭크·숙련도에 거의 없던 챔프를 ${since} 이후 3판 이상.</li>
       <li>「완성」 = 3판 이상·승률 50% 이상·KDA 2.5 이상, 「연습 중」 = 그 밖, 「표본 적음」 = 3판 미만(참고만).</li>
       <li>대회 코드(토너먼트) 경기는 Riot 기록에 안 보일 수 있습니다. 닉네임(Riot ID)을 바꾼 선수는 다음 수집 때까지 빠집니다.</li></ul></details>`;
     const rows = ROLES.map((r) => {
@@ -568,7 +572,7 @@
     const combos = P.combos.slice(0, 5).map((c) => `<span class="prac-c" title="${esc(`${COMBO_KO[c.kind]} ${c.ids.map((id) => CH[id].ko).join("+")} · ${c.g}판 ${c.w}승${c.cu ? ` · 내전 ${c.cu}판` : ""}`)}">${pair(c.ids)}<span class="prac-n">${esc(c.ids.map((id) => CH[id].ko).join("+"))}<small>${COMBO_KO[c.kind]}</small></span><span class="st">${c.g}판 ${c.w}-${c.g - c.w}</span>${c.cu ? `<span class="prac-t">내전 ${c.cu}</span>` : ""}${c.r3 ? `<span class="prac-t">최근 ${c.r3}</span>` : ""}</span>`).join("");
     const bans = P.bans.slice(0, 6).map((b) => `<span class="chip" title="${esc(`${CH[b.id].ko} · 팀 경기 밴 ${b.n}회${b.cu ? ` (내전 ${b.cu})` : ""}`)}">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(CH[b.id].ko)}<span class="st">${b.n}</span></span>`).join("");
     const swaps = P.swaps.map((s) => `<li><b>${ROLE_KO[s.r]} ${esc(nick(t.players[s.r].riot))}</b> → ${ROLE_KO[s.to]} ${s.g}/${s.of}판${s.tg ? ` (팀 경기 ${s.tg})` : ""}${s.ids.length ? ` · ${esc(s.ids.map((id) => CH[id] ? CH[id].ko : id).join("·"))}` : ""}</li>`).join("");
-    return `<section class="plan-box prac-box">${head(sub)}${help}<div class="sc-rows">${rows}</div>
+    return `<section class="plan-box prac-box">${head(sub)}${btn}${help}<div class="sc-rows">${rows}</div>
       <div class="prac-foot">
         <div><div class="sub">함께 연습한 조합</div><div class="row-chips">${combos || `<span class="dim">2판 이상 반복된 조합 없음</span>`}</div></div>
         <div><div class="sub">팀 경기에서 자주 밴</div><div class="row-chips">${bans || `<span class="dim">${tg.banGames ? "없음" : "밴 기록이 있는 팀 경기 없음"}</span>`}</div></div>
@@ -681,6 +685,33 @@
         done(`Riot에서 바로 가져옴 · ${j.at}${add > 0 ? ` · 새 경기 ${add}판` : " · 새 경기 없음"}${j.pending ? ` · 아직 ${j.pending}경기 못 읽음 — 2분 뒤 다시 눌러 주세요` : ""}${j.cached ? " (2분 안에 받은 결과)" : ""}`);
       })
       .catch(() => { clearTimeout(timer); reload("실시간 조회 실패(연결 안 됨)"); });
+  }
+  // 상대 연습 픽 갱신: Worker(/games)가 상대 5명 경기를 Riot에서 바로 읽고, 페이지가 js/practice.js로 다시 분석한다.
+  // 기준선(이전 랭크·숙련도)은 매일 0시 수집 자료(RECENT.practiceBase). 경기를 다 못 읽었으면 바꾸지 않고 다시 누르라고 안내.
+  let prefreshing = false;
+  function refreshPractice() {
+    const t = E.teamOf(S, "enemy"), R = window.RECENT;
+    if (prefreshing || !t || t.solo || !R || R.status !== "ok" || !window.Practice) return;
+    prefreshing = true; S.ui.pState = { team: t.id }; render();
+    const done = (msg) => { prefreshing = false; S.ui.pState = { team: t.id, msg }; render(); };
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const timer = setTimeout(() => ctl && ctl.abort(), 25000);
+    fetch(`${window.RECENT_LIVE_URL.replace(/\/$/, "")}/games?team=${encodeURIComponent(t.id)}`, { signal: ctl ? ctl.signal : undefined, cache: "no-store", credentials: "omit" })
+      .then((r) => r.json().catch(() => ({})).then((j) => ({ ok: r.ok, status: r.status, j })))
+      .then(({ ok, status, j }) => {
+        clearTimeout(timer);
+        if (!ok || !j || j.status !== "ok" || !Array.isArray(j.games)) { done(`실시간 조회 실패(${(j && j.reason) || "응답 " + status}) — 매일 0시 자료 그대로`); return; }
+        if (j.pending) { done(`상대 경기 ${j.games.length}개 읽음 · 아직 ${j.pending}경기 남음 — 2분 뒤 다시 눌러 주세요(그 전까지 0시 자료)`); return; }
+        const roles = ROLES.filter((r) => j.players && j.players[r] && !j.players[r].error && j.players[r].riot === t.players[r].riot);
+        const RR = window.RECENT, sinceMs = Date.parse(`${j.since || RR.since || "2026-11-10"}T00:00:00+09:00`);
+        const P = window.Practice.compute(j.games, roles, RR.practiceBase && RR.practiceBase[t.id], sinceMs, Date.now());
+        const before = RR.practice && RR.practice[t.id];
+        P.live = { at: j.at, acct: j.players };
+        window.RECENT = { ...RR, practice: { ...(RR.practice || {}), [t.id]: P } };
+        const add = (P.teamGames.n || 0) - ((before && before.teamGames && before.teamGames.n) || 0);
+        done(`Riot에서 바로 가져옴 · ${j.at} · 상대 경기 ${j.games.length}개${add > 0 ? ` · 팀 경기 ${add}판 늘어남` : ""}${j.cached ? " (2분 안에 받은 결과)" : ""}`);
+      })
+      .catch(() => { clearTimeout(timer); done("실시간 조회 실패(연결 안 됨) — 매일 0시 자료 그대로"); });
   }
   function stacksHtml(t, mine) {
     const R = window.RECENT;
@@ -1381,6 +1412,7 @@
       case "ourrole": S.ui.ourRole = el.dataset.r; render(); break;
       case "scen": S.ui.scen = el.dataset.k; save(); render(); break;
       case "grefresh": refreshRecent(); break;
+      case "prefresh": refreshPractice(); break;
       case "gpage": { S.ui.gPage = { ...(S.ui.gPage || {}), [el.dataset.k]: Number(el.dataset.p) }; save(); render();
         // 새 페이지 첫 줄부터 보이게 표 머리로 올림(상단바·휴대폰 하단 탭에 가리지 않게)
         const pg = [...document.querySelectorAll(".pager")].find((n) => n.querySelector(`[data-k="${el.dataset.k}"]`));

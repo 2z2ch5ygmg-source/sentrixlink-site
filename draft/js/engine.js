@@ -92,7 +92,9 @@ window.Engine = (function () {
     const R = window.RECENT;
     if (!R || R.status !== "ok" || !team || !R.practice || !R.practice[team.id]) return null;
     const P = R.practice[team.id];
-    const okRole = (r) => { const x = R.players && R.players[team.id] && R.players[team.id][r]; return !!(x && !x.error && (!x.riot || x.riot === team.players[r].riot)); };
+    // 실시간 갱신 결과(P.live)는 그때 조회한 계정으로, 0시 수집 결과는 수집 때 계정으로 판단
+    const acct = P.live ? P.live.acct : R.players && R.players[team.id];
+    const okRole = (r) => { const x = acct && acct[r]; return !!(x && !x.error && (!x.riot || x.riot === team.players[r].riot)); };
     const players = {};
     ROLES.forEach((r) => { if (P.players && P.players[r] && okRole(r)) players[r] = P.players[r]; });
     return { ...P, players, combos: (P.combos || []).filter((c) => c.roles.every(okRole)), swaps: (P.swaps || []).filter((s) => okRole(s.r)), stale: ROLES.filter((r) => !okRole(r)) };
