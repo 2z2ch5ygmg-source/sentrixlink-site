@@ -155,7 +155,7 @@
       if ((m = g.match(/^(.+) 조합에 맞음$/))) return ["layers", m[1]];
       if (g === "갱 버팀") return ["shield", "갱 버팀"];
       if (g === "앞라인 보강") return ["shield", "앞라인"];
-      if ((m = g.match(/^팀 경기 (.+)$/))) return ["users", "팀 " + m[1]];
+      if ((m = g.match(/^팀 경기 (.+)$/))) return ["users", "팀원과 " + m[1]];
       if (g === "상대 주력 뺏기") return ["target", "주력 뺏기"];
       if (g === "대회 메타 픽") return ["trophy", "메타"];
       if (g === "상대 궁 뺏어 쓰기") return ["target", "궁 뺏기"];
@@ -276,17 +276,18 @@
   }
 
   // 근거 줄: 분류 이름표 + 한 문장 (전체·라인 칸 모두 같은 모양)
+  const pillsHtml = (ps) => `<span class="cpills">${ps.map((p) => `<span class="cp ${p.c}">${esc(p.t)}</span>`).join("")}</span>`;
   const factHtml = (lines) => `<span class="fx">${lines.map((x) => `<span class="fx-r"><span class="fx-l fx-${x.k}">${esc(x.l)}</span><span class="fx-t">${esc(x.t)}</span></span>`).join("")}</span>`;
   function recCard(r, type, muted, rank, fx) {
     // 우리 픽: 무엇에 좋고 무엇에 약한지만 짧게. 밴·상대 예상: 근거 두 줄
     // 이름표와 같은 말(예: '한타 조합' + '한타 조합에 맞음')은 한 번만
     const goods = r.good ? r.good.filter((g) => !(r.label && / 조합$/.test(r.label) && g === r.label + "에 맞음")) : null;
-    const why = fx ? factHtml(fx) : r.good ? `<span class="tgs">${goods.map((g) => tagHtml(g, true)).join("")}${r.bad.map((b) => tagHtml(b, false)).join("")}</span>`
+    const why = fx ? pillsHtml(fx) : r.good ? `<span class="tgs">${goods.map((g) => tagHtml(g, true)).join("")}${r.bad.map((b) => tagHtml(b, false)).join("")}</span>`
       : r.reasons.filter((x) => x.v > 0 && !x.order).slice(0, 2).map((x) => esc(x.d)).join("<br>");
-    return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 ? "first" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
-      <span class="hero">${icon(r.id, "hero").replace(/ title="[^"]*"/, "")}${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.label)}</span></span>
-      <span class="nm"><span class="cn">${esc(CH[r.id].ko)}</span>${r.role ? `<span class="pill">${ROLE_KO[r.role]}</span>` : ""}</span><span class="why${fx ? " has-fx" : ""}">${why}</span>
-      ${r.answers && r.answers.length ? `<span class="ans">우리 대응 ${r.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`;
+    return `<button class="rec ${type} ${muted ? "muted" : ""} ${rank === 1 || r.comp ? "first" : ""} ${r.comp ? "comp" : ""}" data-act="pick" data-id="${r.id}" ${r.role ? `data-role="${r.role}"` : ""}>
+      <span class="hero">${icon(r.id, "hero").replace(/ title="[^"]*"/, "")}${rank ? `<span class="rk" aria-label="추천 ${rank}순위">${rank}</span>` : ""}<span class="lab">${esc(r.comp || r.label)}</span></span>
+      <span class="nm"><span class="cn">${esc(CH[r.id].ko)}</span>${r.role || r.tgt ? `<span class="pos">${ROLE_KO[r.role || r.tgt]}</span>` : ""}</span><span class="why${fx ? " has-fx" : ""}">${why}</span>
+      ${r.answers && r.answers.length ? `<span class="ans">대응 ${r.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`;
   }
 
   function renderNow() {
@@ -295,7 +296,21 @@
     const [side, type] = st;
     const who = E.whoOfSide(S, side);
     const t = E.teamOf(S, who);
-    const list = type === "ban" ? E.recommendBan(S, who) : E.recommendPick(S, who);
+    let list = type === "ban" ? E.recommendBan(S, who) : E.recommendPick(S, who);
+    // 우리 픽: 추천 조합 1순위가 남은 라인에 쓰는 챔프도 같은 금색으로(이름표 「OO 추천 조합」). 6장 안에 없으면 마지막 칸에 넣는다
+    if (type === "pick" && who === "our") {
+      const top = E.liveComps(S)[0];
+      if (top) {
+        const C = COMPS[top.key];
+        ROLES.forEach((r) => {
+          const sl = top.slots[r];
+          if (!sl || sl.fixed || !sl.id || sl.suggest) return;
+          let card = list.find((x) => x.id === sl.id);
+          if (!card && !list.some((x) => x.comp)) { card = E.recommendPick(S, "our", r).find((x) => x.id === sl.id); if (card) list = list.slice(0, 5).concat([card]); }
+          if (card && !card.comp) card.comp = `${C.short} 추천 조합`;
+        });
+      }
+    }
     const dir = E.direction(S, who);
     const dirTxt = dir ? `${who === "our" ? "우리" : "상대"} 조합 방향 <b>${COMPS[dir].name}</b>` : "";
     const title = `${who === "our" ? "우리팀" : esc(t.name)} ${type === "ban" ? "밴" : "픽"} 차례${who === "enemy" ? " · 예상" : ""}`;
@@ -317,14 +332,14 @@
       const p = et.players[pr];
       const act = who === "our" ? "우리 밴" : `상대 ${type === "ban" ? "밴" : "픽"}`;
       body = pl.length ? `<p class="help pred-h">상대 ${ROLE_KO[pr]} ${esc(nick(p.riot))} 선수가 꺼낼 수 있는 챔프 · 눌러서 ${act}으로 기록</p><div class="recs">${pl.map((x) => `<button class="rec muted pred" data-act="pick" data-id="${x.id}">
-        <span class="hero">${icon(x.id, "hero").replace(/ title="[^"]*"/, "")}<span class="lab">${esc(x.label)}</span></span><span class="nm"><span class="cn">${esc(CH[x.id].ko)}</span><span class="pill">${ROLE_KO[pr]}</span></span><span class="why has-fx">${factHtml(E.facts(et, pr, x.id).concat(x.now))}</span>
+        <span class="hero">${icon(x.id, "hero").replace(/ title="[^"]*"/, "")}<span class="lab">${esc(x.label)}</span></span><span class="nm"><span class="cn">${esc(CH[x.id].ko)}</span><span class="pos">${ROLE_KO[pr]}</span></span><span class="why has-fx">${pillsHtml(E.cardPills(et, pr, x.id, x.now.map((n) => ({ t: "", d: n.t, v: 1 })), true))}</span>
         ${x.answers.length ? `<span class="ans">우리 대응 ${x.answers.map((id) => `<b>${esc(CH[id].ko)}</b>`).join("·")}</span>` : ""}</button>`).join("")}</div>`
         : `<div class="empty-recs">상대 ${ROLE_KO[pr]} 예상 챔프가 없습니다.</div>`;
     } else if (list.length) {
       // 밴: 노리는 상대 선수(tgt)의 기록, 상대 픽 예상: 그 라인 상대 선수의 기록 — 라인 칸과 같은 줄 모양. 우리 픽은 장단점 태그 그대로
       const opp = E.teamOf(S, who === "our" ? "enemy" : "our");
-      const fxOf = (r) => type === "ban" ? E.facts(opp, r.tgt, r.id).concat(E.nowFacts(r.reasons))
-        : who === "enemy" ? E.facts(t, r.role, r.id).concat(E.nowFacts(r.reasons)) : null;
+      const fxOf = (r) => type === "ban" ? E.cardPills(opp, r.tgt, r.id, r.reasons, who === "our")
+        : who === "enemy" ? E.cardPills(t, r.role, r.id, r.reasons, true) : null;
       body = `<div class="recs">${list.map((r, i) => recCard(r, type, who === "enemy", who === "our" ? i + 1 : 0, fxOf(r))).join("")}</div>`;
     }
     else body = `<div class="empty-recs">${who === "enemy" && !E.teamHasPools(t) ? "상대 챔프폭이 비어 있어 예상이 어렵습니다. 「상대팀 분석」에서 챔프폭을 넣으면 예상이 나옵니다." : "추천할 챔프가 없습니다. 아래에서 직접 고르세요."}</div>`;
@@ -591,7 +606,7 @@
     if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p>${btn}</section>`;
     const tg = P.teamGames || {};
     const since = R.since ? R.since.slice(5).replace("-", "/") : "11/10";
-    const sub = `${esc(t.name)} · ${since}~ 팀 경기 ${tg.n || 0}판${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · ${P.live ? `실시간 ${esc(P.live.at)}` : `수집 ${esc(R.at)}`}`;
+    const sub = `${esc(t.name)} · 연습 기간(${since}~) 팀원끼리 한 판 ${tg.n || 0}${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · ${P.live ? `실시간 ${esc(P.live.at)}` : `수집 ${esc(R.at)}`}`;
     const days = (R.practiceRule && R.practiceRule.recentDays) || 3;
     const help = `<details class="prac-help"><summary>기준·한계</summary><ul class="plain">
       <li>함께 한 경기(같은 팀 2명 이상 같은 편)를 더 크게 봅니다: 사용자 설정(내전·스크림) &gt; 자유랭 5인 &gt; 3·4인 &gt; 2인 &gt; 혼자.</li>
@@ -614,12 +629,12 @@
     }).join("");
     const pair = (ids) => ids.map((id) => `${icon(id, "sm").replace(/ title="[^"]*"/, "")}`).join("");
     const combos = P.combos.slice(0, 5).map((c) => `<span class="prac-c" title="${esc(`${COMBO_KO[c.kind]} ${c.ids.map((id) => CH[id].ko).join("+")} · ${c.g}판 ${c.w}승${c.cu ? ` · 내전 ${c.cu}판` : ""}`)}">${pair(c.ids)}<span class="prac-n">${esc(c.ids.map((id) => CH[id].ko).join("+"))}<small>${COMBO_KO[c.kind]}</small></span><span class="st">${c.g}판 ${c.w}-${c.g - c.w}</span>${c.cu ? `<span class="prac-t">내전 ${c.cu}</span>` : ""}${c.r3 ? `<span class="prac-t">최근 ${c.r3}</span>` : ""}</span>`).join("");
-    const bans = P.bans.slice(0, 6).map((b) => `<span class="chip" title="${esc(`${CH[b.id].ko} · 팀 경기 밴 ${b.n}회${b.cu ? ` (내전 ${b.cu})` : ""}`)}">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(CH[b.id].ko)}<span class="st">${b.n}</span></span>`).join("");
-    const swaps = P.swaps.map((s) => `<li><b>${ROLE_KO[s.r]} ${esc(nick(t.players[s.r].riot))}</b> → ${ROLE_KO[s.to]} ${s.g}/${s.of}판${s.tg ? ` (팀 경기 ${s.tg})` : ""}${s.ids.length ? ` · ${esc(s.ids.map((id) => CH[id] ? CH[id].ko : id).join("·"))}` : ""}</li>`).join("");
+    const bans = P.bans.slice(0, 6).map((b) => `<span class="chip" title="${esc(`${CH[b.id].ko} · 팀원끼리 한 판에서 밴 ${b.n}회${b.cu ? ` (내전 ${b.cu})` : ""}`)}">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(CH[b.id].ko)}<span class="st">${b.n}</span></span>`).join("");
+    const swaps = P.swaps.map((s) => `<li><b>${ROLE_KO[s.r]} ${esc(nick(t.players[s.r].riot))}</b> → ${ROLE_KO[s.to]} ${s.g}/${s.of}판${s.tg ? ` (팀원과 ${s.tg})` : ""}${s.ids.length ? ` · ${esc(s.ids.map((id) => CH[id] ? CH[id].ko : id).join("·"))}` : ""}</li>`).join("");
     return `<section class="plan-box prac-box">${head(sub)}${btn}${help}<div class="sc-rows">${rows}</div>
       <div class="prac-foot">
         <div><div class="sub">함께 연습한 조합</div><div class="row-chips">${combos || `<span class="dim">2판 이상 반복된 조합 없음</span>`}</div></div>
-        <div><div class="sub">팀 경기에서 자주 밴</div><div class="row-chips">${bans || `<span class="dim">${tg.banGames ? "없음" : "밴 기록이 있는 팀 경기 없음"}</span>`}</div></div>
+        <div><div class="sub">팀원끼리 한 판에서 자주 밴</div><div class="row-chips">${bans || `<span class="dim">${tg.banGames ? "없음" : "밴 기록이 있는 판 없음"}</span>`}</div></div>
         ${swaps ? `<div><div class="sub">라인 바꿈 가능성</div><ul class="plain prac-sw">${swaps}</ul></div>` : ""}
       </div></section>`;
   }
@@ -753,7 +768,7 @@
         P.live = { at: j.at, acct: j.players };
         window.RECENT = { ...RR, practice: { ...(RR.practice || {}), [t.id]: P } };
         const add = (P.teamGames.n || 0) - ((before && before.teamGames && before.teamGames.n) || 0);
-        done(`Riot에서 바로 가져옴 · ${j.at} · 상대 경기 ${j.games.length}개${add > 0 ? ` · 팀 경기 ${add}판 늘어남` : ""}${j.cached ? " (2분 안에 받은 결과)" : ""}`);
+        done(`Riot에서 바로 가져옴 · ${j.at} · 상대 경기 ${j.games.length}개${add > 0 ? ` · 팀원끼리 한 판 ${add}판 늘어남` : ""}${j.cached ? " (2분 안에 받은 결과)" : ""}`);
       })
       .catch(() => { clearTimeout(timer); done("실시간 조회 실패(연결 안 됨) — 매일 0시 자료 그대로"); });
   }
@@ -890,7 +905,7 @@
       ${has ? "" : `<div class="note" style="margin-top:12px">이 팀은 op.gg 전적을 읽지 못했고 직접 입력한 챔프폭도 없습니다. 「상대 챔프폭 편집」에 넣으면 카운터·연습 추천·예상 조합이 채워집니다.</div>`}
       ${enemySections([
         ["ban", "사전 밴 후보", () => `<div class="section-title"><h2>사전 밴 후보</h2><p>첫 밴 페이즈 기준</p></div>
-          <div class="card">${preBans.length ? `<div class="recs">${preBans.map((r) => recCard(r, "ban", false, 0, E.facts(en, r.tgt, r.id).concat(E.nowFacts(r.reasons)))).join("")}</div>` : `<span class="muted">상대 챔프폭을 넣으면 나옵니다.</span>`}</div>`],
+          <div class="card">${preBans.length ? `<div class="recs">${preBans.map((r) => recCard(r, "ban", false, 0, E.cardPills(en, r.tgt, r.id, r.reasons, true))).join("")}</div>` : `<span class="muted">상대 챔프폭을 넣으면 나옵니다.</span>`}</div>`],
         ["threat", "요주의 인물", () => renderThreatFor(en.id)],
         ["lanes", "라인별 상대·연습 포인트", () => `<div class="section-title"><h2>라인별 상대와 연습 포인트</h2><p>점수 차 = 우리 − 상대</p></div>
           <div class="card tbl-wrap"><table class="study cards-m"><thead><tr><th>라인</th><th>상대 선수</th><th>우리 선수</th><th>점수 차</th><th>상대 챔프폭</th><th>우리 대응 가능</th><th>새로 연습 추천</th><th>우리 챔프 중 주의</th></tr></thead><tbody>${rows}</tbody></table></div>`],
@@ -1737,7 +1752,7 @@
         ${n.kind === "fix" ? `<button class="pill ${st[1]} nst" data-act="nstat" data-id="${n.id}" title="눌러서 상태 바꾸기">${st[0]}</button>` : `<span class="pill good nst">잘한 점</span>`}</div>
         ${n.body ? `<p>${esc(n.body)}</p>` : ""}
         <div class="ncard-f"><span class="pill">${esc((NOTE_WHO.find((w) => w[0] === n.who) || ["", ""])[1])}</span>${n.game ? `<span class="ng">${esc(gameText(n.game))}</span>` : ""}
-          <span class="nby">${esc(n.by || "")} · ${esc(String(n.upd || n.at).slice(5))}</span>
+          <span class="nby">${esc(String(n.upd || n.at).slice(5))}</span>
           <button class="btn sm ghost" data-act="nedit" data-id="${n.id}">고치기</button><button class="btn sm ghost" data-act="ndel" data-id="${n.id}">지우기</button></div></article>`;
     };
     const cols = NOTE_CAT.map(([c, name]) => { const cs = list.filter((n) => n.cat === c);
@@ -1749,7 +1764,6 @@
     NT.form = init;
     const n = init.note || {};
     const g = init.game || n.game || null;
-    const me = (() => { try { return localStorage.getItem("sentrix-draft.me") || ""; } catch (e) { return ""; } })();
     const root = document.getElementById("nmodal") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "nmodal" }));
     const opt = (list, cur) => list.map(([v, l]) => `<option value="${v}" ${v === cur ? "selected" : ""}>${l}</option>`).join("");
     const champ = n.champ && CH[n.champ] ? CH[n.champ].ko : "";
@@ -1760,10 +1774,8 @@
       <div class="nf-grid">
         <label>분류<select class="input" id="nfCat">${opt(NOTE_CAT, n.cat || init.cat || "champ")}</select></label>
         <label>종류<select class="input" id="nfKind">${opt([["fix", "고칠 점"], ["good", "잘한 점"]], n.kind || "fix")}</select></label>
-        <label>상태<select class="input" id="nfStat">${opt([["todo", "고칠 점"], ["practice", "연습 중"], ["done", "고침 확인"]], n.status || "todo")}</select></label>
         <label>대상<select class="input" id="nfWho">${opt(NOTE_WHO, n.who || "team")}</select></label>
         <label>챔프(선택)<input class="input" id="nfChamp" list="champList" value="${esc(champ)}" placeholder="예: 야스오"></label>
-        <label>적은 사람<input class="input" id="nfBy" maxlength="20" value="${esc(n.by || me)}" placeholder="이름"></label>
       </div>
       <label class="nf-full">제목<input class="input" id="nfTitle" maxlength="60" value="${esc(n.title || "")}" placeholder="예: 라인전 W 낭비"></label>
       <label class="nf-full">내용<textarea class="input" id="nfBody" maxlength="600" rows="4" placeholder="무엇을, 왜, 다음엔 어떻게">${esc(n.body || "")}</textarea></label>
@@ -1779,9 +1791,10 @@
     if (!v("nfTitle").trim()) { msg.textContent = "제목을 적어 주세요."; return; }
     const link = document.getElementById("nfLink");
     const g = NT.form.game || (NT.form.note && NT.form.note.game) || null;
-    const note = { cat: v("nfCat"), kind: v("nfKind"), status: v("nfKind") === "fix" ? v("nfStat") : null, who: v("nfWho"), champ: ch ? ch.id : null,
-      title: v("nfTitle").trim(), body: v("nfBody").trim(), by: v("nfBy").trim(), game: g && (!link || link.checked) ? g : null };
-    try { localStorage.setItem("sentrix-draft.me", note.by); } catch (e) { /* 무시 */ }
+    // 상태는 보드에서 눌러 바꾼다(새 고칠 점은 「고칠 점」으로 시작, 고칠 때는 그대로 둠)
+    const prev = NT.form.note;
+    const note = { cat: v("nfCat"), kind: v("nfKind"), status: v("nfKind") === "fix" ? (prev && prev.status) || "todo" : null, who: v("nfWho"), champ: ch ? ch.id : null,
+      title: v("nfTitle").trim(), body: v("nfBody").trim(), by: (prev && prev.by) || "", game: g && (!link || link.checked) ? g : null };
     msg.textContent = "저장 중…";
     try {
       await sendNote(NT.form.note ? { op: "update", id: NT.form.note.id, note } : { op: "add", note });
@@ -1791,8 +1804,9 @@
   function closeNoteForm() { NT.form = null; const r = document.getElementById("nmodal"); if (r) r.innerHTML = ""; }
 
   if (SH.url) {
-    setInterval(() => { if (document.visibilityState === "visible") pullShared(); }, 45000);
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") pullShared(); });
+    // 팀원이 새로 쓴 자기평가·피드백 노트도 보이게: 화면이 보이는 동안 45초마다, 다시 돌아왔을 때 읽는다
+    setInterval(() => { if (document.visibilityState === "visible") { pullShared(); if (S.tab === "notes" && !NT.form) loadNotes(); } }, 45000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { pullShared(); if (S.tab === "notes" && !NT.form) loadNotes(); } });
   }
 
   // ---------- 픽 후보 정보 카드 (PC 전용: 마우스 올림·키보드 초점) ----------

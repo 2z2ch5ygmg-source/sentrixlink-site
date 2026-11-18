@@ -205,19 +205,27 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .now-h .what.R { color: var(--red); }
 .dir { margin-left: auto; font-size: 12px; color: var(--muted); }
 .dir b { color: var(--gold); }
-.recs { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.recs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; max-width: 1000px; }
 .rec { background: var(--bg2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; min-width: 0; }
 /* 챔프 카드: 초상화를 카드 폭에 맞춰 위쪽에 꽉 채우고, 이름표·순위는 초상화 위에 얹는다(빈 여백 없이) */
 .rec { padding: 0 0 9px; overflow: hidden; align-items: stretch; }
-.rec .hero { position: relative; display: block; height: 92px; background: var(--panel2); }
+.rec .hero { position: relative; display: block; aspect-ratio: 1 / 1; background: var(--panel2); }
 .rec .hero .ic.hero { width: 100%; height: 100%; border-radius: 0; }
-.rec .hero .ic.hero img { transform: none; object-position: 50% 28%; }
+.rec .hero .ic.hero img { transform: scale(1.08); }
 .rec .hero::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 14, 20, 0) 45%, rgba(11, 14, 20, 0.75) 100%); pointer-events: none; }
 .rec .hero .lab { position: absolute; left: 6px; bottom: 6px; z-index: 1; max-width: calc(100% - 12px); background: rgba(11, 14, 20, 0.82); }
 .rec.first .hero .lab { background: rgba(40, 30, 8, 0.9); }
 .rec.ban.first .hero .lab { background: rgba(48, 12, 16, 0.9); }
 .rec .hero .rk { z-index: 1; top: 6px; left: 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
-.rec .nm { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; flex-wrap: wrap; }
+.rec .nm { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 0 8px; }
+.rec .nm .pos { font-size: 12px; font-weight: 700; color: var(--muted); }
+/* 짧은 알약: 색 = 뜻(금 = 연습·자기평가, 파랑 = 팀원과·조합, 초록 = 우리에게 좋음, 빨강 = 위협·불리) */
+.cpills { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.cp { font-size: 12px; font-weight: 700; line-height: 1.3; padding: 2px 7px; border-radius: 6px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+.cp.gold { background: var(--gold-bg); color: var(--gold); }
+.cp.info { background: var(--blue-bg); color: var(--blue); }
+.cp.good { background: var(--good-bg); color: var(--good); }
+.cp.bad { background: var(--red-bg); color: var(--red); }
 .rec .nm .cn { font-size: 14px; }
 .rec .why, .rec .ans, .rec .vs-ours { padding: 0 9px; }
 .rec:hover { border-color: var(--gold); }
@@ -225,6 +233,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .rec.first .lab { color: var(--gold); background: var(--gold-bg); }
 .rec.ban.first .lab { color: var(--red); background: var(--red-bg); }
 .rec.first { border-color: rgba(232, 182, 76, 0.55); }
+.rec.comp .lab { color: var(--gold); }
 .rec.ban.first { border-color: rgba(255, 90, 99, 0.55); }
 .rec .cn { font-weight: 800; font-size: 14px; }
 .rec { position: relative; }
@@ -424,7 +433,6 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
   .slot-pick select { font-size: 12px; min-height: 22px; max-width: 58px; }
   .recs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .rec { padding: 0 0 8px; }
-  .rec .hero { height: 70px; }
   .rec .lab { font-size: 12px; padding: 2px 5px; }
   .rec .rk { width: 20px; height: 20px; font-size: 12px; top: 4px; left: 4px; }
   .rec .why, .rec .ans, .rec .vs-ours { padding: 0 6px; }
@@ -889,7 +897,7 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .nmodal { width: min(640px, 100%); }
 .nf-game { display: flex; flex-direction: column; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 12px; }
 .nf-game .chip small { color: var(--dim); margin-left: 3px; }
-.nf-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.nf-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .nf-grid label, .nf-full { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 700; }
 .nf-full { margin-top: 10px; }
 .nf-full textarea { resize: vertical; min-height: 90px; font: inherit; }

@@ -319,6 +319,44 @@ window.Engine = (function () {
     const neg = rs.filter((x) => x.v < 0 && (x.t === "주의" || x.t === "사일러스 주의")).slice(0, 1).map((x) => ({ k: "warn", l: "주의", t: x.d }));
     return pos.concat(neg);
   }
+  // 카드 알약(짧게): 기록 알약 + 지금 판 알약. threat=true면 상대 쪽 카드(우리 챔프를 카운터 = 위협이라 빨강)
+  //  연습 = 대회 준비 기간(RECENT.since 이후) 판수, 팀원과 = 지금 팀원끼리 같은 편으로 한 판
+  function shortNow(d, threat) {
+    let m;
+    if ((m = d.match(/^(?:우리 )?(.+?) 상대로 강함/))) return { t: `${m[1]} 카운터`, c: threat ? "bad" : "good", ctr: m[1] };
+    if ((m = d.match(/^vs (.+?) 라인전 우위(\(.+\))?/))) return { t: `${m[1]} 카운터${m[2] ? "?" : ""}`, c: threat ? "bad" : "good", ctr: m[1] + (m[2] ? "?" : "") };
+    if ((m = d.match(/^(?:우리 )?(.+?)(?:에| 상대로) 불리/))) return { t: `${m[1]}에 불리`, c: threat ? "good" : "bad" };
+    if ((m = d.match(/^우리 (.+?) 견제$/))) return { t: `${m[1]} 견제`, c: threat ? "bad" : "good" };
+    if ((m = d.match(/^(?:상대 )?(.+?)[과와] 세트/))) return { t: `${m[1]} 세트`, c: "info" };
+    if ((m = d.match(/^우리 (.+?) \S+ 공개 → 맞대응/))) return { t: `${m[1]} 맞대응`, c: threat ? "bad" : "good" };
+    if ((m = d.match(/^우리 (\S+) 조합 받아치기/))) return { t: `${m[1]} 받아치기`, c: threat ? "bad" : "good" };
+    if ((m = d.match(/^상대가 (.+?) 방향$/))) return { t: `${m[1].replace(/ 조합$/, "")} 조합 핵심`, c: "info" };
+    if (/사일러스가|사일러스 궁|궁을 뺏길/.test(d)) return { t: "사일러스 궁 주의", c: "bad" };
+    if ((m = d.match(/^(.+?)에 맞음$/))) return { t: m[1], c: "info" };
+    if ((m = d.match(/^상대 정글 (\S+) 갱 버팀/))) return { t: `${m[1]} 갱 버팀`, c: "good" };
+    return { t: d.length > 12 ? d.slice(0, 12) + "…" : d, c: "" };
+  }
+  function cardPills(team, role, id, reasons, threat) {
+    const out = [];
+    const e = team && role ? poolMap(team, role)[id] : null;
+    if (e && e.manual) out.push({ t: e.one ? "원챔" : `자기평가 ${LEVEL_KO[e.lv]}`, c: "gold" });
+    else if (e && (e.one || e.sone)) out.push({ t: "원챔급", c: "gold" });
+    if (e && e.g) out.push({ t: `시즌 ${e.g}판 ${Math.round(e.wr)}%`, c: "" });
+    const x = team && role ? practicePick(team, role, id) : null;
+    if (x) { out.push({ t: `연습 ${x.g}판 ${x.w}승`, c: "gold" }); if (x.new) out.push({ t: "새 픽", c: "gold" }); }
+    else if (e && e.rg) out.push({ t: `연습 ${e.rg}판 ${e.rw}승`, c: "gold" });
+    const tr = team && role ? stackChampRecord(team, role, id) : null;
+    if (tr) out.push({ t: `팀원과 ${tr.g}판 ${tr.w}승`, c: "info" });
+    const mi = metaInfo(id, role);
+    if (mi && mi.prio >= 5) out.push({ t: `대회 ${Math.round(mi.prio)}%`, c: "" });
+    // 지금 판: 기록 근거는 위에서 이미 보였으니 빼고, 카운터는 한 알약으로 모은다
+    const now = (reasons || []).filter((r) => (r.v == null || r.v !== 0) && !r.order && !RECORD_T.test(r.t || "") && r.d).map((r) => shortNow(r.d, threat));
+    const ctr = now.filter((p) => p.ctr).map((p) => p.ctr);
+    const rest = now.filter((p) => !p.ctr);
+    if (ctr.length) out.push({ t: `${[...new Set(ctr)].slice(0, 2).join("·")} 카운터`, c: threat ? "bad" : "good" });
+    rest.slice(0, 2).forEach((p) => { if (!out.some((o) => o.t === p.t)) out.push(p); });
+    return out.slice(0, 6);
+  }
   function metaText(m) {
     if (!m) return "";
     const a = [];
@@ -1467,6 +1505,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
-    facts, nowFacts, liveComps, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
+    facts, nowFacts, cardPills, liveComps, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };
 })();
