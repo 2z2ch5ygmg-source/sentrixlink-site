@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>피어리스 밴픽 보드</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap">
+  <link rel="stylesheet" href="css/app.css?v=49">
+</head>
+<body>
+  <header class="top">
+    <div class="top-in">
+      <div class="brand">FEARLESS <b>DRAFT</b></div>
+      <nav class="tabs" role="tablist" aria-label="섹션">
+        <button class="tab" role="tab" data-tab="our">우리팀 전략</button>
+        <button class="tab" role="tab" data-tab="live">실시간 벤픽</button>
+        <button class="tab" role="tab" data-tab="enemy">상대팀 분석</button>
+        <button class="tab" role="tab" data-tab="vision">시야 공부</button>
+      </nav>
+      <div class="top-side">
+        <label class="sel">우리팀 <select id="ourSel"></select></label>
+        <label class="sel">상대 <select id="enemySel"></select></label>
+        <div style="position:relative">
+          <button class="btn sm" data-act="data">데이터</button>
+          <div id="dataMenu" class="card" hidden style="position:absolute;right:0;top:38px;width:200px;display:grid;gap:6px;z-index:30">
+            <button class="btn sm" data-act="export">팀·챔프폭 내보내기</button>
+            <button class="btn sm" data-act="import">불러오기</button>
+            <button class="btn sm ghost" data-act="wipe">처음 상태로</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main id="view"></main>
+  <div id="modal"></div>
+  <datalist id="champList"></datalist>
+  <input type="file" id="file" accept="application/json" hidden>
+  <footer>챔피언 이미지·이름: Riot Games Data Dragon. 이 사이트는 Riot Games가 보증하거나 후원하지 않습니다. 카운터·조합 판단은 참고용입니다.</footer>
+  <script src="js/config.js?v=49"></script>
+  <script src="js/champions.js?v=49"></script>
+  <script src="js/teams.js?v=49"></script>
+  <script src="js/recent.js?v=49"></script>
+  <script src="js/pro.js?v=49"></script>
+  <script src="js/meta.js?v=49"></script>
+  <script src="js/knowledge.js?v=49"></script>
+  <script src="js/vision.js?v=49"></script>
+  <script src="js/visiongrid.js?v=49"></script>
+  <script src="js/engine.js?v=49"></script>
+  <script src="js/app.js?v=49"></script>
+</body>
+</html>

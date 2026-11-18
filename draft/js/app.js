@@ -830,7 +830,10 @@
     const sc = sc0 && sc0.cam ? { ...sc0, cam: fitCam(sc0) } : sc0, prev = prev0 && prev0.cam ? { ...prev0, cam: fitCam(prev0) } : prev0;
     const red = !!sc.red;
     const side = (s) => (s === "us") !== red ? "b" : "r";   // 테두리 색 = 그 팀 진영 색
-    const cam = camBox(sc.cam), pcam = prev && prev.cam ? camBox(prev.cam) : null;
+    // 미니맵은 기본 전체. 「장면 확대」를 누르면 장면이 보여 주려는 곳으로(다음 장면에도 유지), ＋/−·끌기로 직접 조절
+    const focusMode = S.ui.mapMode === "focus";
+    const viewCam = focusMode ? sc.cam : [50, 50, 100];
+    const cam = camBox(viewCam), pcam = focusMode && prev && prev.cam ? camBox(prev.cam) : null;
     const camAnim = pcam && (pcam.w !== cam.w || pcam.tx !== cam.tx || pcam.ty !== cam.ty) ? dataA({ k: "cam", from: pcam, to: cam }) : "";
     const zones = (sc.z || []).map((z) => {
       const lab = z.t ? `<em>${esc(z.t)}</em>` : "";
@@ -851,14 +854,30 @@
         : `<span class="sc-vis ${cls}" style="${pct(w.at)};width:${(w.r || 6) * 2}%"${isNew ? dataA({ k: "grow", d: (w.d || 0) + 0.25 }) : ""}${w.x ? dataA({ k: "fade", d: w.d || 0 }) : ""}></span>`;
       return vis + `<span class="sc-ward ${cls}" style="${pct(w.at)}"${inA}><i></i>${w.x ? `<b class="sc-x"${dataA({ k: "in", d: w.d || 0 })}>✕</b>` : ""}</span>`;
     }).join("");
-    // 안개: 우리 챔프(시야 1350)·우리 와드(900)가 못 보는 곳을 어둡게 — 상대는 여기서만 숨을 수 있다
-    const fogSrc = sc.fog === false ? null : [...Object.values(sc.a || {}).filter((t) => t.s === "us" && t.at).map((t) => [t.at[0], t.at[1], 1350]),
-      ...Object.values(sc.w || {}).filter((w) => w.s === "us" && !w.ghost && !w.x).map((w) => [w.at[0], w.at[1], 900]), ...(sc.vis || []).map((v) => [v[0], v[1], v[2]])];
+    // 전체 맥락(js/world.js): 장면에 없는 우리 팀원을 시점 자리에 채우고, 우리 포탑·라인 미니언 시야를 더한다
+    const W = window.WORLD, ctxW = W && sc.ph && !sc.noCtx ? W.fill(sc, sc.ph) : { add: {}, vis: [] };
+    const waves = ctxW.vis.filter((v) => !(sc.vis || []).some((q) => Math.hypot(q[0] - v[0], q[1] - v[1]) < 15));
+    const ourSide = red ? "r" : "b";
+    const towers = W ? W.towers.filter((t, i) => !(sc.down || []).includes(i)) : [];
+    const ctxUs = Object.fromEntries(Object.entries(ctxW.add).filter(([, t]) => t.s === "us"));
+    // 안개: 우리 챔프(1350)·포탑(1350)·와드(900)·라인 미니언(1100)이 못 보는 곳을 어둡게 — 상대는 여기서만 숨을 수 있다
+    const fogSrc = sc.fog === false ? null : [...Object.values({ ...(sc.a || {}), ...ctxUs }).filter((t) => t.s === "us" && t.at).map((t) => [t.at[0], t.at[1], 1350]),
+      ...towers.filter((t) => t.side === ourSide).map((t) => [t.at[0], t.at[1], 1350]),
+      ...Object.values(sc.w || {}).filter((w) => w.s === "us" && !w.ghost && !w.x).map((w) => [w.at[0], w.at[1], 900]), ...(sc.vis || []).map((v) => [v[0], v[1], v[2]]), ...waves.map((v) => [v[0], v[1], v[2]])];
+    const seen = fogSrc && fogSrc.length ? teamVision(fogSrc) : null, gv = vgrid();
+    const inSight = (p) => !seen || !gv || !!seen[Math.min(gv.h - 1, Math.floor((p[1] / 100) * gv.h)) * gv.w + Math.min(gv.w - 1, Math.floor((p[0] / 100) * gv.w))];
+    // 맞라인 상대는 우리 시야 안일 때만 그린다(밖이면 모름)
+    const ctxThem = Object.fromEntries(Object.entries(ctxW.add).filter(([, t]) => t.s === "them" && inSight(t.at)));
+    const towerHtml = towers.map((t) => `<span class="sc-tower s-${t.side} ${t.side === ourSide ? "us" : "them"}" style="${pct(t.at)}" title="${t.side === ourSide ? "우리" : "상대"} 포탑 · ${esc(t.kind)}"></span>`).join("");
     // 다른 시야 출처(우리 라인 미니언 등): 작은 표시 + 이름
-    const vsrc = (sc.vis || []).map((v) => `<span class="sc-vsrc" style="${pct(v)}" title="${esc(v[3] || "우리 시야")}"></span><span class="sc-lab vsrc" style="left:${v[0]}%;top:${v[1] + 2.2}%">${esc(v[3] || "우리 시야")}</span>`).join("");
+    const vsrc = (sc.vis || []).map((v) => `<span class="sc-vsrc" style="${pct(v)}" title="${esc(v[3] || "우리 시야")}"></span><span class="sc-lab vsrc" style="left:${v[0]}%;top:${v[1] + 2.2}%">${esc(v[3] || "우리 시야")}</span>`).join("")
+      + waves.map((v) => `<span class="sc-vsrc wave" style="${pct(v)}" title="${esc(v[3])}"></span>`).join("");
     const fog = fogSrc && fogSrc.length && vgrid() ? `<canvas class="sc-fog" width="${vgrid().w}" height="${vgrid().h}" data-fog='${JSON.stringify(fogSrc)}' aria-hidden="true"></canvas>` : "";
     const pa = (prev && prev.a) || {};
-    const toks = Object.entries(sc.a || {}).map(([id, t]) => {
+    const toks = Object.entries({ ...ctxUs, ...ctxThem, ...(sc.a || {}) }).map(([id, t0]) => {
+      // 문제 그림(autoFog): 우리 시야 밖에 그린 상대는 「예상 위치」로 흐리게
+      const t = sc.autoFog && t0.s === "them" && !t0.fog && !inSight(t0.at) ? { ...t0, fog: 1 } : t0;
+      if (t.ctx) return `<span class="sc-tok ${t.s} s-${side(t.s)} ctx" style="${pct(t.at)}" title="${t.s === "us" ? "우리" : "상대"} ${esc(CH[t.c] ? CH[t.c].ko : t.c)}${t.s === "them" ? " — 우리 시야 안" : ""}">${icon(t.c, "sm")}</span>`;
       const from = pa[id] ? pa[id].at : null;
       const pts = from ? [from, ...(t.via || []), t.at] : [...(t.via || []), t.at];
       const moves = pts.length > 1 && pts.some((q) => q[0] !== t.at[0] || q[1] !== t.at[1]);
@@ -870,8 +889,9 @@
     const base = red ? `<span class="sc-base r" style="right:8px;bottom:8px">우리 = 레드</span>` : "";
     // 보기 핀(버튼)이 들어 있으면 그림(role=img)이 아니라 묶음(group)이어야 버튼을 누를 수 있다
     const role = extra && extra.pins ? `role="group" aria-label="${esc(sc.cap || "맵에서 보기 고르기")}"` : `role="img" aria-label="${esc(sc.cap || "맵 그림")}"`;
-    return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""}" ${role}>
-      <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
+    const zoomBar = `<div class="sc-zoom" role="group" aria-label="미니맵 확대·축소"><button type="button" data-act="mzoom" data-v="in" aria-label="확대">＋</button><button type="button" data-act="mzoom" data-v="out" aria-label="축소">−</button><button type="button" data-act="mapmode" data-v="full" aria-pressed="${!focusMode}">전체</button><button type="button" data-act="mapmode" data-v="focus" aria-pressed="${focusMode}">장면 확대</button></div>`;
+    return `<div class="sc-stage ${extra && extra.cls ? extra.cls : ""} ${viewCam[2] < 99.9 ? "zoomed" : ""}" ${role} data-cam='${JSON.stringify(viewCam)}' data-focus='${JSON.stringify(sc.cam)}'>${zoomBar}
+      <div class="sc-world" style="${camCss(cam)}"${camAnim}><img class="sc-map" src="${MAP_IMG()}" alt="" draggable="false">${fog}${towerHtml}${vsrc}${zones}${arrows}${heads}${wards}${hits}${toks}${labs}${extra && extra.pins ? extra.pins : ""}</div>
       ${base}${sc.approx ? `<span class="sc-approx">대략 자리 · 정확한 자리는 영상</span>` : ""}</div>`;
   }
   // ----- 실제 시야: 게임 이동·시야 격자(js/visiongrid.js)로 와드가 밝히는 칸을 계산 -----
@@ -925,6 +945,47 @@
       for (let k = 0; k < cells.length; k += 2) x.fillRect(cells[k], cells[k + 1], 1, 1);
     });
   }
+  function setStageCam(stage, c) {
+    const s = Math.max(8, Math.min(100, c[2])), h = s / 2;
+    const cam = [Math.max(h, Math.min(100 - h, c[0])), Math.max(h, Math.min(100 - h, c[1])), s];
+    stage.dataset.cam = JSON.stringify(cam);
+    const w = stage.querySelector(".sc-world"); if (w) { w.getAnimations().forEach((a) => a.cancel()); w.setAttribute("style", camCss(camBox(cam))); }
+    stage.classList.toggle("zoomed", s < 99.9);
+  }
+  function zoomStage(stage, dir) {
+    let c; try { c = JSON.parse(stage.dataset.cam); } catch (e) { c = [50, 50, 100]; }
+    setStageCam(stage, [c[0], c[1], dir === "in" ? c[2] / 1.6 : c[2] * 1.6]);
+  }
+  // 마우스 휠(트랙패드 두 손가락)로 확대·축소 — 커서 아래 지점을 고정한 채로
+  let zoomUsed = false;
+  function zoomHintDone() { if (zoomUsed) return; zoomUsed = true; document.querySelectorAll(".sc-hint").forEach((h) => { h.classList.add("out"); setTimeout(() => h.remove(), 400); }); }
+  function addZoomHint(root) {
+    if (zoomUsed || !root) return;
+    const st = root.querySelector(".sc-stage"); if (!st) return;
+    st.insertAdjacentHTML("beforeend", `<div class="sc-hint" aria-hidden="true"><span class="sc-hint-b"><b class="hint-wheel">마우스 스크롤로 확대·축소할 수 있습니다</b><b class="hint-touch">＋ − 버튼으로 확대·축소할 수 있습니다</b><small>확대한 뒤에는 끌어서 옮기기 · 「전체」로 돌아오기</small></span></div>`);
+  }
+  document.addEventListener("wheel", (ev) => {
+    const stage = ev.target.closest && ev.target.closest(".sc-stage"); if (!stage || !ev.deltaY) return;
+    let c; try { c = JSON.parse(stage.dataset.cam); } catch (e) { c = [50, 50, 100]; }
+    const k = Math.exp(Math.max(-60, Math.min(60, ev.deltaY * (ev.deltaMode === 1 ? 16 : 1))) * 0.004);
+    const s2 = Math.max(8, Math.min(100, c[2] * k));
+    if (Math.abs(s2 - c[2]) < 0.01) return;   // 전체에서 더 줄이면 그냥 페이지가 내려간다
+    ev.preventDefault();
+    const r = stage.getBoundingClientRect(), fx = (ev.clientX - r.left) / r.width, fy = (ev.clientY - r.top) / r.height;
+    const px = c[0] - c[2] / 2 + fx * c[2], py = c[1] - c[2] / 2 + fy * c[2];
+    setStageCam(stage, [px - (fx - 0.5) * s2, py - (fy - 0.5) * s2, s2]);
+    zoomHintDone();
+  }, { passive: false });
+  // 확대한 그림은 끌어서 옮긴다(손가락·마우스)
+  document.addEventListener("pointerdown", (ev) => {
+    const stage = ev.target.closest && ev.target.closest(".sc-stage.zoomed"); if (!stage || ev.target.closest("button")) return;
+    let c; try { c = JSON.parse(stage.dataset.cam); } catch (e) { return; }
+    const r = stage.getBoundingClientRect(), x0 = ev.clientX, y0 = ev.clientY, c0 = c.slice();
+    stage.setPointerCapture && stage.setPointerCapture(ev.pointerId);
+    const move = (e) => setStageCam(stage, [c0[0] - ((e.clientX - x0) / r.width) * c0[2], c0[1] - ((e.clientY - y0) / r.height) * c0[2], c0[2]]);
+    const up = () => { stage.removeEventListener("pointermove", move); stage.removeEventListener("pointerup", up); stage.removeEventListener("pointercancel", up); };
+    stage.addEventListener("pointermove", move); stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+  });
   // 그린 뒤 애니메이션 실행(움직임 줄이기 설정이면 바로 마지막 모습)
   const reduceMotion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : { matches: false };
   function runAnims(root) {
@@ -973,7 +1034,7 @@
       const n = un.scenes.length, k = Math.min(Math.max(0, T.k || 0), n - 1);
       const sc = un.scenes[k], prev = T.pk != null && T.pk >= 0 && T.pk < n ? un.scenes[T.pk] : null;
       const dots = un.scenes.map((_, i) => `<button class="sc-dot ${i === k ? "on" : i < k ? "seen" : ""}" data-act="tscene" data-k="${i}" aria-label="장면 ${i + 1}" ${i === k ? 'aria-current="step"' : ""}></button>`).join("");
-      body = `<div class="sc-wrap">${stageHtml(sc, prev)}
+      body = `<div class="sc-wrap">${stageHtml({ ...sc, ph: sc.ph != null ? sc.ph : un.ph }, prev ? { ...prev, ph: prev.ph != null ? prev.ph : un.ph } : prev)}
         <div class="sc-cap"><div class="sc-cap-h"><span class="sc-n">${k + 1} / ${n}</span><b>${esc(sc.cap)}</b></div><p>${esc(sc.say)}</p>
           <div class="sc-meta">${sc.t != null ? vlink(V, sc.t) : `<span class="dim">영상 밖 기본 원칙</span>`}${sc.approx ? `<span class="dim">그림 자리는 대략 — 정확한 자리는 영상에서</span>` : ""}</div>
           <div class="sc-dots" role="group" aria-label="장면">${dots}</div>
@@ -1023,6 +1084,7 @@
     </section>`;
   }
 
+  const phaseOf = (d) => d.ph != null ? d.ph : window.WORLD ? window.WORLD.phaseOf(d.time) : "";
   // 문제 한 장: 상황(시점·양 팀 레벨·아이템) → 질문 → 고르기 → 왜 맞고 틀린지
   function drillCard(V, d, numLabel) {
     const ans = (S.ui.ans || {})[d.id];
@@ -1033,7 +1095,7 @@
     let body;
     if (d.scene) {
       // 상황 그림(실제 맵·실제 거리): 고르기 전 = 상황, 고른 뒤 = 그 선택으로 벌어지는 일을 애니메이션으로
-      const base = { ...d.scene, a: { ...(d.scene.a || {}) }, w: { ...(d.scene.w || {}) }, fitPts: d.opts.filter((o) => o.x != null).map((o) => [o.x, o.y]) };
+      const base = { ...d.scene, ph: d.scene.ph != null ? d.scene.ph : phaseOf(d), a: { ...(d.scene.a || {}) }, w: { ...(d.scene.w || {}) }, fitPts: d.opts.filter((o) => o.x != null).map((o) => [o.x, o.y]) };
       const pinned = d.opts.every((o) => o.x != null);
       if (done && d.kind === "pos" && d.scene.me) base.a.me = { c: d.scene.me, s: "us", at: [d.opts[ans].x, d.opts[ans].y], me: 1 };
       let sc = base, prev = null;
@@ -1048,35 +1110,21 @@
       const note = d.scene.note || (d.kind === "pos" ? "그림의 거리는 게임 거리 비율 그대로 · 빨간 원 = 말파이트 궁이 닿는 범위(사거리 1,000 + 충격 325)" : "");
       body = `<div class="dgrid">${stageHtml(sc, prev, { pins, cls: "dmap-pos" })}${optList(false)}</div>${note ? `<p class="help sc-note">${esc(note)}</p>` : ""}${done ? "" : `<p class="help sc-note">고르면 그 선택으로 벌어지는 일이 그림에서 움직입니다</p>`}`;
     } else if (d.kind === "map") {
-      // 맵 문제: 보기들이 있는 구역만 확대(옆 구역과 헷갈리지 않게) + 모서리에 전체 맵·확대 위치
+      // 와드 위치 문제도 같은 그림(전체 미니맵 + 확대·축소): 양 팀 위치, 이미 박힌 와드, 보기 핀. 맞힌 뒤 정답 와드의 실제 시야
       const xs = d.opts.map((o) => o.x), ys = d.opts.map((o) => o.y);
-      // 보이는 범위: 문제에 view [가운데 x, y, 폭]가 있으면 그대로(가까운 보기끼리 겹치지 않게), 없으면 보기들을 감싸게
-      const vs = d.view ? d.view[2] : Math.min(100, Math.max(40, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 22));
-      const vx = Math.max(0, Math.min(100 - vs, (d.view ? d.view[0] : (Math.max(...xs) + Math.min(...xs)) / 2) - vs / 2));
-      const vy = Math.max(0, Math.min(100 - vs, (d.view ? d.view[1] : (Math.max(...ys) + Math.min(...ys)) / 2) - vs / 2));
-      const px = (v, o) => ((v - o) / vs) * 100;
-      const red = d.side === "R";
-      const zoomBg = `<img class="dzoom" src="${MAP_IMG()}" alt="소환사의 협곡 미니맵 확대" style="width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%">
-        ${vs < 100 ? `<span class="dmini" aria-hidden="true"><img src="${MAP_IMG()}" alt=""><i style="left:${vx}%;top:${vy}%;width:${vs}%;height:${vs}%"></i><b class="mb b" style="left:2%;bottom:2%">${red ? "상대" : "우리"}</b><b class="mb r" style="right:2%;top:2%">${red ? "우리" : "상대"}</b></span>` : ""}`;
-      // 양 팀 챔프 위치(테두리 = 그 팀 진영 색) — 확대 밖이면 가장자리에 붙여 흐리게
-      const usCol = red ? "r" : "b", themCol = red ? "b" : "r";
-      const champs = d.pos ? [...d.pos.us.map((c) => [c, "us " + usCol]), ...d.pos.them.map((c) => [c, "them " + themCol])].map(([[id, x, y], cls]) => {
-        let l = px(x, vx), t = px(y, vy); const out = l < 0 || l > 100 || t < 0 || t > 100;
-        l = Math.max(4, Math.min(96, l)); t = Math.max(4, Math.min(96, t));
-        return `<span class="dch-map ${cls} ${out ? "out" : ""}" style="left:${l}%;top:${t}%" title="${cls.startsWith("us") ? "우리" : "상대"} ${esc(CH[id].ko)}">${icon(id, "sm")}</span>`; }).join("") : "";
-      const baseTag = red
-        ? `<span class="dbase us r" style="right:8px;top:8px">우리(레드) 기지 ↗</span><span class="dbase them b" style="left:8px;bottom:8px">↙ 상대(블루) 기지</span>`
-        : `<span class="dbase us b" style="left:8px;bottom:8px">↙ 우리(블루) 기지</span><span class="dbase them r" style="right:8px;top:8px">상대(레드) 기지 ↗</span>`;
-      // 맞힌 뒤: 정답 자리에 와드 시야(900 ≈ 맵 6%)를 펼쳐 보여 준다
+      const span = Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) + 12;
+      const focus = d.view || [(Math.max(...xs) + Math.min(...xs)) / 2, (Math.max(...ys) + Math.min(...ys)) / 2, Math.min(100, Math.max(14, span))];
+      const a = {};
+      (d.pos ? [...d.pos.us.map((c) => [c, "us"]), ...d.pos.them.map((c) => [c, "them"])] : []).forEach(([[id, x, y], side], i) => { a[`${side}${i}`] = { c: id, s: side, at: [x, y] }; });
+      const w = {};
+      (d.wards || []).forEach((q, i) => { w[`pw${i}`] = { at: q.at, k: q.k, s: q.s }; });
       const okO = d.opts.find((o) => o.ok);
-      const vis = !done ? "" : vgrid() ? visCanvas("dvcan", `width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%`, { x: okO.x, y: okO.y, r: 900, s: "b" })
-        : `<span class="dvis" style="left:${px(okO.x, vx)}%;top:${px(okO.y, vy)}%;width:${(6 / vs) * 200}%"></span>`;
-      // 이미 박혀 있는 와드(상대 핑크 등): 아이콘 + 이름표 + 그 와드의 실제 시야(상대 = 빨강)
-      const zoomStyle = `width:${10000 / vs}%;left:${-vx * 100 / vs}%;top:${-vy * 100 / vs}%`;
-      const placed = (d.wards || []).map((w) => { const l = px(w.at[0], vx), t = px(w.at[1], vy), sd = w.s === "them" ? "r" : "b";
-        return visCanvas(`dvcan s-${sd}`, zoomStyle, { x: w.at[0], y: w.at[1], r: 900, s: sd }) + `<span class="dmk sc-ward ${w.k === "ctrl" ? "k-ctrl" : "k-ward"} s-${sd}" style="left:${l}%;top:${t}%" title="${esc(w.t)}"><i></i></span><span class="dmk-l ${sd}" style="left:${l}%;top:${t}%">${esc(w.t)}</span>`; }).join("");
-      const pins = d.opts.map((o, i) => { const l = px(o.x, vx), t = px(o.y, vy); return `<button class="dpin ${optCls(o, i)}" style="left:${l}%;top:${t}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button><span class="dpin-l" style="left:${l}%;top:${t}%" aria-hidden="true">${esc(o.t)}</span>`; }).join("");
-      body = `<div class="dgrid"><div class="vmap dmap map">${zoomBg}${baseTag}${placed}${vis}${champs}${pins}</div>${optList(false)}</div>${d.wards && d.wards.length ? `<p class="help sc-note">빨간 영역 = 이미 박힌 상대 와드가 보는 곳(게임 격자로 계산)</p>` : ""}`;
+      if (done) w.ans = { at: [okO.x, okO.y], k: "ward", s: "us", d: 0.2 };
+      const labs = (d.wards || []).map((q) => ({ at: [q.at[0], q.at[1] - 1.6], t: q.t, k: q.s === "them" ? "bad" : "" }));
+      const sc = { cam: focus, a, w, l: labs, fitPts: d.opts.map((o) => [o.x, o.y]), cap: d.q, ph: phaseOf(d), autoFog: 1 };
+      const pins = d.opts.map((o, i) => `<button class="dpin sc-pin ${optCls(o, i)}" style="left:${o.x}%;top:${o.y}%" data-act="dans" data-id="${d.id}" data-i="${i}" ${done ? "disabled" : ""} aria-label="${"ABCD"[i]} ${esc(o.t)}">${"ABCD"[i]}</button><span class="dpin-l" style="left:${o.x}%;top:${o.y}%" aria-hidden="true">${esc(o.t)}</span>`).join("");
+      body = `<div class="dgrid">${stageHtml(sc, done ? { ...sc, w: Object.fromEntries(Object.entries(w).filter(([k]) => k !== "ans")) } : null, { pins, cls: "dmap-pos" })}${optList(false)}</div>
+        <p class="help sc-note">기본은 전체 미니맵 · 「장면 확대」나 ＋로 가까이 · 어두운 곳 = 우리 시야 밖${d.wards && d.wards.length ? " · 빨간 영역 = 이미 박힌 상대 와드가 보는 곳" : ""}</p>`;
     } else {
       body = optList(true);
     }
@@ -1121,7 +1169,7 @@
     const keepFocus = document.activeElement && document.activeElement.id === "q";
     const pos = keepFocus ? document.activeElement.selectionStart : 0;
     v.innerHTML = S.tab === "live" ? renderLive() : S.tab === "our" ? renderOur() : S.tab === "vision" ? renderVision() : renderEnemy();
-    if (S.tab === "vision") { drawVision(v); runAnims(v); }
+    if (S.tab === "vision") { drawVision(v); runAnims(v); addZoomHint(v); }
     if (keepFocus) { const q = document.getElementById("q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
   }
 
@@ -1165,6 +1213,8 @@
       case "vpurp": S.ui.vPurp = S.ui.vPurp === el.dataset.v ? "" : el.dataset.v; S.ui.vSpot = null; save(); render(); break;
       case "dcat": S.ui.dCat = el.dataset.v; S.ui.dIdx = 0; S.ui.dAns = null; save(); render(); window.scrollTo(0, 0); break;
       case "lpos": S.ui.lPos = el.dataset.v; save(); render(); break;
+      case "mapmode": S.ui.mapMode = el.dataset.v; save(); { const st = el.closest(".sc-stage"); if (st) { let f; try { f = JSON.parse(st.dataset.focus); } catch (e) { f = [50, 50, 100]; } setStageCam(st, el.dataset.v === "focus" ? f : [50, 50, 100]); st.querySelectorAll('[data-act="mapmode"]').forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === el.dataset.v))); } } break;
+      case "mzoom": { const st = el.closest(".sc-stage"); if (st) zoomStage(st, el.dataset.v); zoomHintDone(); break; }
       case "dans": { const d = drillById(el.dataset.id); if (!d) break; const i = Number(el.dataset.i);
         S.ui.ans = { ...(S.ui.ans || {}), [d.id]: i }; S.ui.dScore = { ...(S.ui.dScore || {}), [d.id]: !!d.opts[i].ok }; save(); render(); break; }
       case "dretry": { const a = { ...(S.ui.ans || {}) }; delete a[el.dataset.id]; S.ui.ans = a; save(); render(); break; }
