@@ -603,42 +603,37 @@
     const ps = S.ui.pState && S.ui.pState.team === t.id ? S.ui.pState : {};
     const canLive = !!window.RECENT_LIVE_URL && !!window.Practice && R && R.status === "ok";
     const btn = canLive ? `<div class="g-refresh"><button class="btn sm primary g-btn${prefreshing ? " busy" : ""}" data-act="prefresh" ${prefreshing ? "disabled" : ""}>${REFRESH_ICO}${prefreshing ? "갱신 중…" : "갱신하기"}</button>
-      <span class="help" role="status">${esc(ps.msg || (P && P.live ? `Riot에서 바로 가져옴 · ${P.live.at}` : "누르면 상대 경기를 Riot에서 바로 가져와 다시 분석합니다"))}</span></div>` : "";
-    const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>${prepHtml(R)}`;
-    if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p>${btn}</section>`;
+      <span class="help" role="status">${esc(ps.msg || (P && P.live ? `실시간 ${P.live.at}` : R && R.at ? `수집 ${R.at}` : ""))}</span></div>` : "";
+    const head = (sub) => `<div class="now-h"><span class="what">상대 연습 픽</span><span class="step">${sub}</span></div>`;
+    const bar = `<div class="pr-bar">${prepHtml(R)}${btn}</div>`;
+    if (!P) return `<section class="plan-box prac-box">${head(esc(t.name))}${bar}<p class="help">미확보 — ${R && R.status === "ok" ? "다음 자동 수집(매일 0시) 때 분석됩니다." : "Riot 최근 경기 수집 전입니다."}</p></section>`;
     const tg = P.teamGames || {};
     const since = md((P.live && P.live.since) || R.since) || "11/10";
-    const sub = `${esc(t.name)} · 연습 기간(${since}~) 팀원끼리 한 판 ${tg.n || 0}${tg.custom ? ` (내전 ${tg.custom})` : ""}${tg.five ? ` · 5인 ${tg.five}` : ""} · ${P.live ? `실시간 ${esc(P.live.at)}` : `수집 ${esc(R.at)}`}`;
+    const sub = `${esc(t.name)} · 팀원끼리 한 판 ${tg.n || 0}${tg.five ? ` (5인 ${tg.five})` : ""}`;
     const days = (R.practiceRule && R.practiceRule.recentDays) || 3;
     const help = `<details class="prac-help"><summary>기준·한계</summary><ul class="plain">
       <li>함께 한 경기(같은 팀 2명 이상 같은 편)를 더 크게 봅니다: 사용자 설정(내전·스크림) &gt; 자유랭 5인 &gt; 3·4인 &gt; 2인 &gt; 혼자.</li>
       <li>${P.live ? "갱신한" : "수집"} 시각 기준 최근 ${days}일 경기는 1.5배. 「새로」 = 이전 랭크·숙련도에 거의 없던 챔프를 ${since} 이후 3판 이상.</li>
       <li>「완성」 = 3판 이상·승률 50% 이상·KDA 2.5 이상, 「연습 중」 = 그 밖, 「표본 적음」 = 3판 미만(참고만).</li>
       <li>대회 코드(토너먼트) 경기는 Riot 기록에 안 보일 수 있습니다. 닉네임(Riot ID)을 바꾼 선수는 다음 수집 때까지 빠집니다.</li></ul></details>`;
-    const rows = ROLES.map((r) => {
+    // 라인 다섯 칸: 선수 이름 + 연습 픽 3개(한 줄씩: 얼굴·이름·판수, 새 픽·완성만 표시). 자세한 수치는 마우스를 올리면
+    const cols = ROLES.map((r) => {
       const pl = P.players[r];
-      const who = `<span class="prac-who"><b>${esc(nick(t.players[r].riot))}</b>`;
-      if (!pl) return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells">${who} <span class="dim">${P.stale.includes(r) ? "계정 변경·조회 실패 — 다음 수집 때 반영" : "자료 없음"}</span></span></div></div>`;
-      const chips = pl.picks.slice(0, 5).map((x) => {
-        const full = `${CH[x.id].ko}${x.r !== r ? ` (${ROLE_KO[x.r]})` : ""} · ${E.practiceText(x)}`;
-        return `<span class="prac-c" title="${esc(full)}">${icon(x.id, "sm").replace(/ title="[^"]*"/, "")}<span class="prac-n">${esc(CH[x.id].ko)}${x.r !== r ? `<small>${ROLE_KO[x.r]}</small>` : ""}</span>
-          <span class="st">${x.g}판 ${x.w}-${x.g - x.w} · KDA ${x.kda}</span><span class="lv ${READY_LV[x.ready] || "lv1"}">${esc(x.ready)}</span>
-          ${x.new ? `<span class="lv lvone">새로 ${x.pre}→${x.g}</span>` : ""}${x.r3 ? `<span class="prac-t">최근 ${x.r3}</span>` : ""}${x.cu ? `<span class="prac-t">내전 ${x.cu}</span>` : x.tg ? `<span class="prac-t">팀 ${x.tg}</span>` : ""}
-          <span class="sr-only">${esc(full)}</span></span>`;
-      }).join("");
-      return `<div class="sc-row"><span class="pp-role">${ROLE_KO[r]}</span><div class="sc-cells">${who} <span class="dim">${since}~ ${pl.n}판</span></span>
-        <div class="row-chips">${chips || `<span class="dim">2판 이상 꺼낸 챔프 없음</span>`}</div></div></div>`;
+      const name = esc(nick(t.players[r].riot));
+      if (!pl) return `<div class="pr-col"><div class="pr-h"><span class="pr-r">${ROLE_KO[r]}</span><b>${name}</b></div><p class="dim">${P.stale.includes(r) ? "계정 변경·조회 실패" : "자료 없음"}</p></div>`;
+      const items = pl.picks.slice(0, 3).map((x) => `<li title="${esc(`${CH[x.id].ko}${x.r !== r ? ` (${ROLE_KO[x.r]})` : ""} · ${E.practiceText(x)}`)}">${icon(x.id, "sm").replace(/ title="[^"]*"/, "")}
+          <span class="pr-t"><span class="pr-n">${esc(CH[x.id].ko)}${x.r !== r ? `<small>${ROLE_KO[x.r]}</small>` : ""}</span>
+          <span class="pr-g">${x.g}판 ${x.w}승${x.new ? ` <span class="cp gold">새 픽</span>` : x.ready === "완성" ? ` <span class="cp good">완성</span>` : ""}</span></span></li>`).join("");
+      return `<div class="pr-col"><div class="pr-h"><span class="pr-r">${ROLE_KO[r]}</span><b>${name}</b><span class="dim">${pl.n}판</span></div>
+        ${items ? `<ul class="pr-list">${items}</ul>` : `<p class="dim">2판 이상 꺼낸 챔프 없음</p>`}</div>`;
     }).join("");
-    const pair = (ids) => ids.map((id) => `${icon(id, "sm").replace(/ title="[^"]*"/, "")}`).join("");
-    const combos = P.combos.slice(0, 5).map((c) => `<span class="prac-c" title="${esc(`${COMBO_KO[c.kind]} ${c.ids.map((id) => CH[id].ko).join("+")} · ${c.g}판 ${c.w}승${c.cu ? ` · 내전 ${c.cu}판` : ""}`)}">${pair(c.ids)}<span class="prac-n">${esc(c.ids.map((id) => CH[id].ko).join("+"))}<small>${COMBO_KO[c.kind]}</small></span><span class="st">${c.g}판 ${c.w}-${c.g - c.w}</span>${c.cu ? `<span class="prac-t">내전 ${c.cu}</span>` : ""}${c.r3 ? `<span class="prac-t">최근 ${c.r3}</span>` : ""}</span>`).join("");
-    const bans = P.bans.slice(0, 6).map((b) => `<span class="chip" title="${esc(`${CH[b.id].ko} · 팀원끼리 한 판에서 밴 ${b.n}회${b.cu ? ` (내전 ${b.cu})` : ""}`)}">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(CH[b.id].ko)}<span class="st">${b.n}</span></span>`).join("");
-    const swaps = P.swaps.map((s) => `<li><b>${ROLE_KO[s.r]} ${esc(nick(t.players[s.r].riot))}</b> → ${ROLE_KO[s.to]} ${s.g}/${s.of}판${s.tg ? ` (팀원과 ${s.tg})` : ""}${s.ids.length ? ` · ${esc(s.ids.map((id) => CH[id] ? CH[id].ko : id).join("·"))}` : ""}</li>`).join("");
-    return `<section class="plan-box prac-box">${head(sub)}${btn}${help}<div class="sc-rows">${rows}</div>
-      <div class="prac-foot">
-        <div><div class="sub">함께 연습한 조합</div><div class="row-chips">${combos || `<span class="dim">2판 이상 반복된 조합 없음</span>`}</div></div>
-        <div><div class="sub">팀원끼리 한 판에서 자주 밴</div><div class="row-chips">${bans || `<span class="dim">${tg.banGames ? "없음" : "밴 기록이 있는 판 없음"}</span>`}</div></div>
-        ${swaps ? `<div><div class="sub">라인 바꿈 가능성</div><ul class="plain prac-sw">${swaps}</ul></div>` : ""}
-      </div></section>`;
+    const ko = (id) => (CH[id] ? CH[id].ko : id);
+    const foot = [
+      P.combos.length ? `<div><span class="pr-k">함께 연습</span>${P.combos.slice(0, 3).map((c) => `<span class="pr-f" title="${esc(`${COMBO_KO[c.kind]} · ${c.g}판 ${c.w}승`)}">${esc(c.ids.map(ko).join("+"))} ${c.g}판</span>`).join("")}</div>` : "",
+      P.bans.length ? `<div><span class="pr-k">자주 밴</span>${P.bans.slice(0, 5).map((b) => `<span class="pr-f">${icon(b.id, "sm").replace(/ title="[^"]*"/, "")}${esc(ko(b.id))} ${b.n}</span>`).join("")}</div>` : "",
+      P.swaps.length ? `<div><span class="pr-k">라인 바꿈</span>${P.swaps.map((x) => `<span class="pr-f" title="${esc(x.ids.map(ko).join("·"))}">${ROLE_KO[x.r]} → ${ROLE_KO[x.to]} ${x.g}/${x.of}판</span>`).join("")}</div>` : "",
+    ].filter(Boolean).join("");
+    return `<section class="plan-box prac-box">${head(sub)}${bar}<div class="pr-grid">${cols}</div>${foot ? `<div class="pr-foot">${foot}</div>` : ""}${help}</section>`;
   }
 
   function renderLive() {
@@ -776,7 +771,7 @@
       <button class="btn sm primary" data-act="prepsave">저장</button>${PREP.def && PREP.def !== cur ? `<button class="btn sm ghost" data-act="prepdef">${md(PREP.def)}로</button>` : ""}<button class="btn sm ghost" data-act="prepcancel">취소</button>
       <span class="help">이 날짜부터 한 판을 「연습」으로 셉니다 · 팀 전체 적용</span></div>`;
     return `<div class="prep"><span class="help">연습 기간 <b>${md(cur)}~</b>${stale ? ` · 지금 보이는 자료는 ${md(R.since)}~ 기준(갱신하기·0시 수집 때 바뀜)` : ""}</span>
-      ${PREP.since ? `<button class="btn sm ghost" data-act="prepedit">대회 준비 시작일 바꾸기</button>` : ""}${PREP.msg ? `<span class="help" role="status">${esc(PREP.msg)}</span>` : ""}</div>`;
+      ${PREP.since ? `<button class="btn sm ghost" data-act="prepedit" title="대회 준비 시작일 바꾸기(팀 전체)">바꾸기</button>` : ""}${PREP.msg ? `<span class="help" role="status">${esc(PREP.msg)}</span>` : ""}</div>`;
   }
   function refreshPractice() {
     const t = E.teamOf(S, "enemy"), R = window.RECENT;
