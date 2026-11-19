@@ -126,5 +126,24 @@
     return { players, combos: comboList.slice(0, 8), bans: banList.slice(0, 8), swaps, teamGames: tgs };
   }
 
-  root.Practice = { compute, gameWeight, RECENT_DAYS };
+  // 함께 한 경기(tools/recent.py groups와 같은 규칙): 이 팀 선수 2명 이상이 같은 편이었던 경기, 큐 무관, 최근 순
+  //  {date:"MM-DD HH:MM"(한국 시각), queue, n, win, picks:{라인:챔프}, playedRole:{라인:실제 라인}}
+  // 상대 팀은 Worker /groups(우리 팀 전용) 대신 /games 경기로 화면에서 만든다(사용자 요청 11-19: 우리팀 갱신하기 한 번에 상대도)
+  function groups(games, roles) {
+    const pad = (n) => String(n).padStart(2, "0");
+    const kst = (ms) => { const d = new Date(ms + 9 * 3600e3); return `${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
+    const out = [];
+    (games || []).forEach((g) => {
+      const bySide = {};
+      roles.forEach((r) => { const x = g.p && g.p[r]; if (x) (bySide[x[0]] = bySide[x[0]] || []).push([r, x]); });
+      Object.values(bySide).forEach((mem) => {
+        if (mem.length < 2) return;
+        out.push({ date: kst(g.t), queue: g.q, n: mem.length, win: !!mem[0][1][1],
+          picks: Object.fromEntries(mem.map(([r, x]) => [r, x[2]])), playedRole: Object.fromEntries(mem.map(([r, x]) => [r, x[3] || ""])) });
+      });
+    });
+    return out.sort((a, b) => cmp(b.date, a.date));
+  }
+
+  root.Practice = { compute, groups, gameWeight, RECENT_DAYS };
 })(typeof window !== "undefined" ? window : globalThis);

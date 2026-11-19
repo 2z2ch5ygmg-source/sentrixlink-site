@@ -772,6 +772,7 @@
   const NIGHT = { groups: {}, at: "" };
   const kstMs = (s) => Date.parse(String(s).replace(" ", "T") + ":00+09:00");
   let gTimer = null;
+  let chainEnemy = false;   // 우리팀 「갱신하기」: 우리 팀 다음에 상대도
   function refreshRecent(auto) {
     if (refreshing && !auto) return;
     clearTimeout(gTimer);
@@ -779,7 +780,20 @@
     const count = () => { const g = window.RECENT && window.RECENT.status === "ok" ? E.groupsOf(ourT) : null; return g ? g.length : 0; };
     const n0 = count(), at0 = before && before.at;
     refreshing = true; S.ui.rState = {}; render();
-    const done = (msg) => { refreshing = false; S.ui.rState = { msg }; render(); };
+    const done = (msg) => {
+      // 우리 팀이 끝나면 지금 고른 상대(연습 픽·함께 한 경기)를 이어서 — Riot 한도를 두 팀이 동시에 쓰지 않게 차례로
+      const en = E.teamOf(S, "enemy");
+      if (chainEnemy && en && !en.solo && window.Practice && window.RECENT_LIVE_URL) {
+        chainEnemy = false;
+        S.ui.rState = { msg: `${msg} · 상대 ${en.name} 갱신 중…` }; render();
+        refreshPractice(false, {
+          progress: (m) => { S.ui.rState = { msg: `${msg} · 상대 ${en.name}: ${m}` }; render(); },
+          done: (m) => { refreshing = false; S.ui.rState = { msg: `${msg} · 상대 ${en.name}: ${m}` }; render(); },
+        });
+        return;
+      }
+      chainEnemy = false; refreshing = false; S.ui.rState = { msg }; render();
+    };
     const reload = (why) => {
       const s = document.createElement("script");
       s.src = `js/recent.js?t=${Date.now()}`;
@@ -867,13 +881,14 @@
     try { const R = window.RECENT; const r = await fetch(`js/practice-games.json?t=${encodeURIComponent((R && R.at) || Date.now())}`, { cache: "no-store" }); if (r.ok) PG = await r.json(); } catch (e) { /* 없으면 처음부터 */ }
     return PG;
   }
-  let pTimer = null;
-  async function refreshPractice(auto) {
+  let pTimer = null, pCb = null;   // pCb: 우리팀 「갱신하기」가 이어서 부를 때 {progress(msg), done(msg)}
+  async function refreshPractice(auto, cb) {
+    if (cb) pCb = cb;
     const t = E.teamOf(S, "enemy"), R = window.RECENT;
-    if ((prefreshing && !auto) || !t || t.solo || !R || R.status !== "ok" || !window.Practice) return;
+    if ((prefreshing && !auto) || !t || t.solo || !R || R.status !== "ok" || !window.Practice) { if (cb && pCb === cb) { pCb = null; cb.done("상대 갱신 건너뜀"); } return; }
     clearTimeout(pTimer);
     prefreshing = true; S.ui.pState = { team: t.id, msg: auto ? "남은 경기 이어 읽는 중…" : "" }; render();
-    const done = (msg) => { prefreshing = false; S.ui.pState = { team: t.id, msg }; render(); };
+    const done = (msg) => { prefreshing = false; S.ui.pState = { team: t.id, msg }; const c = pCb; pCb = null; if (c) c.done(msg); render(); };
     const pg = await practiceGames();
     const since = PREP.since || R.since;
     const base = pg && pg.since === since && pg.teams && pg.teams[t.id] ? pg : null;   // 기준일이 같을 때만 0시 경기를 쓴다
@@ -886,8 +901,10 @@
         if (!ok || !j || j.status !== "ok" || !Array.isArray(j.games)) { done(`실시간 조회 실패(${(j && j.reason) || "응답 " + status}) — 매일 0시 자료 그대로`); return; }
         if (j.pending) {
           const wait = Math.max(3, j.retryIn || 30);
-          if (E.teamOf(S, "enemy").id === t.id) pTimer = setTimeout(() => refreshPractice(true), wait * 1000);
-          prefreshing = false; S.ui.pState = { team: t.id, msg: `상대 경기 ${j.games.length}개 읽음 · 남은 ${j.pending}경기는 ${wait}초 뒤 자동으로 이어 읽음(Riot 한도: 2분 100회)` }; render(); return;
+          const msg = `상대 경기 ${j.games.length}개 읽음 · 남은 ${j.pending}경기는 ${wait}초 뒤 자동으로 이어 읽음(Riot 한도: 2분 100회)`;
+          if (E.teamOf(S, "enemy").id === t.id) { pTimer = setTimeout(() => refreshPractice(true), wait * 1000); if (pCb) pCb.progress(msg); }
+          else { const c = pCb; pCb = null; if (c) c.done("상대가 바뀌어 멈춤"); }
+          prefreshing = false; S.ui.pState = { team: t.id, msg }; render(); return;
         }
         const roles = ROLES.filter((r) => j.players && j.players[r] && !j.players[r].error && j.players[r].riot === t.players[r].riot);
         const all = {};
@@ -898,7 +915,9 @@
         const P = window.Practice.compute(games, roles, RR.practiceBase && RR.practiceBase[t.id], sinceMs, Date.now());
         const before = RR.practice && RR.practice[t.id];
         P.live = { at: j.at, acct: j.players, since: j.since };
-        window.RECENT = { ...RR, practice: { ...(RR.practice || {}), [t.id]: P } };
+        // 상대 「함께 한 경기」도 같은 경기로(0시 수집기와 같은 규칙, tools/test-groups-from-games.cjs)
+        const gr = window.Practice.groups(games, roles);
+        window.RECENT = { ...RR, practice: { ...(RR.practice || {}), [t.id]: P }, groups: { ...(RR.groups || {}), [t.id]: gr }, live: { ...(RR.live || {}), [t.id]: { at: j.at, pending: 0 } } };
         const add = (P.teamGames.n || 0) - ((before && before.teamGames && before.teamGames.n) || 0);
         done(`실시간 ${j.at} · 상대 경기 ${games.length}개${base ? `(0시 이후 새 경기 ${j.games.length})` : ""}${add > 0 ? ` · 팀원끼리 한 판 ${add}판 늘어남` : ""}`);
       })
@@ -1883,7 +1902,7 @@
       case "goalclr": S.ui.goal = { ids: [] }; save(); render(); break;
       case "ctnav": { const tr = document.getElementById("ctrack"); if (tr) { const w = (tr.firstElementChild || {}).offsetWidth || 300; tr.scrollBy({ left: Number(el.dataset.d) * (w + 12), behavior: "smooth" }); } break; }
       case "dock": S.ui.dock = el.dataset.k; S.ui.dockAt = S.draft.idx; render(); break;
-      case "grefresh": refreshRecent(false); break;
+      case "grefresh": if (!refreshing) { chainEnemy = true; refreshRecent(false); } break;
       case "prefresh": refreshPractice(false); break;
       case "prepedit": PREP.edit = true; PREP.msg = ""; render(); { const d = document.getElementById("prepDate"); if (d) d.focus(); } break;
       case "prepcancel": PREP.edit = false; render(); break;
