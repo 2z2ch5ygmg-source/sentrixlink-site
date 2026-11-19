@@ -758,10 +758,21 @@ window.Engine = (function () {
     const tryRoles = only && open.includes(only) ? [only] : open;
     const mine = picks(state, who);
     const theirs = picks(state, opp);
-    const dir = direction(state, who);
+    // 우리 픽: 추천 조합 카드(고른 카드, 없으면 1순위)와 같은 조합으로 — 순서·카드·밴픽 설계가 따로 놀지 않게(사용자 지적 11-19 「돌진 주력은 아지르, 설계는 리산드라인데 카타가 1순위」)
+    const scList = who === "our" ? scenarios(state, who, true) || [] : [];
+    const scen = scList.find((x) => x.id === (state.ui && state.ui.scen)) || scList[0] || null;
+    const dir = scen ? scen.key : direction(state, who);
     const pp = pickPlan(state, who);
     const threat = keyThreats(state, who);
-    const nowRoles = (pp.plan.find((p) => p.idxs.includes(state.draft.idx)) || { items: [] }).items.filter((x) => !x.done && x.role).map((x) => x.role);
+    let nowRoles = (pp.plan.find((p) => p.idxs.includes(state.draft.idx)) || { items: [] }).items.filter((x) => !x.done && x.role).map((x) => x.role);
+    // 우리 픽: 밴픽 설계가 이번 차례(연속 픽 칸)에 배정한 라인
+    let planNow = null;   // 밴픽 설계의 이번 칸 픽
+    if (who === "our" && scen) {
+      const gp = goalPlan(state), side = sideOf(state, who), grp = [];
+      planNow = gp && gp.steps.find((x) => x.i === state.draft.idx && x.who === "our" && x.id) || null;
+      for (let i = state.draft.idx; gp && i < ORDER.length && ORDER[i][0] === side && ORDER[i][1] === "pick"; i++) { const st = gp.steps.find((x) => x.i === i && x.who === "our"); if (st && st.r) grp.push(st.r); }
+      if (grp.length) nowRoles = grp;
+    }
     const hasFront = mine.some((p) => CH[p.champ].st.includes("front"));
     // 딜 계산은 실제 딜러만 센다(말파이트·누누·갈리오 같은 탱커는 AP여도 딜러가 아님)
     const dealers = mine.filter((p) => isDealer(CH[p.champ]));
@@ -776,10 +787,6 @@ window.Engine = (function () {
     const anti = antiAgainst(state, who);
     // 우리 밴이 남아 있으면(2차 밴) 사일러스를 밴해서 막을 수 있으니 감점을 줄이고 밴을 권한다
     // 고른 큰 그림 시나리오: 그 칸의 주 픽·대체 픽을 앞으로
-    // 목표 챔프가 있으면 고른 조합이 없어도 1순위 조합을 기준으로
-    const goalOn = who === "our" && state.ui && state.ui.goal && state.ui.goal.ids && state.ui.goal.ids.length;
-    const scList = who === "our" && state.ui && (state.ui.scen || goalOn) ? scenarios(state, who, true) || [] : [];
-    const scen = scList.find((x) => x.id === state.ui.scen) || (goalOn ? scList[0] : null) || null;
     const myBanLeft = ORDER.some(([sd, t], i) => i >= state.draft.idx && t === "ban" && sd === sideOf(state, who));
     const theirUlt = theirs.filter((t) => ULT[t.champ]);
     // 상대 예상: 상대 픽 순서는 추정이라 '나중에' 감점을 약하게 하고, 우리 라이너가 공개된 라인(맞대응 차례)에 가중치를 준다
@@ -802,8 +809,9 @@ window.Engine = (function () {
         if (scen && scen.slots[r] && !scen.slots[r].done) {
           const sl = scen.slots[r];
           if (sl.id === c.id && sl.goal) { s += 40; reasons.push({ t: "목표 챔프", d: `목표 챔프 · ${ROLE_KO[r]}`, v: 40 }); }
-          else if (sl.id === c.id) { s += 8; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 주 픽`, v: 8 }); }
-          else if (sl.alts.some((a) => a.id === c.id)) { s += 4; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 대체 픽`, v: 4 }); }
+          // 지금 차례 라인이면 크게(조합 주 픽이 1순위), 뒤 차례 라인은 조금만(지금 차례가 아닌 라인이 앞에 섞이지 않게)
+          else if (sl.id === c.id) { const v = (!nowRoles.length || nowRoles.includes(r) ? 24 : 6) + (planNow && planNow.id === c.id && planNow.r === r ? 30 : 0); s += v; reasons.push({ t: "조합 주 픽", d: `${scen.name} · ${ROLE_KO[r]} 주 픽`, v }); }
+          else if (sl.alts.some((a) => a.id === c.id)) { const v = !nowRoles.length || nowRoles.includes(r) ? 10 : 3; s += v; reasons.push({ t: "조합 대체 픽", d: `${scen.name} · ${ROLE_KO[r]} 대체 픽`, v }); }
         }
         if (bp) { s += bp.v; reasons.push({ t: "바텀 세트", d: `${j(ko(bp.partner), "과", "와")} 세트 · ${bp.d}`, v: bp.v }); }
         const ut = ULT[c.id];
@@ -1060,6 +1068,14 @@ window.Engine = (function () {
         duo = true;
       }
     }
+    // 두 칸 차례(B2·B3 등) 첫 칸에서 바텀 한 명을 뽑았으면 둘째 칸은 그 짝 — 계획대로 뽑았는데 계획이 바뀌지 않게(사용자 지적 11-19)
+    {
+      const i0 = state.draft.idx, prev = i0 - 1;
+      if (prev >= 0 && ORDER[i0] && ORDER[i0][0] === side && ORDER[i0][1] === "pick" && ORDER[prev][0] === side && ORDER[prev][1] === "pick") {
+        const pp0 = mineAll.find((p) => p.i === prev), mate = pp0 && pp0.role === "A" ? "S" : pp0 && pp0.role === "S" ? "A" : null;
+        if (mate && order.includes(mate)) { order = [mate].concat(order.filter((x) => x !== mate)); duo = true; }
+      }
+    }
     let k = 0;
     const lastIdx = remainingIdx[remainingIdx.length - 1];
     const plan = slots.map((s) => {
@@ -1175,7 +1191,8 @@ window.Engine = (function () {
           if (bp) { v += bp.v * 0.3; notes.push(`${j(ko(mate.id), "과", "와")} 세트`); }
           if (ULT[id] && sy > 0) { v -= (ULT[id] === 3 ? 6 : 2) * sy; if (ULT[id] === 3 && sy >= 0.3) notes.push("사일러스 주의"); }
           const blk = blockedBy(c, antiS);
-          if (blk) { v -= Math.min(8, 2 * blk.sum); notes.push(`${blk.ids.map(ko).join("·")} ${blk.kind} 차단`); }
+          // 추천 순서와 같은 기준: 원딜은 앞라인 뒤에서 칠 수 있어 돌진 차단 감점을 절반만
+          if (blk) { v -= Math.min(8, 2 * blk.sum) * (r === "A" && blk.kind === "돌진" ? 0.5 : 1); notes.push(`${blk.ids.map(ko).join("·")} ${blk.kind} 차단`); }
           if (tankK && isDealer(c)) {
             if (TANKBUSTER.has(id)) { v += 2 + 1.5 * tankK; notes.push("탱커 녹이기"); }
             else if (weakVsTanks(c)) { v -= 1.5 + 1.5 * tankK; notes.push("탱커 상대 딜 부족"); }
@@ -1306,8 +1323,13 @@ window.Engine = (function () {
       if (h && (h.e.one || h.e.lv >= 3)) u += 2;
       return { r, id, goal: !!x.goal, u, contest, exposure, ctrs, hold: h, meta: mi, laner, own };
     }).sort((a, b) => b.u - a.u);
+    // 라인 순서 = 「픽 순서」 탭(pickPlan)과 같게. 목표 챔프만 2차 밴 전 칸으로 당긴다(사용자 지적 11-19: 추천 순서·설계·픽 순서가 따로 놀지 않게)
+    const ban2 = ORDER.findIndex((o, i) => i > firstPick() && o[1] === "ban");   // 2차 밴 시작 칸
+    let order = (pickPlan(state, "our").order || []).map((r) => targets.find((t) => t.r === r)).filter(Boolean);
+    targets.forEach((t) => { if (!order.includes(t)) order.push(t); });
+    const nBefore = ban2 > 0 ? pickIdx.filter((i) => i < ban2).length : 0;
+    order.filter((t) => t.goal).forEach((t) => { const k = order.indexOf(t); if (k < nBefore) return; for (let j = nBefore - 1; j >= 0; j--) if (!order[j].goal) { order[k] = order[j]; order[j] = t; break; } });
     // 바텀 두 명은 연속 두 칸(B2·B3, B4·B5, R1·R2, R4·R5)이 있으면 함께
-    let order = targets.slice();
     const posA = order.findIndex((t) => t.r === "A"), posS = order.findIndex((t) => t.r === "S");
     if (posA >= 0 && posS >= 0) {
       const pairs = pickIdx.map((i, k) => (pickIdx[k + 1] === i + 1 ? k : -1)).filter((k) => k >= 0);
@@ -1326,7 +1348,6 @@ window.Engine = (function () {
     const ourIds = new Set(ROLES.map((r) => sel.slots[r] && sel.slots[r].id).filter(Boolean));
     const threatBans = recommendBan(state, "our").slice(0, 6).map((x) => x.id);
     const lastPick = pickIdx[pickIdx.length - 1];
-    const ban2 = ORDER.findIndex((o, i) => i > firstPick() && o[1] === "ban");   // 2차 밴 시작 칸
     // 상대가 밴할 만한 우리 목표: 상대 밴 추천 상위 5 안에 있고, 우리가 뽑기 전에 상대 밴 차례가 남음
     const enemyBanTop = recommendBan(state, "enemy").slice(0, 5).map((x) => x.id);
     targets.filter((t) => t.goal && enemyBanTop.includes(t.id)).forEach((t) => {

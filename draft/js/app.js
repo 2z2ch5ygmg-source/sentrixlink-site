@@ -304,9 +304,12 @@
       const GP = goalPlanNow();
       const top = GP ? GP.sel : null;
       if (top) {
+        // 금색은 이번 차례(연속 픽 칸) 라인의 조합 주 픽만 — 뒤 차례 라인(예: 19번 탑)은 금색·앞자리에서 뺀다
+        const turnRoles = [];
+        for (let i = S.draft.idx; i < ORDER.length && ORDER[i][0] === side && ORDER[i][1] === "pick"; i++) { const x = GP.steps.find((y) => y.i === i && y.who === "our"); if (x && x.r) turnRoles.push(x.r); }
         ROLES.forEach((r) => {
           const sl = top.slots[r];
-          if (!sl || sl.done || !sl.id) return;
+          if (!sl || sl.done || !sl.id || (turnRoles.length && !turnRoles.includes(r))) return;
           let card = list.find((x) => x.id === sl.id);
           if (!card && !list.some((x) => x.comp)) { card = E.recommendPick(S, "our", r).find((x) => x.id === sl.id); if (card) list = list.slice(0, 5).concat([card]); }
           if (card && !card.comp) card.comp = `${top.short} 추천 조합`;
@@ -314,6 +317,8 @@
         const ps = GP.steps.find((x) => x.i === S.draft.idx && x.who === "our" && x.id);
         const pc = ps && list.find((x) => x.id === ps.id);
         if (pc) pc.comp = "밴픽 설계 픽";
+        // 금색(밴픽 설계 픽 → 조합 주 픽)은 앞에 모아서: 순서 번호와 금색이 따로 놀지 않게
+        list = (pc ? [pc] : []).concat(list.filter((x) => x.comp && x !== pc), list.filter((x) => !x.comp));
       }
     }
     // 우리 밴: 밴픽 설계의 이번 밴을 맨 앞에 금색으로(설계 = 목표 조합의 카운터 막기)
@@ -327,8 +332,10 @@
         card.comp = "밴픽 설계";
       }
     }
-    const dir = E.direction(S, who);
-    const dirTxt = dir ? `${who === "our" ? "우리" : "상대"} 조합 방향 <b>${COMPS[dir].name}</b>` : "";
+    // 우리 쪽 방향 = 추천 조합 카드에서 고른 조합(없으면 1순위) — 밴픽 설계·추천 순서와 같은 조합
+    const GPd = who === "our" ? goalPlanNow() : null;
+    const dir = GPd ? null : E.direction(S, who);
+    const dirTxt = GPd ? `우리 조합 방향 <b>${esc(GPd.sel.name)}</b>${S.ui.scen === GPd.sel.id ? " · 고름" : ""}` : dir ? `${who === "our" ? "우리" : "상대"} 조합 방향 <b>${COMPS[dir].name}</b>` : "";
     const title = `${who === "our" ? "우리팀" : esc(t.name)} ${type === "ban" ? "밴" : "픽"} 차례${who === "enemy" ? " · 예상" : ""}`;
     let body;
     // 라인별 칸: 상대 차례 = 그 라인 선수 예상, 우리 픽 차례 = 그 라인 우리 추천, 우리 밴 차례 = 상대 그 라인 선수가 꺼낼 챔프(밴 후보)
