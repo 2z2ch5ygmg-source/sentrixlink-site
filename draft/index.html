@@ -10,18 +10,19 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap">
-  <link rel="stylesheet" href="css/app.css?v=80">
+  <link rel="stylesheet" href="css/app.css?v=81">
 </head>
 <body>
   <header class="top">
     <div class="top-in">
       <div class="brand">FEARLESS <b>DRAFT</b></div>
       <nav class="tabs" role="tablist" aria-label="섹션">
-        <button class="tab" role="tab" data-tab="our">우리팀 전략</button>
-        <button class="tab" role="tab" data-tab="live">실시간 벤픽</button>
-        <button class="tab" role="tab" data-tab="enemy">상대팀 분석</button>
-        <button class="tab" role="tab" data-tab="vision">시야 공부</button>
-        <button class="tab" role="tab" data-tab="notes">피드백 노트</button>
+        <button class="tab" role="tab" data-tab="our"><span class="t-long">우리팀 전략</span><span class="t-short">전략</span></button>
+        <button class="tab" role="tab" data-tab="live"><span class="t-long">실시간 벤픽</span><span class="t-short">벤픽</span></button>
+        <button class="tab" role="tab" data-tab="enemy"><span class="t-long">상대팀 분석</span><span class="t-short">상대</span></button>
+        <button class="tab t-vision" role="tab" data-tab="vision">시야 공부</button>
+        <button class="tab" role="tab" data-tab="notes"><span class="t-long">피드백 노트</span><span class="t-short">노트</span></button>
+        <button class="tab-more m-only" data-act="mmore" aria-label="메뉴 열기" aria-expanded="false"><svg class="ico-dots" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>
       </nav>
       <div class="top-side">
         <label class="sel">우리팀 <select id="ourSel"></select></label>
@@ -42,19 +43,19 @@
   <datalist id="champList"></datalist>
   <input type="file" id="file" accept="application/json" hidden>
   <footer>챔피언 이미지·이름: Riot Games Data Dragon. 이 사이트는 Riot Games가 보증하거나 후원하지 않습니다. 카운터·조합 판단은 참고용입니다.</footer>
-  <script src="js/config.js?v=80"></script>
-  <script src="js/champions.js?v=80"></script>
-  <script src="js/teams.js?v=80"></script>
-  <script src="js/recent.js?v=80"></script>
-  <script src="js/pro.js?v=80"></script>
-  <script src="js/meta.js?v=80"></script>
-  <script src="js/knowledge.js?v=80"></script>
-  <script src="js/vision.js?v=80"></script>
-  <script src="js/visiongrid.js?v=80"></script>
-  <script src="js/world.js?v=80"></script>
-  <script src="js/macro.js?v=80"></script>
-  <script src="js/practice.js?v=80"></script>
-  <script src="js/engine.js?v=80"></script>
-  <script src="js/app.js?v=80"></script>
+  <script src="js/config.js?v=81"></script>
+  <script src="js/champions.js?v=81"></script>
+  <script src="js/teams.js?v=81"></script>
+  <script src="js/recent.js?v=81"></script>
+  <script src="js/pro.js?v=81"></script>
+  <script src="js/meta.js?v=81"></script>
+  <script src="js/knowledge.js?v=81"></script>
+  <script src="js/vision.js?v=81"></script>
+  <script src="js/visiongrid.js?v=81"></script>
+  <script src="js/world.js?v=81"></script>
+  <script src="js/macro.js?v=81"></script>
+  <script src="js/practice.js?v=81"></script>
+  <script src="js/engine.js?v=81"></script>
+  <script src="js/app.js?v=81"></script>
 </body>
 </html>
