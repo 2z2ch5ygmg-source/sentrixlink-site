@@ -1167,7 +1167,8 @@
     if (!editing) { root.innerHTML = ""; return; }
     const t = team(editing);
     const roles = ROLES.map((r) => { const p = t.players[r]; return `<div class="ed-role" data-r="${r}"><div class="ed-row"><b style="width:40px">${ROLE_KO[r]}</b>
-      <input class="input" style="flex:2" data-f="riot" data-role="${r}" value="${esc(p.riot)}" aria-label="${ROLE_KO[r]} 라이엇 ID">
+      <input class="input ed-acc" style="flex:2" data-f="riot" data-role="${r}" value="${esc(p.riot)}" placeholder="본계정 이름#태그" aria-label="${ROLE_KO[r]} 라이엇 ID">
+      ${[0, 1].map((k) => `<input class="input ed-acc ed-alt" style="flex:1.4" data-alt="${k}" data-role="${r}" value="${esc(((p.alts || altsOf(t.id, r)) || [])[k] || "")}" placeholder="부계정${k + 1}(선택)" aria-label="${ROLE_KO[r]} 부계정 ${k + 1}">`).join("")}
       ${tierPicker(r, p.tier)}
       <input class="input" style="width:70px" type="number" data-f="pts" data-role="${r}" value="${p.pts}" aria-label="점수"></div>
       <div class="row-chips">${poolChips(t, r, { edit: true })}</div>
@@ -1194,27 +1195,120 @@
   }
 
   // 부계정(js/teams.js players[라인].alts): 기록 수집이 그 라인으로 한 판만 본계정 기록에 합친다
-  const altsOf = (tid, r) => { const t = window.SEED_TEAMS.find((x) => x.id === tid); return (t && t.players[r] && t.players[r].alts) || []; };
+  const altsOf = (tid, r) => {
+    const tt = S.teams.find((x) => x.id === tid), mine = tt && tt.players[r] && tt.players[r].alts;   // 엑셀·편집 창에서 넣은 값(본계정 포함 라인당 3개)
+    if (Array.isArray(mine)) return mine.filter(Boolean).slice(0, 2);
+    const t = window.SEED_TEAMS.find((x) => x.id === tid); return (t && t.players[r] && t.players[r].alts) || [];
+  };
 
   // ---------- data menu ----------
-  function exportData() {
-    const blob = new Blob([JSON.stringify({ teams: S.teams, ourTeam: S.ourTeam }, null, 1)], { type: "application/json" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "draft-teams.json"; a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  // ---------- 팀·챔프폭 엑셀 내보내기 · 불러오기 페이지(사용자 요청 11-19) ----------
+  // 엑셀 라이브러리(SheetJS 0.20.3, js/vendor)는 내보내기·불러오기 때만 읽는다(평소 화면 속도 그대로).
+  let XL = null;
+  function loadXLSX() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (XL) return XL;
+    XL = new Promise((ok, no) => {
+      const s = document.createElement("script");
+      s.src = "js/vendor/xlsx-0.20.3.mini.min.js"; s.onload = () => (window.XLSX ? ok(window.XLSX) : no(new Error("엑셀 도구를 읽지 못했습니다")));
+      s.onerror = () => { XL = null; no(new Error("엑셀 도구를 읽지 못했습니다 — 인터넷 연결을 확인해 주세요")); };
+      document.head.appendChild(s);
+    });
+    return XL;
   }
-  function importData(file) {
-    const fr = new FileReader();
-    fr.onload = () => {
-      try {
-        const d = JSON.parse(fr.result);
+  const todayKST = () => new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  async function exportData() {
+    try {
+      const X = await loadXLSX();
+      const rows = window.TeamSheet.toRows(S.teams.filter((t) => !t.solo), S.ourTeam, (id) => (CH[id] ? CH[id].ko : id), todayKST());
+      const ws = X.utils.aoa_to_sheet(rows);
+      ws["!cols"] = [{ wch: 8 }, { wch: 26 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 6 }, { wch: 70 }];
+      ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }];
+      const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, ws, "팀 챔프폭");
+      X.writeFile(wb, `팀챔프폭-${todayKST()}.xlsx`);
+    } catch (e) { alert("내보내기 실패: " + (e.message || e)); }
+  }
+  // 불러오기 페이지 상태: 고른 파일을 읽은 결과와 바뀌는 것
+  const IMP = { file: "", parsed: null, diff: null, msg: "", busy: false, from: "our", json: null };
+  const newTeamId = () => { let id; do { id = "u" + Math.random().toString(36).slice(2, 10); } while (S.teams.some((t) => t.id === id)); return id; };
+  async function readImport(file) {
+    IMP.file = file.name; IMP.parsed = null; IMP.diff = null; IMP.json = null; IMP.msg = ""; IMP.busy = true; render();
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error("파일이 너무 큽니다(2MB까지)");
+      if (/\.json$/i.test(file.name)) {   // 예전 「내보내기」 파일(.json)도 받는다
+        const d = JSON.parse(await file.text());
         if (!Array.isArray(d.teams)) throw new Error("teams 없음");
-        S.teams = d.teams; if (d.ourTeam) S.ourTeam = d.ourTeam; E.setOurTeam(S.ourTeam);
-        if (!S.teams.find((t) => t.id === S.enemyTeam) || S.enemyTeam === S.ourTeam) S.enemyTeam = S.teams.find((t) => t.id !== S.ourTeam).id;
-        save(); render(); alert("불러왔습니다.");
-      } catch (e) { alert("파일 형식이 맞지 않습니다: " + e.message); }
-    };
-    fr.readAsText(file);
+        IMP.json = d;
+      } else {
+        const X = await loadXLSX();
+        const wb = X.read(await file.arrayBuffer(), { type: "array", cellFormula: false, cellHTML: false, cellStyles: false });
+        const name = wb.SheetNames.includes("팀 챔프폭") ? "팀 챔프폭" : wb.SheetNames[0];
+        const rows = X.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: "", raw: false, blankrows: true });
+        IMP.parsed = window.TeamSheet.parse(rows, (n) => { const c = findChamp(n); return c ? c.id : null; });
+        IMP.diff = window.TeamSheet.diff(S.teams, IMP.parsed, S.ourTeam);
+      }
+    } catch (e) { IMP.msg = "읽지 못했습니다: " + (e.message || e); }
+    IMP.busy = false; render();
+  }
+  function applyImport() {
+    if (IMP.json) {
+      const d = IMP.json;
+      S.teams = d.teams; if (d.ourTeam) S.ourTeam = d.ourTeam; E.setOurTeam(S.ourTeam);
+      if (!S.teams.find((t) => t.id === S.enemyTeam) || S.enemyTeam === S.ourTeam) S.enemyTeam = (S.teams.find((t) => t.id !== S.ourTeam && !t.solo) || S.teams[0]).id;
+      save(); IMP.json = null; IMP.msg = "예전 파일(.json)을 그대로 불러왔습니다."; render(); return;
+    }
+    const P = IMP.parsed;
+    if (!P || P.errors.length) return;
+    const res = window.TeamSheet.apply(S.teams, P, S.ourTeam, newTeamId);
+    S.teams = res.teams;
+    if (res.ourId !== S.ourTeam) { S.ourTeam = res.ourId; E.setOurTeam(S.ourTeam); }
+    if (S.enemyTeam === S.ourTeam || !S.teams.find((t) => t.id === S.enemyTeam)) S.enemyTeam = (S.teams.find((t) => t.id !== S.ourTeam && !t.solo) || S.teams[0]).id;
+    save();
+    res.touched.forEach(([tid, r]) => shareChanged(tid, r));   // 챔프폭·티어는 팀 공간에 공유
+    const n = P.teams.length, nNew = IMP.diff.filter((x) => x.isNew).length;
+    IMP.msg = `적용했습니다 — 팀 ${n}개${nNew ? `(새 팀 ${nNew})` : ""}.${SH.url ? " 챔프폭·티어는 팀 공간에 공유됩니다." : ""}`;
+    IMP.parsed = null; IMP.diff = null; IMP.file = "";
+    render();
+  }
+  const accTxt = (a) => (a.length ? a.map(esc).join(" · ") : "없음");
+  const champList = (pool, cls) => pool.map(([id, lv, one]) => `<span class="cp ${cls}">${esc(CH[id] ? CH[id].ko : id)} ${one ? "원챔" : LEVEL_KO[lv]}</span>`).join("");
+  function renderImport() {
+    const ex = [["팀", "수빈이의아이들", "우리팀"], ["라인", "본계정", "부계정1", "부계정2", "티어", "점수", "챔프폭"],
+      ["탑", "loegu#kr1", "", "", "에메랄드 4 24LP", "45", "다리우스:상, 말파이트:상, 케넨:중"], ["정글", "키아나#1234", "장국보#KR1", "", "챌린저 630LP", "90", "키아나:원챔, 누누:중"], ["…", "", "", "", "", "", ""]];
+    const exHtml = `<div class="tbl-wrap"><table class="imp-ex"><tbody>${ex.map((r, i) => `<tr class="${i === 0 ? "t" : i === 1 ? "h" : ""}">${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    let pv = "";
+    if (IMP.busy) pv = `<p class="help">읽는 중…</p>`;
+    else if (IMP.json) pv = `<div class="card imp-pv"><h3>예전 내보내기 파일(.json)</h3><p class="help">팀 ${IMP.json.teams.length}개 · 지금 팀·챔프폭이 이 파일 내용으로 통째로 바뀝니다.</p>
+      <div class="dnav"><button class="btn primary" data-act="impapply">적용</button><button class="btn ghost" data-act="impclear">취소</button></div></div>`;
+    else if (IMP.parsed) {
+      const P = IMP.parsed, D = IMP.diff;
+      const changed = D.filter((x) => x.lanes.length), same = D.length - changed.length;
+      const errs = P.errors.length ? `<div class="imp-errs" role="alert"><b>고칠 곳 ${P.errors.length}개</b> — 고친 뒤 다시 올려 주세요<ul>${P.errors.slice(0, 30).map((e) => `<li>${e.row ? `<span class="pill">${e.row}행</span>` : ""}${esc(e.msg)}</li>`).join("")}</ul></div>` : "";
+      const warns = P.warnings.length ? `<details class="imp-warn"><summary>확인할 것 ${P.warnings.length}개</summary><ul>${P.warnings.map((w) => `<li><span class="pill">${w.row}행</span>${esc(w.msg)}</li>`).join("")}</ul></details>` : "";
+      const lane = (l) => `<li><b>${l.ko}</b>${l.ch.length ? l.ch.map((c) => c.k === "acc" ? `<span class="imp-c">계정 ${accTxt(c.from)} → <b>${accTxt(c.to)}</b></span>`
+        : c.k === "tier" ? `<span class="imp-c">티어 ${esc(c.from || "없음")} → <b>${esc(c.to || "없음")}</b></span>` : c.k === "pts" ? `<span class="imp-c">점수 ${c.from == null ? "-" : c.from} → <b>${c.to}</b></span>`
+        : `<span class="imp-c">챔프폭 ${c.add.length ? `<span class="cpills">${champList(c.add, "good")}</span>` : ""}${c.del.length ? `<span class="cpills">${champList(c.del, "bad")}</span>` : ""}</span>`).join("") : `<span class="help">새로 넣음</span>`}</li>`;
+      const cards = changed.map((x) => `<div class="card imp-team"><h3>${esc(x.name)} ${x.isNew ? `<span class="pill gold">새 팀</span>` : `<span class="pill">바뀜</span>`}${x.becomesOur ? `<span class="pill blue">우리팀으로</span>` : x.our ? `<span class="pill blue">우리팀</span>` : ""}</h3><ul class="imp-lanes">${x.lanes.map(lane).join("")}</ul></div>`).join("");
+      pv = `<section class="imp-pv"><div class="imp-sum"><b>${esc(IMP.file)}</b><span class="help">팀 ${D.length}개 · 바뀌는 팀 ${changed.length}${same ? ` · 그대로 ${same}` : ""}${D.some((x) => x.isNew) ? ` · 새 팀 ${D.filter((x) => x.isNew).length}` : ""}</span></div>
+        ${errs}${warns}${cards || (P.errors.length ? "" : `<p class="help">바뀌는 것이 없습니다.</p>`)}
+        <div class="dnav"><button class="btn primary" data-act="impapply" ${P.errors.length || !changed.length ? "disabled" : ""}>적용</button><button class="btn ghost" data-act="impclear">다시 고르기</button></div></section>`;
+    }
+    return `<div class="section-title"><h2>팀·챔프폭 불러오기</h2><p>엑셀로 팀 명단·계정·챔프폭을 한 번에 넣습니다</p><button class="btn sm" data-act="impback">돌아가기</button></div>
+      <div class="imp">
+        <section class="card imp-how"><h3>엑셀 쓰는 법</h3><ol class="steps">
+          <li>「지금 자료로 양식 내려받기」를 누르면 지금 팀·챔프폭이 채워진 엑셀이 받아집니다. 그 파일을 고쳐 쓰면 됩니다.</li>
+          <li>팀마다 <b>「팀 | 팀 이름 | 우리팀 또는 상대」</b> 줄 하나, 그 아래 <b>라인 5줄</b>(탑·정글·미드·원딜·서폿).</li>
+          <li><b>계정</b>: 본계정·부계정1·부계정2 칸에 <code>이름#태그</code>. 라인당 3개까지, 부계정은 그 라인으로 한 판만 기록에 합칩니다.</li>
+          <li><b>챔프폭</b>: <code>챔프이름:상</code>을 쉼표로 이어서. 숙련도는 상·중·하·원챔, 안 쓰면 중. 한글 이름·줄임말·영어 이름 모두 됩니다.</li>
+          <li>저장한 엑셀을 아래에 올리면 <b>바뀌는 것을 먼저 보여 주고</b>, 「적용」을 눌러야 바뀝니다.</li></ol>
+          ${exHtml}
+          <ul class="plain help"><li>팀은 <b>이름</b>으로 맞춥니다 — 같은 이름이면 그 팀을 고치고, 처음 보는 이름이면 새 팀을 만듭니다. 파일에 없는 팀·라인은 지우지 않고 그대로 둡니다.</li>
+          <li>챔프폭·티어는 팀 공간 팀원에게 공유됩니다. 계정은 이 브라우저에 저장되고, 새 계정의 전적은 서버 수집이 그 팀을 알게 된 뒤(다음 단계)부터 채워집니다.</li></ul>
+          <div class="dnav"><button class="btn" data-act="export">지금 자료로 양식 내려받기</button></div></section>
+        <section class="card imp-up"><h3>엑셀 올리기</h3>
+          <label class="imp-drop" id="impDrop"><input type="file" id="impFile" accept=".xlsx,.xls,.json" hidden><b>엑셀 파일 고르기</b><span class="help">또는 여기로 끌어다 놓기 · .xlsx (예전 .json도 됨)</span></label>
+          ${IMP.msg ? `<p class="help imp-msg" role="status">${esc(IMP.msg)}</p>` : ""}${pv}</section>
+      </div>`;
   }
 
   // ---------- actions ----------
@@ -1896,7 +1990,7 @@
     const pos = keepFocus ? document.activeElement.selectionStart : 0;
     const mob = MOB.matches, mobV = mob && MOB_VIEW[S.tab];
     document.body.classList.toggle("mob", mob); document.body.classList.toggle("mv-on", !!mobV);
-    v.innerHTML = mobV ? mobV() : S.tab === "live" ? renderLive() : S.tab === "our" ? renderOur() : S.tab === "vision" ? renderVision() : S.tab === "notes" ? renderNotes() : renderEnemy();
+    v.innerHTML = mobV ? mobV() : S.tab === "live" ? renderLive() : S.tab === "our" ? renderOur() : S.tab === "vision" ? renderVision() : S.tab === "notes" ? renderNotes() : S.tab === "import" ? renderImport() : renderEnemy();
     // 휴대폰: 챔프 고르기·「⋯」 메뉴는 화면 아래 시트로
     const ms = document.getElementById("msheet") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "msheet" }));
     ms.innerHTML = mob ? (S.tab === "live" && S.ui.sheet ? renderPickM() : "") + (MV.more ? renderMoreM() : "") : "";
@@ -2035,8 +2129,11 @@
       case "cycle": { const p = team(el.dataset.team).players[el.dataset.role]; const e = p.pool.find((x) => x[0] === el.dataset.id);
         if (e[2]) { e[1] = 3; e.length = 2; } else if (e[1] === 1) { e[1] = 3; e[2] = true; } else e[1] = e[1] - 1;
         save(); shareChanged(el.dataset.team, el.dataset.role); renderEditor(); render(); break; }
-      case "export": MV.more = false; exportData(); render(); break;
-      case "import": MV.more = false; render(); document.getElementById("file").click(); break;
+      case "export": MV.more = false; { const dm = document.getElementById("dataMenu"); if (dm) dm.hidden = true; } exportData(); render(); break;
+      case "import": MV.more = false; IMP.from = S.tab === "import" ? IMP.from : S.tab; S.tab = "import"; { const dm = document.getElementById("dataMenu"); if (dm) dm.hidden = true; } render(); window.scrollTo(0, 0); break;
+      case "impback": S.tab = IMP.from && IMP.from !== "import" ? IMP.from : "our"; render(); window.scrollTo(0, 0); break;
+      case "impapply": applyImport(); break;
+      case "impclear": IMP.parsed = null; IMP.diff = null; IMP.json = null; IMP.file = ""; IMP.msg = ""; render(); break;
       case "wipe": if (confirm("모든 입력(챔프폭·밴픽·피어리스)을 처음 상태로 되돌릴까요?")) { S = fresh(); E.setOurTeam(S.ourTeam); save(); render(); } break;
       case "data": { const m = document.getElementById("dataMenu"); m.hidden = !m.hidden; break; }
     }
@@ -2075,11 +2172,19 @@
     if (near) d.tr.scrollTo({ left: near.offsetLeft - base, behavior: "smooth" });
   });
   document.addEventListener("click", (ev) => { if (dragEat) { ev.stopPropagation(); ev.preventDefault(); dragEat = false; } }, true);
+  document.addEventListener("dragover", (ev) => { const d = ev.target.closest && ev.target.closest("#impDrop"); if (d) { ev.preventDefault(); d.classList.add("over"); } });
+  document.addEventListener("dragleave", (ev) => { const d = ev.target.closest && ev.target.closest("#impDrop"); if (d) d.classList.remove("over"); });
+  document.addEventListener("drop", (ev) => { const d = ev.target.closest && ev.target.closest("#impDrop"); if (!d) return; ev.preventDefault(); d.classList.remove("over"); const f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) readImport(f); });
   document.addEventListener("input", (ev) => {
     const t = ev.target;
     if (t.id === "q") { S.ui.q = t.value; const box = document.getElementById("champs"); if (box) box.innerHTML = champButtons(); else render();
       const sh = document.querySelector(".mv-pick"); if (sh) sh.classList.toggle("searching", !!t.value.trim()); return; }
     if (t.dataset && t.dataset.tf === "lp" && editing) { setTierFrom(t); return; }
+    if (t.dataset && t.dataset.alt != null && editing) {
+      const p = team(editing).players[t.dataset.role];
+      const a = (p.alts || altsOf(editing, t.dataset.role)).slice(0, 2); while (a.length < 2) a.push("");
+      a[Number(t.dataset.alt)] = t.value.replace(/\s*#\s*/, "#").trim(); p.alts = a.filter(Boolean); save(); return;
+    }
     if (t.dataset && t.dataset.f && editing) {
       const p = team(editing).players[t.dataset.role];
       p[t.dataset.f] = t.dataset.f === "pts" ? Number(t.value) || 0 : t.value; save();
@@ -2091,7 +2196,7 @@
     else if (t.dataset && t.dataset.act === "nfc") { S.ui.nf = { ...(S.ui.nf || {}), champ: t.value }; render(); }
     else if (t.id === "enemySel" || t.id === "enemySelM" || t.id === "enemyPick") { S.enemyTeam = t.value; syncQueue(true); save(); render(); }
     else if (t.dataset && t.dataset.act === "role") setRole(Number(t.dataset.i), t.value);
-    else if (t.id === "file" && t.files[0]) { importData(t.files[0]); t.value = ""; }
+    else if (t.id === "impFile" && t.files[0]) { readImport(t.files[0]); t.value = ""; }
     else if (t.dataset && t.dataset.tf && editing) { const r = t.dataset.role, k = t.dataset.tf; setTierFrom(t); renderEditor(); render();
       const next = document.querySelector(`#modal [data-role="${r}"][data-tf="${k === "t" ? "d" : k}"]`) || document.querySelector(`#modal [data-role="${r}"][data-tf="${k === "t" ? "lp" : k}"]`) || document.querySelector(`#modal [data-role="${r}"][data-tf="t"]`); if (next) next.focus(); }
     else if (t.dataset && t.dataset.f && editing) render();

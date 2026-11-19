@@ -947,6 +947,29 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sv-g.focus, tr.focus td { background: var(--gold-bg); }
 .sv-g.focus { border-radius: 8px; padding: 6px; outline: 1px solid rgba(232, 182, 76, 0.5); }
 
+/* ---------- 팀·챔프폭 불러오기 페이지 (2026-11-19) ---------- */
+.imp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.imp .card h3 { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.imp-how .steps { margin: 0 0 12px; }
+.imp-how code { font-family: var(--font-num); font-size: 12px; background: var(--panel2); border-radius: 4px; padding: 1px 5px; }
+.imp-ex { border-collapse: collapse; font-size: 12px; margin: 0 0 10px; width: 100%; }
+.imp-ex td { border: 1px solid var(--line); padding: 4px 6px; white-space: nowrap; }
+.imp-ex tr.t td { background: var(--gold-bg); color: var(--gold); font-weight: 700; } .imp-ex tr.h td { background: var(--panel2); color: var(--muted); font-weight: 700; }
+.imp-drop { display: grid; justify-items: center; gap: 6px; padding: 28px 16px; border: 2px dashed var(--line); border-radius: 12px; cursor: pointer; text-align: center; }
+.imp-drop:hover, .imp-drop.over { border-color: var(--gold); background: var(--gold-bg); }
+.imp-drop:focus-within { outline: 2px solid var(--gold); outline-offset: 2px; }
+.imp-pv { display: grid; gap: 10px; margin-top: 12px; }
+.imp-sum { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.imp-errs { border: 1px solid rgba(255, 90, 99, 0.5); background: var(--red-bg); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.imp-errs ul, .imp-warn ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.imp-errs .pill, .imp-warn .pill { margin-right: 6px; }
+.imp-warn { font-size: 13px; } .imp-warn summary { cursor: pointer; min-height: 32px; }
+.imp-team { padding: 10px 12px; } .imp-team h3 { font-size: 14px; }
+.imp-lanes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 12px; }
+.imp-lanes li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; } .imp-lanes li > b { width: 34px; color: var(--muted); }
+.imp-c { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; } .imp-c .cpills { justify-content: flex-start; }
+@media (max-width: 900px) { .imp { grid-template-columns: minmax(0, 1fr); } }
+
 /* ---------- 주소 이전 막대 (2026-11-19) ---------- */
 .move-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; padding: 8px 16px; background: var(--gold-bg); border-bottom: 1px solid rgba(232, 182, 76, 0.45); color: var(--text); font-size: 13px; }
 .move-bar b { color: var(--gold); }
@@ -1233,6 +1256,7 @@ button.gp-t { cursor: pointer; }
   .modal[data-edr] .ed-role { border-top: 0; }
   .modal[data-edr] .ed-row > b { display: none; }
   .modal[data-edr] .ed-row > [data-f="riot"] { flex: 1 1 100% !important; }
+  .modal[data-edr] .ed-row > .ed-alt { flex: 1 1 calc(50% - 4px) !important; }
   .modal[data-edr] .ed-row > [data-tf="t"] { flex: 1 1 120px !important; }
   .modal[data-edr] .ed-row > [data-add] { flex: 1 1 100% !important; }
   .modal[data-edr] .ed-row > [data-addlv] { flex: 1; }
