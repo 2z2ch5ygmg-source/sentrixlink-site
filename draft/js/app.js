@@ -881,7 +881,7 @@
     try { const R = window.RECENT; const r = await fetch(`js/practice-games.json?t=${encodeURIComponent((R && R.at) || Date.now())}`, { cache: "no-store" }); if (r.ok) PG = await r.json(); } catch (e) { /* 없으면 처음부터 */ }
     return PG;
   }
-  let pTimer = null, pCb = null;   // pCb: 우리팀 「갱신하기」가 이어서 부를 때 {progress(msg), done(msg)}
+  let pTimer = null, pCb = null, NIGHTSTAT = null;   // NIGHTSTAT: 0시 수집 랭크 집계(새 경기를 더하기 전 원본)   // pCb: 우리팀 「갱신하기」가 이어서 부를 때 {progress(msg), done(msg)}
   async function refreshPractice(auto, cb) {
     if (cb) pCb = cb;
     const t = E.teamOf(S, "enemy"), R = window.RECENT;
@@ -917,9 +917,20 @@
         P.live = { at: j.at, acct: j.players, since: j.since };
         // 상대 「함께 한 경기」도 같은 경기로(0시 수집기와 같은 규칙, tools/test-groups-from-games.cjs)
         const gr = window.Practice.groups(games, roles);
-        window.RECENT = { ...RR, practice: { ...(RR.practice || {}), [t.id]: P }, groups: { ...(RR.groups || {}), [t.id]: gr }, live: { ...(RR.live || {}), [t.id]: { at: j.at, pending: 0 } } };
+        // 시즌 전적·11/10 이후 랭크 전적(챔프폭 점수의 바탕): 0시 집계에 그 뒤 새 랭크 경기만 더함. 같은 날 다시 눌러도 0시 값에서 다시 더해 두 번 세지 않음
+        let season = RR.season, players = RR.players, ranked = 0;
+        if (base) {
+          if (!NIGHTSTAT || NIGHTSTAT.at !== RR.at) NIGHTSTAT = { at: RR.at, season: {}, players: {} };
+          if (!NIGHTSTAT.season[t.id]) { NIGHTSTAT.season[t.id] = (RR.season || {})[t.id] || null; NIGHTSTAT.players[t.id] = (RR.players || {})[t.id] || null; }
+          const baseIds = new Set(base.teams[t.id].map((g) => g.id)), fresh = j.games.filter((g) => !baseIds.has(g.id));
+          const ns = NIGHTSTAT.season[t.id], np = NIGHTSTAT.players[t.id];
+          const addAll = (src, kind) => src && Object.fromEntries(Object.entries(src).map(([r, x]) => [r, roles.includes(r) ? window.Practice.addRanked(x, fresh, r, kind) : x]));
+          if (ns) { season = { ...(RR.season || {}), [t.id]: addAll(ns, "season") }; ranked = ROLES.reduce((n, r) => n + ((season[t.id][r] && season[t.id][r].added) || 0), 0); }
+          if (np) players = { ...(RR.players || {}), [t.id]: addAll(np, "recent") };
+        }
+        window.RECENT = { ...RR, season, players, practice: { ...(RR.practice || {}), [t.id]: P }, groups: { ...(RR.groups || {}), [t.id]: gr }, live: { ...(RR.live || {}), [t.id]: { at: j.at, pending: 0, ranked } } };
         const add = (P.teamGames.n || 0) - ((before && before.teamGames && before.teamGames.n) || 0);
-        done(`실시간 ${j.at} · 상대 경기 ${games.length}개${base ? `(0시 이후 새 경기 ${j.games.length})` : ""}${add > 0 ? ` · 팀원끼리 한 판 ${add}판 늘어남` : ""}`);
+        done(`실시간 ${j.at} · 상대 경기 ${games.length}개${base ? `(0시 이후 새 경기 ${j.games.length}${ranked ? ` · 랭크 ${ranked}판 전적에 더함` : ""})` : ""}${add > 0 ? ` · 팀원끼리 한 판 ${add}판 늘어남` : ""}`);
       })
       .catch(() => { clearTimeout(timer); done("실시간 조회 실패(연결 안 됨) — 매일 0시 자료 그대로"); });
   }

@@ -145,5 +145,34 @@
     return out.sort((a, b) => cmp(b.date, a.date));
   }
 
-  root.Practice = { compute, groups, gameWeight, RECENT_DAYS };
+  // 랭크 전적 더하기(사용자 요청 11-19: 갱신하기로 상대 시즌 전적·챔프폭도): 0시 수집 집계(recent.py season·players)에
+  // 그 뒤 새 랭크 경기(솔랭 420·자랭 440)만 더한다. Riot 추가 호출 없음 — /games가 이미 가져온 경기.
+  //  kind "season": {n, w, roleN, champs:[{id,g,w,ml,mp,rr}], tier}  /  kind "recent": {n, w, roles, last, champs:[{id,g,w,rr}]}
+  // 티어(LP)·숙련도 점수는 따로 조회해야 해서 0시 값 그대로.
+  const RANKED = new Set([420, 440]);
+  function addRanked(base, games, role, kind) {
+    if (!base || base.error) return base;
+    const out = JSON.parse(JSON.stringify(base));
+    const rk = kind === "season" ? "roleN" : "roles";
+    out.n = out.n || 0; out.w = out.w || 0; out[rk] = out[rk] || {}; out.champs = out.champs || [];
+    let added = 0, last = 0;
+    (games || []).forEach((g) => {
+      const x = g.p && g.p[role];
+      if (!x || !RANKED.has(g.q) || !x[2]) return;
+      const win = x[1] ? 1 : 0, c = x[2], pos = x[3];
+      added++; out.n++; out.w += win; last = Math.max(last, g.t || 0);
+      let e = out.champs.find((y) => y.id === c);
+      if (!e) { e = kind === "season" ? { id: c, g: 0, w: 0, ml: 0, mp: 0, rr: {} } : { id: c, g: 0, w: 0, rr: {} }; out.champs.push(e); }
+      e.g++; e.w += win;
+      if (pos) { e.rr[pos] = e.rr[pos] || [0, 0]; e.rr[pos][0]++; e.rr[pos][1] += win; out[rk][pos] = (out[rk][pos] || 0) + 1; }
+    });
+    if (!added) return base;
+    out.champs.sort((a, b) => b.g - a.g || (b.mp || 0) - (a.mp || 0));
+    if (kind === "season") out.champs = out.champs.slice(0, 20);
+    if (kind === "recent" && last) { const d = new Date(last + 9 * 3600e3), mmdd = `${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`; if (!out.last || mmdd > out.last) out.last = mmdd; }
+    out.added = (base.added || 0) + added;
+    return out;
+  }
+
+  root.Practice = { compute, groups, addRanked, gameWeight, RECENT_DAYS };
 })(typeof window !== "undefined" ? window : globalThis);
