@@ -1,4 +1,44 @@
 (function () {
+  // ---------- 주소 이전(11-19: sentrixlink.kr/draft → lolban.com) ----------
+  // 브라우저 저장은 주소마다 따로라, 옛 주소에서 「가지고 이동」을 누르면 이 브라우저 자료(설정·저장 밴픽·팀 공간 열쇠)를
+  // gzip → base64url로 주소 # 뒤(#move=…)에 실어 새 주소로 보낸다. # 뒤는 서버로 가지 않는다. 새 주소는 받아서 저장하고 # 를 지운 뒤 다시 연다.
+  const MOVE_KEYS = ["sentrix-draft.v1", "sentrix-draft.saved.v1", "sentrix-draft.space.v1"];
+  const b64u = (bytes) => { let s = ""; bytes.forEach((b) => (s += String.fromCharCode(b))); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); };
+  const unb64u = (t) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  async function packMove() {
+    const data = {}; MOVE_KEYS.forEach((k) => { try { const v = localStorage.getItem(k); if (v) data[k] = v; } catch (e) { /* 무시 */ } });
+    const raw = new TextEncoder().encode(JSON.stringify({ v: 1, data }));
+    if (typeof CompressionStream !== "function") return "j" + b64u(raw);
+    const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
+    return "z" + b64u(z);
+  }
+  async function unpackMove(t) {
+    const bytes = unb64u(t.slice(1));
+    const raw = t[0] === "z" ? new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer()) : bytes;
+    const d = JSON.parse(new TextDecoder().decode(raw));
+    if (!d || d.v !== 1 || typeof d.data !== "object") throw new Error("형식");
+    return d.data;
+  }
+  {
+    const mv = location.hash.match(/^#move=([zj][A-Za-z0-9_-]{8,})$/);
+    if (mv) {
+      unpackMove(mv[1]).then((data) => {
+        const had = (() => { try { return !!localStorage.getItem(MOVE_KEYS[0]); } catch (e) { return false; } })();
+        if (!had || confirm("이 주소에 이미 저장된 자료가 있습니다. 옛 주소에서 가져온 자료로 바꿀까요?")) {
+          MOVE_KEYS.forEach((k) => { try { if (data[k]) localStorage.setItem(k, data[k]); } catch (e) { /* 무시 */ } });
+        }
+      }).catch(() => alert("옮겨 온 자료를 읽지 못했습니다. 옛 주소에서 다시 눌러 주세요."))
+        .finally(() => location.replace(location.pathname + location.search));
+      return;   // 다시 열 때까지 그리지 않음
+    }
+  }
+  if (window.NEW_HOME && /(^|\.)sentrixlink\.kr$/.test(location.hostname)) {
+    const bar = document.createElement("div");
+    bar.className = "move-bar"; bar.setAttribute("role", "region"); bar.setAttribute("aria-label", "주소 이전");
+    bar.innerHTML = `<span>밴픽 보드 주소가 <b>${window.NEW_HOME.replace(/^https?:\/\//, "").replace(/\/$/, "")}</b>로 바뀌었습니다.</span><button class="btn sm primary" type="button">이 브라우저 자료 가지고 이동</button>`;
+    bar.querySelector("button").addEventListener("click", async () => { location.href = `${window.NEW_HOME}#move=${await packMove()}`; });
+    document.body.prepend(bar);
+  }
   const { ROLES, ROLE_KO, COMPS, ORDER, LEVEL_KO, STYLE_KO } = window.KB;
   const E = window.Engine;
   // 휴대폰 화면(폭 760px 이하): 화면마다 따로 그린다(PC 화면은 그대로)

@@ -5,3 +5,5 @@ window.SELF_EVAL_CSV_URL = "";
 window.RECENT_LIVE_URL = "https://fearless-draft-recent.fearless-draft-worker.workers.dev";
 // 팀 공유 자기평가 저장소: 같은 Worker의 /selfeval. 비어 있으면 이 브라우저에만 저장한다.
 window.SELF_EVAL_SHARE_URL = window.RECENT_LIVE_URL;
+// 새 주소(11-19 도메인 이전): 옛 주소(sentrixlink.kr/draft)에서 「이 브라우저 자료 가지고 이동」 막대를 띄운다. 새 주소가 열리기 전에는 비워 둔다.
+window.NEW_HOME = "";
