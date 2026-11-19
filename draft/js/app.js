@@ -301,17 +301,30 @@
     let list = type === "ban" ? E.recommendBan(S, who) : E.recommendPick(S, who);
     // 우리 픽: 추천 조합 1순위가 남은 라인에 쓰는 챔프도 같은 금색으로(이름표 「OO 추천 조합」). 6장 안에 없으면 마지막 칸에 넣는다
     if (type === "pick" && who === "our") {
-      const scs = E.scenarios(S, "our", true) || [];
-      const top = scs.find((x) => x.key === S.ui.scen) || scs[0];
+      const GP = goalPlanNow();
+      const top = GP ? GP.sel : null;
       if (top) {
-        const C = COMPS[top.key];
         ROLES.forEach((r) => {
           const sl = top.slots[r];
           if (!sl || sl.done || !sl.id) return;
           let card = list.find((x) => x.id === sl.id);
           if (!card && !list.some((x) => x.comp)) { card = E.recommendPick(S, "our", r).find((x) => x.id === sl.id); if (card) list = list.slice(0, 5).concat([card]); }
-          if (card && !card.comp) card.comp = `${C.short} 추천 조합`;
+          if (card && !card.comp) card.comp = `${top.short} 추천 조합`;
         });
+        const ps = GP.steps.find((x) => x.i === S.draft.idx && x.who === "our" && x.id);
+        const pc = ps && list.find((x) => x.id === ps.id);
+        if (pc) pc.comp = "밴픽 설계 픽";
+      }
+    }
+    // 우리 밴: 밴픽 설계의 이번 밴을 맨 앞에 금색으로(설계 = 목표 조합의 카운터 막기)
+    if (type === "ban" && who === "our") {
+      const GP = goalPlanNow();
+      const ps = GP && GP.steps.find((x) => x.i === S.draft.idx && x.who === "our" && x.id);
+      if (ps) {
+        let card = list.find((x) => x.id === ps.id);
+        if (!card) card = { id: ps.id, tgt: ps.er, reasons: [{ t: "밴픽 설계", d: ps.notes.map((x) => x.t).join(" · "), v: 1 }] };
+        list = [card].concat(list.filter((x) => x !== card)).slice(0, 6);
+        card.comp = "밴픽 설계";
       }
     }
     const dir = E.direction(S, who);
@@ -499,30 +512,61 @@
   const cutChips = (lost) => (lost || []).map((l) => `<span class="chip cut" title="${esc(CH[l.id].ko)} ${esc(l.st)}">${icon(l.id, "sm")}<s>${esc(CH[l.id].ko)}</s><span class="st">${esc(l.st)}</span></span>`).join("");
   // 큰 그림: 1차 밴 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 (픽마다 갱신, 칸마다 대체 픽)
   // 실시간 추천 조합: 「우리팀 전략」에 있던 조합 카드와 같은 모양, 밴픽마다 남은 챔프·확정 픽으로 다시 짠다
+  // ---- 목표 챔프 · 밴픽 설계(사용자 요청 11-19) ----
+  // 「블리츠 뽑아보자」처럼 목표 챔프를 넣으면 추천 조합이 그 챔프를 넣고 짜이고, 고른 조합(없으면 1순위)을 만드는 우리 남은 밴·픽 순서를 보여 준다.
+  let GPC;   // 한 번 그릴 때 한 번만 계산
+  const goalPlanNow = () => (GPC === undefined ? (GPC = E.goalPlan(S)) : GPC);
+  const XICO = `<svg class="ico-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  function goalBar() {
+    const g = ((S.ui.goal && S.ui.goal.ids) || []).filter((id) => CH[id]);
+    const chips = g.map((id) => `<span class="chip gl-chip">${icon(id, "sm")}${esc(CH[id].ko)}<button class="gl-x" data-act="goaldel" data-id="${id}" aria-label="${esc(CH[id].ko)} 목표에서 빼기">${XICO}</button></span>`).join("");
+    return `<div class="gl-bar"><span class="gl-l">목표 챔프</span>${chips}<span class="gl-add"><input class="input" id="goalIn" list="champList" placeholder="${g.length ? "더 넣기" : "뽑고 싶은 챔프 (예: 블리츠)"}" autocomplete="off" enterkeyhint="done" aria-label="목표 챔프 넣기"><button class="btn sm" data-act="goaladd">넣기</button></span>
+      ${g.length ? `<button class="btn sm ghost" data-act="goalclr">비우기</button>` : `<span class="help gl-help">넣으면 그 챔프를 뽑는 밴·픽 순서를 짭니다</span>`}<span class="help" id="goalMsg" role="status"></span></div>`;
+  }
+  function goalPlanHtml(P) {
+    const st = curStep();
+    const tile = (s) => {
+      const now = s.i === S.draft.idx;
+      if (s.who === "enemy") return `<li class="gp-t en ${s.kind} ${now ? "now" : ""} ${s.risk ? "risk" : ""}" title="${s.i + 1}. 상대 ${s.kind === "ban" ? "밴" : "픽"}${s.risk ? ` · ${esc(CH[s.risk].ko)}를 먼저 가져갈 수 있음` : ""}"><span class="gp-n">${s.i + 1}</span><span class="gp-k">상대<br>${s.kind === "ban" ? "밴" : "픽"}</span>${s.risk ? icon(s.risk, "sm") : ""}</li>`;
+      const head = `<span class="gp-n">${s.i + 1}</span><span class="gp-k">${s.kind === "ban" ? "우리 밴" : `우리 픽${s.r ? ` · ${ROLE_KO[s.r]}` : ""}`}</span>`;
+      if (!s.id) return `<li class="gp-t our ${s.kind} ${now ? "now" : ""}">${head}<span class="dim">-</span></li>`;
+      const body = `${head}${icon(s.id, "gp")}<b>${esc(CH[s.id].ko)}</b>${pillsHtml(s.notes.slice(0, 2))}`;
+      // 지금 차례 칸은 눌러서 바로 기록
+      const act = now && st ? `<button class="gp-t our ${s.kind} now ${s.goal ? "goal" : ""}" data-act="pick" data-id="${s.id}" ${s.r ? `data-role="${s.r}"` : ""} aria-label="${s.kind === "ban" ? "밴" : "픽"} ${esc(CH[s.id].ko)} 기록">${body}</button>` : "";
+      return act ? `<li class="gp-li">${act}</li>` : `<li class="gp-t our ${s.kind} ${s.goal ? "goal" : ""}">${body}</li>`;
+    };
+    const warn = P.lost.map((l) => `<span class="cp bad">${esc(CH[l.id].ko)} ${esc(l.st)}</span>`).concat(P.risks.map((r) => `<span class="cp bad" title="${esc(r.d)}">${esc(r.t)}</span>`)).join("");
+    return `<div class="gp"><div class="gp-h"><b>밴픽 설계</b><span class="help">${esc(P.sel.name)} · ${P.side === "B" ? "블루" : "레드"} 진영 · 남은 차례</span>${warn ? `<span class="cpills gp-w">${warn}</span>` : ""}</div>
+      <ol class="gp-strip drag-x" id="gpStrip" aria-label="우리 남은 밴·픽 순서">${P.steps.map(tile).join("")}</ol></div>`;
+  }
+  // 실시간 추천 조합: 「우리팀 전략」에 있던 조합 카드와 같은 모양, 밴픽마다 남은 챔프·확정 픽으로 다시 짠다
+  // 조합 유형 카드 + 숙련도 우선·바텀 세트·팀 경기 카드를 옆으로 끌어서 넘긴다(휴대폰은 밀어서)
   function renderLiveComps() {
     const t = team(S.ourTeam);
     if (!t || !E.teamHasPools(t)) return "";
     const n = E.picks(S, "our").length;
     if (n >= 5) { const fin = E.liveComps(S)[0]; return fin ? `<section class="live-comps"><div class="section-title"><h2>우리 조합</h2><p>픽 완료 · 운영 방향은 「운영 전략」 탭</p></div>
       <div class="comps">${compCard(fin, null, `<span class="pill gold">확정</span>`)}</div></section>` : ""; }
-    // 추천 순서와 같은 계산(scenarios): 상대 라이너 상성·바텀 세트·사일러스·상대 조합 방향까지 반영, 라인마다 대체 픽
     const list = E.scenarios(S, "our", true) || [];
-    if (!list.length) return "";
+    if (!list.length) return goalBar();
+    const GP = goalPlanNow();
+    const selId = GP ? GP.sel.id : "";
     const st = curStep();
     const ourTurn = st && st[1] === "pick" && E.whoOfSide(S, st[0]) === "our";
     const chip = (id, r) => `<button class="chip pp-c" ${ourTurn ? `data-act="pick" data-id="${id}" data-role="${r}"` : "disabled"}>${icon(id, "sm")}${esc(CH[id].ko)}</button>`;
     const cards = list.map((sc, i) => {
-      const c = { key: sc.key, slots: Object.fromEntries(ROLES.filter((r) => sc.slots[r] && sc.slots[r].id).map((r) => { const x = sc.slots[r]; return [r, { id: x.id, lv: x.lv || 0, fixed: !!x.done }]; })) };
-      const alts = ROLES.filter((r) => sc.slots[r] && !sc.slots[r].done && sc.slots[r].alts && sc.slots[r].alts.length)
+      const c = { key: sc.key, slots: Object.fromEntries(ROLES.filter((r) => sc.slots[r] && sc.slots[r].id).map((r) => { const x = sc.slots[r]; return [r, { id: x.id, lv: x.lv || 0, fixed: !!x.done, goal: !!x.goal }]; })) };
+      const alts = ROLES.filter((r) => sc.slots[r] && !sc.slots[r].done && !sc.slots[r].goal && sc.slots[r].alts && sc.slots[r].alts.length)
         .map((r) => `<div class="lc-alt"><span class="pp-role">${ROLE_KO[r]}</span>${sc.slots[r].alts.map((a) => chip(a.id, r)).join("")}</div>`).join("");
-      const on = S.ui.scen === sc.key;
+      const on = selId === sc.id;
       const why = sc.why.map((w) => `<span class="cp ${/잡는 방향/.test(w) ? "good" : "bad"}">${esc(w.replace(/^상대 (\S+) 조합을 잡는 방향$/, "$1 상대 유리").replace(/ — .*$/, ""))}</span>`).join("");
-      const extra = `${why ? `<div class="cpills lc-why">${why}</div>` : ""}${alts ? `<div class="lc-alts"><span class="help">대체 픽</span>${alts}</div>` : ""}
-        <div class="dnav"><button class="btn sm ${on ? "primary" : "ghost"}" data-act="scen" data-k="${sc.key}" aria-pressed="${on}">${on ? "추천 순서에 반영 중" : "이 조합 기준으로 추천"}</button></div>`;
-      return compCard(c, null, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>`, false, false, extra);
+      const extra = `<p class="ct-win">${esc(COMPS[sc.key].win)}</p>${why ? `<div class="cpills lc-why">${why}</div>` : ""}${alts ? `<div class="lc-alts"><span class="help">대체 픽</span>${alts}</div>` : ""}
+        <div class="dnav"><button class="btn sm ${on ? "primary" : "ghost"}" data-act="scen" data-k="${sc.id}" aria-pressed="${S.ui.scen === sc.id}">${on ? "이 조합으로 밴픽 설계 중" : "이 조합으로 밴픽 설계"}</button></div>`;
+      return `<div class="ct-card ${on ? "on" : ""}">${compCard(c, sc.name, `<span class="pill ${i === 0 ? "gold" : ""}">${i === 0 ? "주력" : "대안 " + i}</span>${sc.tag ? `<span class="pill">${esc(sc.tag)}</span>` : ""}`, true, false, extra)}</div>`;
     }).join("");
-    return `<section class="live-comps"><div class="section-title"><h2>추천 조합</h2><p>${n ? `우리 픽 ${n}개 고정 · ` : ""}남은 챔프로 다시 짠 조합 · 추천 순서와 같은 계산 · 픽마다 갱신</p></div>
-      <div class="comps">${cards}</div></section>`;
+    return `<section class="live-comps">${goalBar()}${GP ? goalPlanHtml(GP) : ""}
+      <div class="section-title"><h2>추천 조합</h2><p>${n ? `우리 픽 ${n}개 고정 · ` : ""}${list.length}개 · 옆으로 끌어서 넘김 · 고른 조합으로 위 밴픽 설계가 바뀝니다</p></div>
+      <div class="ctrack-wrap"><button class="ct-nav prev" data-act="ctnav" data-d="-1" aria-label="이전 조합">‹</button><div class="comps ctrack drag-x" id="ctrack">${cards}</div><button class="ct-nav next" data-act="ctnav" data-d="1" aria-label="다음 조합">›</button></div></section>`;
   }
   // 실시간 벤픽 아래 섹션을 탭 하나로(시안 A): 한 번에 하나만 보여 스크롤을 줄인다.
   // 차례에 맞춰 자동으로 고르고(밴 → 요주의 인물, 우리 픽 → 추천 조합, 상대 픽 → 상대 연습 픽, 끝 → 운영 전략), 직접 누르면 그 차례 동안 유지
@@ -685,7 +729,7 @@
   function compCard(c, title, sub, compact, enemy, extra) {
     const C = COMPS[c.key];
     const five = ROLES.map((r) => { const s = c.slots[r]; if (!s) return `<div class="s"><span class="ic"></span></div>`;
-      return `<div class="s ${s.suggest ? "suggest" : ""} ${s.fixed ? "fixed" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.fixed ? `<span class="lv lvone">픽 완료</span>` : s.suggest ? `<span class="lv lv1">새로</span>` : lvTag({ lv: Math.min(3, Math.round(s.lv)), one: s.lv > 3 })}</div>`; }).join("");
+      return `<div class="s ${s.suggest ? "suggest" : ""} ${s.fixed ? "fixed" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.fixed ? `<span class="lv lvone">픽 완료</span>` : s.goal ? `<span class="lv lv3">목표</span>` : s.suggest ? `<span class="lv lv1">새로</span>` : lvTag({ lv: Math.max(1, Math.min(3, Math.round(s.lv))), one: s.lv > 3 })}</div>`; }).join("");
     const filled = ROLES.map((r) => c.slots[r]).filter(Boolean);
     const first = filled.filter((s) => !s.suggest).sort((a, b) => b.lv - a.lv || CH[b.id].pos.length - CH[a.id].pos.length)[0];
     const last = filled.filter((s) => (window.KB.COUNTERS[s.id] || []).length && s !== first).sort((a, b) => (window.KB.COUNTERS[b.id] || []).length - (window.KB.COUNTERS[a.id] || []).length)[0];
@@ -1737,8 +1781,12 @@
   }
   const MOB_VIEW = { live: renderLiveM, our: renderOurM, enemy: renderEnemyM, notes: renderNotesM };
 
+  let lastIdx = -1;
   function render() {
     if (typeof hideHover === "function") hideHover();
+    GPC = undefined;
+    // 다시 그려도 옆으로 넘긴 위치는 그대로(차례가 바뀌면 밴픽 설계 띠는 지금 칸으로)
+    const keepX = ["ctrack", "gpStrip"].map((id) => [id, (document.getElementById(id) || {}).scrollLeft || 0]);
     renderTop();
     const v = document.getElementById("view");
     const keepFocus = document.activeElement && document.activeElement.id === "q";
@@ -1750,6 +1798,8 @@
     const ms = document.getElementById("msheet") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "msheet" }));
     ms.innerHTML = mob ? (S.tab === "live" && S.ui.sheet ? renderPickM() : "") + (MV.more ? renderMoreM() : "") : "";
     const mb = document.querySelector(".tab-more"); if (mb) { mb.setAttribute("aria-expanded", String(MV.more)); mb.classList.toggle("cur", S.tab === "vision"); }
+    keepX.forEach(([id, x]) => { const el = document.getElementById(id); if (el) el.scrollLeft = x; });
+    if (lastIdx !== S.draft.idx) { const sp = document.getElementById("gpStrip"), nw = sp && sp.querySelector(".now"); if (sp && nw) sp.scrollLeft = Math.max(0, nw.offsetLeft - 8); lastIdx = S.draft.idx; }
     if (S.tab === "vision") { drawVision(v); runAnims(v); addZoomHint(v); }
     if (S.tab === "notes") v.querySelectorAll(".nbody").forEach((p) => { if (p.scrollHeight > p.clientHeight + 2) p.classList.add("clamped"); });
     if (keepFocus) { const q = document.getElementById("q"); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
@@ -1821,6 +1871,10 @@
       case "ngame": S.ui.nf = { game: el.dataset.gk }; S.tab = "notes"; save(); render(); window.scrollTo(0, 0); break;
       case "nfpick": { const w = document.getElementById("nfWho"), c = document.getElementById("nfChamp");
         if (w) w.value = el.dataset.r; if (c && CH[el.dataset.c]) c.value = CH[el.dataset.c].ko; break; }
+      case "goaladd": addGoal(); break;
+      case "goaldel": S.ui.goal = { ids: ((S.ui.goal && S.ui.goal.ids) || []).filter((x) => x !== el.dataset.id) }; save(); render(); break;
+      case "goalclr": S.ui.goal = { ids: [] }; save(); render(); break;
+      case "ctnav": { const tr = document.getElementById("ctrack"); if (tr) { const w = (tr.firstElementChild || {}).offsetWidth || 300; tr.scrollBy({ left: Number(el.dataset.d) * (w + 12), behavior: "smooth" }); } break; }
       case "dock": S.ui.dock = el.dataset.k; S.ui.dockAt = S.draft.idx; render(); break;
       case "grefresh": refreshRecent(false); break;
       case "prefresh": refreshPractice(false); break;
@@ -1881,6 +1935,40 @@
       case "data": { const m = document.getElementById("dataMenu"); m.hidden = !m.hidden; break; }
     }
   });
+  function addGoal() {
+    const inp = document.getElementById("goalIn"), msg = document.getElementById("goalMsg");
+    const c = inp && findChamp(inp.value);
+    if (!c) { if (msg) msg.textContent = inp && inp.value.trim() ? "챔프 이름을 찾지 못했습니다." : "챔프 이름을 넣어 주세요."; return; }
+    const ids = ((S.ui.goal && S.ui.goal.ids) || []).filter((x) => x !== c.id).concat([c.id]).slice(-3);
+    S.ui.goal = { ids }; save(); render();
+    const n = document.getElementById("goalIn"); if (n && !MOB.matches) n.focus();
+  }
+  // PC: 추천 조합·밴픽 설계 띠는 마우스로 끌어서 넘김(휴대폰은 손가락으로 밀기)
+  let drag = null, dragEat = false;
+  document.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType !== "mouse" || ev.button !== 0) return;
+    const tr = ev.target.closest && ev.target.closest(".drag-x");
+    if (!tr || ev.target.closest("input, select, textarea")) return;
+    drag = { tr, x: ev.clientX, left: tr.scrollLeft, moved: false };
+  });
+  document.addEventListener("pointermove", (ev) => {
+    if (!drag) return;
+    const dx = ev.clientX - drag.x;
+    if (!drag.moved && Math.abs(dx) > 5) { drag.moved = true; drag.tr.classList.add("dragging"); }
+    if (drag.moved) { drag.tr.scrollLeft = drag.left - dx; ev.preventDefault(); }
+  });
+  document.addEventListener("pointerup", () => {
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (!d.moved) return;
+    d.tr.classList.remove("dragging");
+    dragEat = true; setTimeout(() => (dragEat = false), 0);   // 끌기 끝의 클릭은 버튼으로 안 받음
+    // 가장 가까운 카드 시작점에 맞춤
+    const kids = [...d.tr.children], base = kids.length ? kids[0].offsetLeft : 0;
+    const near = kids.reduce((b, k) => (Math.abs(k.offsetLeft - base - d.tr.scrollLeft) < Math.abs(b.offsetLeft - base - d.tr.scrollLeft) ? k : b), kids[0]);
+    if (near) d.tr.scrollTo({ left: near.offsetLeft - base, behavior: "smooth" });
+  });
+  document.addEventListener("click", (ev) => { if (dragEat) { ev.stopPropagation(); ev.preventDefault(); dragEat = false; } }, true);
   document.addEventListener("input", (ev) => {
     const t = ev.target;
     if (t.id === "q") { S.ui.q = t.value; const box = document.getElementById("champs"); if (box) box.innerHTML = champButtons(); else render();
@@ -1904,6 +1992,7 @@
   });
   document.addEventListener("keydown", (ev) => {
     if (ev.key === "Enter" && ev.target.dataset && ev.target.dataset.add) { ev.preventDefault(); addChamp(ev.target.dataset.add); }
+    else if (ev.key === "Enter" && ev.target.id === "goalIn") { ev.preventDefault(); addGoal(); }
     else if (ev.key === "Enter" && ev.target.id === "q") { const first = document.querySelector("#champs .cbtn:not([disabled])"); if (first) choose(first.dataset.id); }
     else if (ev.key === "Escape" && editing) { editing = null; renderEditor(); }
     else if (ev.key === "Escape" && MV.more) { MV.more = false; render(); }

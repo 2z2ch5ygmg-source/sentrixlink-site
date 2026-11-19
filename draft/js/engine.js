@@ -773,7 +773,10 @@ window.Engine = (function () {
     const anti = antiAgainst(state, who);
     // 우리 밴이 남아 있으면(2차 밴) 사일러스를 밴해서 막을 수 있으니 감점을 줄이고 밴을 권한다
     // 고른 큰 그림 시나리오: 그 칸의 주 픽·대체 픽을 앞으로
-    const scen = who === "our" && state.ui && state.ui.scen ? (scenarios(state, who) || []).find((x) => x.key === state.ui.scen) : null;
+    // 목표 챔프가 있으면 고른 조합이 없어도 1순위 조합을 기준으로
+    const goalOn = who === "our" && state.ui && state.ui.goal && state.ui.goal.ids && state.ui.goal.ids.length;
+    const scList = who === "our" && state.ui && (state.ui.scen || goalOn) ? scenarios(state, who, true) || [] : [];
+    const scen = scList.find((x) => x.id === state.ui.scen) || (goalOn ? scList[0] : null) || null;
     const myBanLeft = ORDER.some(([sd, t], i) => i >= state.draft.idx && t === "ban" && sd === sideOf(state, who));
     const theirUlt = theirs.filter((t) => ULT[t.champ]);
     // 상대 예상: 상대 픽 순서는 추정이라 '나중에' 감점을 약하게 하고, 우리 라이너가 공개된 라인(맞대응 차례)에 가중치를 준다
@@ -795,7 +798,8 @@ window.Engine = (function () {
         else s -= teamHasPools(team) && !bp ? 8 : 0;
         if (scen && scen.slots[r] && !scen.slots[r].done) {
           const sl = scen.slots[r];
-          if (sl.id === c.id) { s += 8; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 주 픽`, v: 8 }); }
+          if (sl.id === c.id && sl.goal) { s += 40; reasons.push({ t: "목표 챔프", d: `목표 챔프 · ${ROLE_KO[r]}`, v: 40 }); }
+          else if (sl.id === c.id) { s += 8; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 주 픽`, v: 8 }); }
           else if (sl.alts.some((a) => a.id === c.id)) { s += 4; reasons.push({ t: "큰 그림", d: `${scen.short} 시나리오 ${ROLE_KO[r]} 대체 픽`, v: 4 }); }
         }
         if (bp) { s += bp.v; reasons.push({ t: "바텀 세트", d: `${j(ko(bp.partner), "과", "와")} 세트 · ${bp.d}`, v: bp.v }); }
@@ -1093,9 +1097,35 @@ window.Engine = (function () {
     return { side, plan, summary, outlook, nextRole: nextRoles[0] ? nextRoles[0].role : null, order };
   }
 
+  // 목표 챔프(사용자 요청 11-19 「블츠 뽑아보자」·「녹턴 오리 뽑기 위한 밴픽 설계」): 우리 열린 라인 중 그 챔프를 가장 잘 다루는 라인에 고정
+  function goalAnchors(state) {
+    const g = state.ui && state.ui.goal;
+    const ids = g && Array.isArray(g.ids) ? g.ids.filter((id) => CH[id]) : [];
+    if (!ids.length) return { fixed: {}, lost: [], ids: [] };
+    const team = teamOf(state, "our");
+    const mine = picks(state, "our");
+    const avail = new Set(available(state, "our").map((c) => c.id));
+    const banned = new Set(bans(state)), locked = lockedFor(state, "our");
+    const theirs = new Set(picks(state, "enemy").map((p) => p.champ));
+    const open = openRoles(state, "our");
+    const fixed = {}, lost = [];
+    ids.forEach((id) => {
+      if (mine.some((p) => p.champ === id)) return;   // 이미 뽑음
+      if (!avail.has(id)) { lost.push({ id, st: banned.has(id) ? "밴" : theirs.has(id) ? "상대 픽" : locked.has(id) ? "피어리스" : "사용 불가" }); return; }
+      const roles = open.filter((r) => !fixed[r] && (CH[id].pos.includes(r) || poolMap(team, r)[id]));
+      if (!roles.length) { lost.push({ id, st: "남은 라인 없음" }); return; }
+      roles.sort((a, b) => lvScore(poolMap(team, b)[id]) - lvScore(poolMap(team, a)[id]) || CH[id].pos.indexOf(a) - CH[id].pos.indexOf(b));
+      fixed[roles[0]] = id;
+    });
+    return { fixed, lost, ids };
+  }
+
   // ---- 큰 그림: 1차 밴이 끝난 뒤 남은 챔프로 만들 수 있는 우리 조합 시나리오 ----
   // 밴·상대 픽·피어리스 잠금을 뺀 챔프폭으로 조합별 5칸을 채우고(주 픽 + 대체 2), 양쪽 픽이 들어올 때마다 다시 계산한다.
-  // anytime: 화면의 「추천 조합」은 밴 단계에도 보여 준다(추천 순서 가산은 첫 밴 단계 뒤부터)
+  // anytime: 화면의 「추천 조합」은 밴 단계에도 보여 준다(추천 순서 가산은 첫 밴 단계 뒤부터).
+  //   화면용(anytime)에는 조합 유형 3개 뒤에 다른 방향 카드도 붙인다: 숙련도 우선 · 바텀 세트 · 팀 경기에서 이긴 조합(사용자 요청 11-19)
+  // 목표 챔프(state.ui.goal)가 있으면 모든 조합이 그 챔프를 그 라인에 넣고 짠다.
+  // id = 카드 구분(조합 유형은 key와 같음, 다른 방향은 comfort·duo·played), key = 조합 유형(COMPS)
   function scenarios(state, who, anytime) {
     who = who || "our";
     if (!anytime && state.draft.idx < firstPick()) return null;   // 첫 밴 단계가 끝난 뒤부터
@@ -1114,15 +1144,18 @@ window.Engine = (function () {
     const tankK = theirFront.length >= 3 ? theirFront.length - 2 : 0;   // 상대 앞라인 3명 이상 → 지속딜 필요
     const lost = {};
     open.forEach((r) => (lost[r] = roleOutlook(state, who, r).mains.filter((m) => m.st !== "가능").map((m) => ({ id: m.id, st: m.st }))));
-    const out = [];
-    for (const key of COMP_KEYS) {
+    const G = who === "our" ? goalAnchors(state) : { fixed: {}, lost: [], ids: [] };
+    // 한 조합 짜기: pre = 미리 고정할 칸 {r: id}, comfortOnly = 조합 성향 대신 숙련도만
+    function build(key, pre, comfortOnly) {
       const slots = {};
       const used = new Set();
       mine.forEach((p) => { if (p.role) { slots[p.role] = { r: p.role, id: p.champ, done: true, alts: [], notes: [] }; used.add(p.champ); } });
-      let hasFront = mine.some((p) => CH[p.champ].st.includes("front"));
-      let comfort = 0;
+      Object.entries(G.fixed).forEach(([r, id]) => { if (!slots[r]) { slots[r] = { r, id, goal: true, lv: lvScore(poolMap(team, r)[id]), notes: ["목표 챔프"], alts: [] }; used.add(id); } });
+      Object.entries(pre || {}).forEach(([r, id]) => { if (!slots[r] && !used.has(id)) { slots[r] = { r, id, lv: lvScore(poolMap(team, r)[id]), notes: [], alts: [], cands: [] }; used.add(id); } });
+      let hasFront = ROLES.some((r) => slots[r] && CH[slots[r].id].st.includes("front"));
+      let comfort = ROLES.reduce((s, r) => s + (slots[r] && !slots[r].done ? slots[r].lv || 0 : 0), 0);
       // 챔프폭이 좁은 라인부터 채워 겹침을 줄인다
-      const order = open.slice().sort((a, b) => Object.keys(poolMap(team, a)).length - Object.keys(poolMap(team, b)).length);
+      const order = open.filter((r) => !slots[r]).sort((a, b) => Object.keys(poolMap(team, a)).length - Object.keys(poolMap(team, b)).length);
       for (const r of order) {
         const pm = poolMap(team, r);
         const laner = theirs.find((p) => p.role === r);
@@ -1130,7 +1163,7 @@ window.Engine = (function () {
         const mate = r === "A" ? slots.S : r === "S" ? slots.A : null;
         const cands = Object.keys(pm).filter((id) => avail.has(id) && CH[id] && !used.has(id)).map((id) => {
           const c = CH[id], notes = [];
-          let v = lvScore(pm[id]) * 4 + fit(c, key) * 2;
+          let v = lvScore(pm[id]) * 4 + (comfortOnly ? 0 : fit(c, key) * 2);
           if (!hasFront && c.st.includes("front") && "TJS".includes(r)) v += 3;
           const vs = laner || maybe;
           if (vs && lanesCounter(id, vs.champ)) { v += laner ? 4 : 2; notes.push(`${ko(vs.champ)} 상대 강함${laner ? "" : "(라인 모름)"}`); }
@@ -1152,28 +1185,204 @@ window.Engine = (function () {
         if (CH[m.id].st.includes("front")) hasFront = true;
         slots[r] = { r, id: m.id, lv: m.lv, notes: m.notes, cands, lost: lost[r] };
       }
-      // 대체 픽: 이 시나리오의 다른 칸 주 픽은 빼고 2개
+      // 대체 픽: 이 조합의 다른 칸 주 픽은 빼고 2개
       const mains = new Set(ROLES.map((r) => slots[r] && slots[r].id).filter(Boolean));
       ROLES.forEach((r) => { const x = slots[r]; if (x && x.cands) { x.alts = x.cands.slice(1).filter((y) => !mains.has(y.id)).slice(0, 2).map((y) => ({ id: y.id, notes: y.notes })); delete x.cands; } });
+      return { slots, comfort };
+    }
+    // 점수·이유: 조합 유형(key) 기준
+    function judge(id, key, b, extra) {
+      const { slots, comfort } = b;
       const ids = ROLES.map((r) => slots[r] && slots[r].id).filter(Boolean);
       const sc = compScores(ids);
       const fitScore = (sc.find((x) => x.key === key) || {}).score || 0;
-      if (sc[0].key !== key && fitScore < 9) continue;
       const why = [];
       let score = comfort * 3 + fitScore + mine.reduce((a, p) => a + fit(CH[p.champ], key), 0) * 1.5;
       if (oppDir && COMPS[key].beats.includes(oppDir)) { score += 8; why.push(`상대 ${COMPS[oppDir].short} 조합을 잡는 방향`); }
       if (oppDir && COMPS[oppDir].beats.includes(key)) { score -= 8; why.push(`상대 ${COMPS[oppDir].short} 조합에 약함 — 진입 순서 주의`); }
       const blockC = key === "eng" ? antiS.eng : key === "dive" ? antiS.dive : null;
       if (blockC && blockC.sum) { score -= blockC.sum * 5; why.push(`${blockC.ids.map(ko).join("·")}가 ${key === "eng" ? "진입" : "돌진"}을 막음`); }
-      const thin = open.filter((r) => slots[r] && slots[r].id && !slots[r].alts.length);
+      const thin = open.filter((r) => slots[r] && slots[r].id && !slots[r].done && !slots[r].goal && !slots[r].alts.length);
       const empty = open.filter((r) => slots[r] && !slots[r].id);
       if (thin.length) why.push(`${thin.map((r) => ROLE_KO[r]).join("·")} 대체 픽 없음 → 먼저 확보`);
       if (empty.length) { score -= 10 * empty.length; why.push(`${empty.map((r) => ROLE_KO[r]).join("·")} 남은 챔프폭 없음`); }
-      const sig = ids.slice().sort().join(",");
-      if (out.some((o) => o.sig === sig)) continue;
-      out.push({ key, sig, name: COMPS[key].name, short: COMPS[key].short, win: COMPS[key].win, slots, score, why, oppDir });
+      return { id, key, sig: ids.slice().sort().join(","), name: (extra && extra.name) || COMPS[key].name, short: (extra && extra.short) || COMPS[key].short,
+        win: COMPS[key].win, slots, score, why, oppDir, identity: sc[0].key, fitScore, tag: extra && extra.tag, goalLost: G.lost };
     }
-    return out.sort((a, b) => b.score - a.score).slice(0, 3);
+    let out = [];
+    const fallback = [];
+    for (const key of COMP_KEYS) {
+      const x = judge(key, key, build(key));
+      if (x.identity !== key && x.fitScore < 9) { fallback.push(x); continue; }
+      if (out.some((o) => o.sig === x.sig)) continue;
+      out.push(x);
+    }
+    // 목표 챔프 때문에 어느 유형에도 딱 맞지 않으면 가장 높은 것 하나는 남긴다
+    if (!out.length && fallback.length) out = [fallback.sort((a, b) => b.score - a.score)[0]];
+    out = out.sort((a, b) => b.score - a.score).slice(0, 3);
+    if (!anytime) return out;
+    // ---- 다른 방향 카드(화면용) ----
+    const addVar = (x) => { if (x && !out.some((o) => o.sig === x.sig)) out.push(x); };
+    const identOf = (b) => compScores(ROLES.map((r) => b.slots[r] && b.slots[r].id).filter(Boolean))[0].key;
+    // 1) 숙련도 우선: 조합 성향을 빼고 라인마다 가장 잘 다루는 챔프
+    { const b = build("eng", null, true); const k = identOf(b); addVar(judge("comfort", k, b, { name: `숙련도 우선 · ${COMPS[k].short}`, short: "숙련도", tag: "숙련도 우선" })); }
+    // 2) 바텀 세트: 대회·정석·팀 경기로 검증된 원딜+서폿 세트를 먼저 놓고 나머지를 맞춤
+    if (open.includes("A") && open.includes("S") && !G.fixed.A && !G.fixed.S) {
+      const ds = duoSuggest(state, who).find((d) => d.pro || d.team || PAIRS[d.a + "|" + d.s]);
+      if (ds) {
+        const pre = { A: ds.a, S: ds.s };
+        const k0 = compScores([ds.a, ds.s, ...mine.map((p) => p.champ), ...Object.values(G.fixed)])[0].key;
+        const b = build(k0, pre); const k = identOf(b);
+        const src = ds.team ? `팀 ${ds.team.g}판 ${ds.team.w}승` : ds.pro ? `대회 ${ds.pro.g}판 ${ds.pro.w}승` : "정석 세트";
+        addVar(judge("duo", k, b, { name: `바텀 세트 ${ko(ds.a)}+${ko(ds.s)} · ${COMPS[k].short}`, short: "바텀 세트", tag: src }));
+      }
+    }
+    // 3) 팀 경기에서 이긴 조합: 4~5인 팀 경기 중 이긴 판의 챔프를 그 라인에 놓고 빈 칸만 채움
+    const gr = who === "our" ? groupsOf(team) : null;
+    if (gr && gr.length) {
+      const real = (g, r) => !g.playedRole || !g.playedRole[r] || g.playedRole[r] === r;
+      const won = {};
+      gr.filter((g) => g.win && (g.n || 5) >= 4).forEach((g) => {
+        const pre = {};
+        ROLES.forEach((r) => { const id = g.picks && g.picks[r]; if (id && real(g, r) && open.includes(r) && !G.fixed[r] && avail.has(id)) pre[r] = id; });
+        const n = Object.keys(pre).length;
+        if (n < 2) return;
+        const k = Object.entries(pre).sort().map(([r, id]) => r + id).join(",");
+        won[k] = won[k] || { pre, n, w: 0 };
+        won[k].w++;
+      });
+      const best = Object.values(won).sort((a, b) => b.n - a.n || b.w - a.w)[0];
+      if (best) {
+        const k0 = compScores(Object.values(best.pre))[0].key;
+        const b = build(k0, best.pre); const k = identOf(b);
+        addVar(judge("played", k, b, { name: `팀 경기 조합 · ${COMPS[k].short}`, short: "팀 경기", tag: `이긴 판 ${best.w}번 · ${best.n}명 그대로` }));
+      }
+    }
+    return out;
+  }
+
+  // ---- 밴픽 설계(사용자 요청 11-19): 고른 조합(없으면 1순위)을 만들기 위한 우리 남은 밴·픽 순서 ----
+  // 픽: 상대도 잘 다루거나 대회 우선도가 높은 챔프는 먼저, 상대 그 라인 선수 챔프폭에 카운터가 많은 챔프는 뒤로.
+  // 밴: 우리가 뽑을(뽑은) 챔프의 카운터 중 상대 그 라인 선수가 실제로 꺼낼 수 있는 것부터.
+  // 진영(블루·레드)마다 밴픽 순서가 달라 칸 배정이 바뀌고, 밴·픽·고른 조합이 바뀔 때마다 다시 계산한다.
+  const ROLE_BASE = { J: 1, S: 0.8, A: 0.3, M: -0.6, T: -1 };
+  function goalPlan(state) {
+    const list = scenarios(state, "our", true);
+    if (!list || !list.length) return null;
+    const sel = list.find((x) => x.id === (state.ui && state.ui.scen)) || list[0];
+    const side = sideOf(state, "our");
+    const opp = teamOf(state, "enemy");
+    const oppOpen = openRoles(state, "enemy");
+    const oppAvail = new Set(available(state, "enemy").map((c) => c.id));
+    const theirs = picks(state, "enemy");
+    const now = state.draft.idx;
+    const free = (i) => !state.draft.steps[i].champ && !state.draft.steps[i].skip;
+    const ourIdx = ORDER.map((o, i) => i).filter((i) => i >= now && ORDER[i][0] === side && free(i));
+    const pickIdx = ourIdx.filter((i) => ORDER[i][1] === "pick"), banIdx = ourIdx.filter((i) => ORDER[i][1] === "ban");
+    const enemyPickIdx = ORDER.map((o, i) => i).filter((i) => i >= now && ORDER[i][0] !== side && ORDER[i][1] === "pick" && free(i));
+    const lvKo = (e) => (!e ? "" : e.one ? "원챔" : e.lv >= 3 ? "상" : e.lv === 2 ? "중" : "하");
+    // 상대가 이 챔프를 얼마나 잘 다루나(열린 라인 선수 중 최고)
+    const enemyHold = (id) => { let best = null; oppOpen.forEach((r) => { const e = poolMap(opp, r)[id]; if (e && (!best || lvScore(e) > lvScore(best.e))) best = { r, e }; }); return best; };
+    const oppHasPools = teamHasPools(opp);
+    // 상대 r 라인 선수가 c를 꺼낼 가능성(0~1). 챔프폭 자료가 없으면 메타 카운터로 약하게
+    const canPlay = (c, r) => { const e = poolMap(opp, r)[c]; if (e) return e.one || e.lv >= 2 ? Math.min(1, lvScore(e) / 3) : 0.25; return oppHasPools ? 0.12 : CH[c].pos.includes(r) ? 0.35 : 0; };
+    const targets = ROLES.filter((r) => sel.slots[r] && sel.slots[r].id && !sel.slots[r].done).map((r) => {
+      const x = sel.slots[r], id = x.id, laner = theirs.find((p) => p.role === r);
+      const h = enemyHold(id), mi = metaInfo(id, r);
+      const contest = (h ? lvScore(h.e) / 1.8 : 0) + (mi ? Math.min(2, mi.prio / 30) : 0);
+      const own = lvScore(poolMap(teamOf(state, "our"), r)[id]);
+      // 상대 라이너가 이미 나왔으면 그 상대 기준, 아니면 그 라인 선수 챔프폭의 카운터
+      let exposure = 0, ctrs = [];
+      if (laner) { if (lanesCounter(laner.champ, id)) exposure = 2; }
+      else if (oppOpen.includes(r)) {
+        ctrs = Object.keys(CH).filter((c) => oppAvail.has(c) && c !== id && lanesCounter(c, id)).map((c) => ({ c, w: canPlay(c, r) })).filter((x) => x.w >= 0.45).sort((a, b) => b.w - a.w);
+        exposure = Math.min(3, ctrs.reduce((s, x) => s + x.w, 0));
+      }
+      // 목표 챔프·우리 원챔은 2차 밴 전에 확보하는 쪽으로(뒤로 미루면 2차 밴에 잘림)
+      let u = contest * 1.5 + (x.goal ? 2.5 : 0) + (own >= 3.5 ? 3 : 0) - exposure * 1.2 + ROLE_BASE[r];
+      if (h && (h.e.one || h.e.lv >= 3)) u += 2;
+      return { r, id, goal: !!x.goal, u, contest, exposure, ctrs, hold: h, meta: mi, laner, own };
+    }).sort((a, b) => b.u - a.u);
+    // 바텀 두 명은 연속 두 칸(B2·B3, B4·B5, R1·R2, R4·R5)이 있으면 함께
+    let order = targets.slice();
+    const posA = order.findIndex((t) => t.r === "A"), posS = order.findIndex((t) => t.r === "S");
+    if (posA >= 0 && posS >= 0) {
+      const pairs = pickIdx.map((i, k) => (pickIdx[k + 1] === i + 1 ? k : -1)).filter((k) => k >= 0);
+      if (pairs.length) {
+        const want = Math.min(posA, posS);
+        const k = pairs.sort((a, b) => Math.abs(a - want) - Math.abs(b - want))[0];
+        const rest = order.filter((t) => t.r !== "A" && t.r !== "S");
+        rest.splice(Math.min(k, rest.length), 0, order[posA], order[posS]);
+        order = rest;
+      }
+    }
+    const at = {};   // ORDER 칸 → 우리 목표
+    pickIdx.forEach((i, k) => { if (order[k]) at[i] = order[k]; });
+    const steps = [], risks = [];
+    const usedBan = new Set();
+    const ourIds = new Set(ROLES.map((r) => sel.slots[r] && sel.slots[r].id).filter(Boolean));
+    const threatBans = recommendBan(state, "our").slice(0, 6).map((x) => x.id);
+    const lastPick = pickIdx[pickIdx.length - 1];
+    const ban2 = ORDER.findIndex((o, i) => i > firstPick() && o[1] === "ban");   // 2차 밴 시작 칸
+    // 상대가 밴할 만한 우리 목표: 상대 밴 추천 상위 5 안에 있고, 우리가 뽑기 전에 상대 밴 차례가 남음
+    const enemyBanTop = recommendBan(state, "enemy").slice(0, 5).map((x) => x.id);
+    targets.filter((t) => t.goal && enemyBanTop.includes(t.id)).forEach((t) => {
+      const k = Object.keys(at).find((k) => at[k] === t);
+      const banBefore = ORDER.some(([sd, ty], i) => i >= now && sd !== side && ty === "ban" && free(i) && (!k || i < Number(k)));
+      if (banBefore) { const alt = (sel.slots[t.r].alts || [])[0]; risks.push({ id: t.id, t: `${ko(t.id)} 밴 가능성`, d: `상대가 밴할 만한 챔프${alt ? ` · 대안 ${ko(alt.id)}` : ""}` }); }
+    });
+    for (let i = now; i < ORDER.length; i++) {
+      if (!free(i)) continue;
+      const [sd, kind] = ORDER[i];
+      if (sd !== side) {
+        if (kind === "pick") {
+          // 상대가 먼저 뽑을 차례에 우리 목표를 가져갈 수 있으면 경고
+          const tk = targets.find((t) => t.hold && (t.hold.e.one || t.hold.e.lv >= 2) && Object.keys(at).some((k) => at[k] === t && Number(k) > i) && !risks.some((x) => x.id === t.id));
+          if (tk) risks.push({ i, id: tk.id, t: `${ko(tk.id)} 뺏길 수 있음`, d: `상대 ${ROLE_KO[tk.hold.r]} ${lvKo(tk.hold.e)} · 우리보다 먼저 뽑는 차례` });
+          steps.push({ i, who: "enemy", kind, risk: tk ? tk.id : null });
+        } else steps.push({ i, who: "enemy", kind });
+        continue;
+      }
+      if (kind === "pick") {
+        const t = at[i];
+        if (!t) { steps.push({ i, who: "our", kind }); continue; }
+        // 이유는 그 칸 자리에 맞는 것만: 앞 칸 = 먼저 확보할 이유, 마지막 칸 = 카운터 숨기기
+        const notes = [];
+        const k = pickIdx.indexOf(i), early = k <= 1 && pickIdx.length > 2, beforeBan2 = ban2 > 0 && i < ban2 && pickIdx.some((x) => x > ban2);
+        if (t.goal) notes.push({ t: "목표 챔프", c: "gold" });
+        if (t.laner && lanesCounter(t.id, t.laner.champ)) notes.push({ t: `${ko(t.laner.champ)} 카운터`, c: "good" });
+        else if (i === lastPick && pickIdx.length > 1 && t.exposure >= 1) notes.push({ t: "카운터 많아 마지막", c: "info" });
+        else if (early && t.hold && (t.hold.e.one || t.hold.e.lv >= 2)) notes.push({ t: `상대도 ${lvKo(t.hold.e)} → 먼저`, c: "gold" });
+        else if (early && t.meta && t.meta.prio >= 40) notes.push({ t: `대회 ${Math.round(t.meta.prio)}% → 먼저`, c: "gold" });
+        else if (beforeBan2 && (t.goal || t.own >= 3.5)) notes.push({ t: "2차 밴 전에 확보", c: "gold" });
+        else if (t.exposure >= 1 && !t.laner) notes.push({ t: `카운터 ${t.ctrs.length}개 주의`, c: "bad" });
+        if (notes.length < 2 && t.own >= 3.5) notes.push({ t: "우리 원챔", c: "good" });
+        if (!notes.length) notes.push({ t: `${ROLE_KO[t.r]} 채우기`, c: "" });
+        steps.push({ i, who: "our", kind, id: t.id, r: t.r, goal: t.goal, notes });
+        continue;
+      }
+      // 밴: 이 밴 뒤에 상대가 뽑을 수 있는 카운터. 상대 라이너가 아직 안 나온 라인의 우리 목표만 대상
+      const enemyAfter = enemyPickIdx.some((k) => k > i);
+      // 한 챔프가 우리 목표 여럿을 카운터하면 점수를 더하고, 이유는 가장 큰 목표로
+      const cand = {};
+      const add = (c, v, t) => { const x = cand[c] || (cand[c] = { c, v: 0, top: 0, t: null }); x.v += v; if (t && v > x.top) { x.top = v; x.t = t; } };
+      if (enemyAfter) targets.filter((t) => !t.laner && oppOpen.includes(t.r)).forEach((t) => t.ctrs.forEach(({ c, w }) => {
+        if (usedBan.has(c) || ourIds.has(c)) return;
+        add(c, w * (t.goal ? 1.5 : 1) * (Object.keys(at).some((k) => at[k] === t && Number(k) > i) ? 1.2 : 0.8), t);
+      }));
+      threatBans.forEach((c, k) => { if (!usedBan.has(c) && !ourIds.has(c) && oppAvail.has(c)) add(c, (0.6 - k * 0.08) * (cand[c] ? 0.5 : 1), null); });
+      const best = Object.values(cand).sort((a, b) => b.v - a.v)[0];
+      if (!best) { steps.push({ i, who: "our", kind }); continue; }
+      usedBan.add(best.c);
+      const notes = [];
+      if (best.t) {
+        const r = best.t.r, e = poolMap(opp, r)[best.c];
+        notes.push({ t: `${ko(best.t.id)} 카운터`, c: "bad" });
+        if (e) notes.push({ t: `상대 ${ROLE_KO[r]} ${lvKo(e)}`, c: "" });
+      } else { const h = enemyHold(best.c); notes.push({ t: "상대 주력", c: "bad" }); if (h) notes.push({ t: `상대 ${ROLE_KO[h.r]} ${lvKo(h.e)}`, c: "" }); }
+      steps.push({ i, who: "our", kind, id: best.c, notes, guard: best.t ? best.t.id : null, er: best.t ? best.t.r : null });
+    }
+    return { sel, side, steps, risks, lost: sel.goalLost || [] };
   }
 
   // ---- 요주의 인물: 상대에서 가장 위험한 선수와 그에 맞춘 라인별 움직임·조합 ----
@@ -1563,6 +1772,6 @@ window.Engine = (function () {
   return {
     champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
-    facts, nowFacts, cardPills, liveComps, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
+    facts, nowFacts, cardPills, liveComps, goalAnchors, goalPlan, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };
 })();

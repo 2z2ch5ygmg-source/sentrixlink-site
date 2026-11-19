@@ -102,7 +102,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
 .dh > .side.B { grid-area: b; }
 .dh > .side.R { grid-area: r; }
 .dh > .dstat { grid-area: st; }
-.col-main { grid-area: main; display: grid; gap: 12px; min-width: 0; }
+.col-main { grid-area: main; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .col-grid { grid-area: grid; min-width: 0; position: sticky; top: 70px; }
 .col-grid .champs { max-height: calc(100vh - 210px); }
 .m-only { display: none !important; }
@@ -947,6 +947,60 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sv-g.focus, tr.focus td { background: var(--gold-bg); }
 .sv-g.focus { border-radius: 8px; padding: 6px; outline: 1px solid rgba(232, 182, 76, 0.5); }
 
+/* ---------- 목표 챔프 · 밴픽 설계 · 추천 조합 끌어서 넘기기 (2026-11-19) ---------- */
+.gl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 12px; }
+.gl-l { font-size: 12px; font-weight: 800; color: var(--gold); }
+.gl-chip { display: inline-flex; align-items: center; gap: 6px; padding-right: 2px; border-color: rgba(232, 182, 76, 0.5); }
+.gl-x { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--dim); display: inline-grid; place-items: center; }
+.gl-x:hover { color: var(--text); background: var(--panel2); }
+.gl-x .ico-x { width: 14px; height: 14px; }
+.gl-add { display: inline-flex; gap: 6px; align-items: center; }
+.gl-add .input { width: 210px; min-height: 32px; }
+.gp { margin: 0 0 14px; }
+.gp-h { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 0 0 8px; }
+.gp-h b { font-size: 14px; }
+.gp-w { justify-content: flex-start; }
+.gp-strip { list-style: none; margin: 0; padding: 3px 3px 8px; display: flex; gap: 6px; overflow-x: auto; position: relative; scrollbar-width: thin; }
+.gp-li { display: flex; flex: none; }
+.gp-t { flex: none; width: 112px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px; border-radius: 10px; background: var(--bg2); border: 1px solid var(--line); text-align: center; color: var(--text); font: inherit; }
+button.gp-t { cursor: pointer; }
+.gp-t.en { width: 48px; padding: 8px 2px; justify-content: flex-start; background: transparent; border-style: dashed; color: var(--dim); }
+.gp-t.en.risk { border-color: rgba(255, 90, 99, 0.6); }
+.gp-t.en .ic.sm { width: 26px; height: 26px; outline: 1px solid rgba(255, 90, 99, 0.6); }
+.gp-t.our.pick { border-color: rgba(76, 141, 255, 0.4); }
+.gp-t.our.ban .gp-k { color: var(--red); }
+.gp-t.our.ban .ic.gp img { filter: grayscale(0.5); }
+.gp-t.goal { border-color: rgba(232, 182, 76, 0.65); background: var(--gold-bg); }
+.gp-t.now { outline: 2px solid var(--gold); outline-offset: 1px; }
+.gp-n { font: 700 11px var(--font-num); color: var(--dim); }
+.gp-k { font-size: 11px; font-weight: 700; color: var(--muted); line-height: 1.25; }
+.gp-t .ic.gp { width: 44px; height: 44px; }
+.gp-t b { font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gp-t .cpills { flex-direction: column; align-items: center; gap: 3px; }
+.gp-t .cp { font-size: 11px; padding: 1px 5px; }
+.ctrack-wrap { position: relative; }
+.live-comps .ctrack { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: thin; }
+.ctrack > .ct-card { flex: 0 0 min(400px, 86%); min-width: 0; display: flex; }
+.ctrack > .ct-card > .card { flex: 1; margin: 0; }
+.ct-card .plan { display: none; }
+.ct-win { margin: 0 0 8px; font-size: 12px; line-height: 1.45; color: var(--muted); }
+.ctrack > .ct-card.on > .card { border-color: rgba(76, 141, 255, 0.6); }
+.drag-x { user-select: none; -webkit-user-select: none; }
+.drag-x img { -webkit-user-drag: none; }
+@media (hover: hover) and (pointer: fine) { .drag-x { cursor: grab; } .drag-x.dragging, .drag-x.dragging * { cursor: grabbing; } }
+.ct-nav { position: absolute; top: 50%; z-index: 2; transform: translateY(-50%); width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: rgba(22, 28, 41, 0.94); color: var(--text); font-size: 22px; line-height: 1; display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+.ct-nav:hover { border-color: #3a4560; }
+.ct-nav.prev { left: -6px; } .ct-nav.next { right: -6px; }
+@media (max-width: 760px) {
+  .ct-nav, .gl-help, .gl-bar [data-act="goalclr"] { display: none; }
+  .gl-add { flex: 1 1 100%; } .gl-add .input { width: auto; flex: 1; min-height: 40px; } .gl-add .btn { min-height: 40px; }
+  .gl-bar { margin-bottom: 10px; }
+  .gp-t { width: 100px; } .gp-t.en { width: 42px; }
+  .gp-strip { scrollbar-width: none; } .gp-strip::-webkit-scrollbar { display: none; }
+  .mv .live-comps .ctrack { display: flex; }
+  .mv .ctrack > .ct-card { flex: 0 0 90%; scroll-snap-align: start; }
+}
+
 /* ---------- 휴대폰 화면(모바일 시안 A, 2026-11-19): 폭 760px 이하에서만. PC는 그대로 ---------- */
 .t-short { display: none; }
 @media (max-width: 760px) {
@@ -1038,7 +1092,8 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
   .mv-dbody .plan-box { margin: 0; padding: 0; border: 0; background: transparent; }
   .mv .comps { display: flex; gap: 8px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; }
   .mv .comps > .card { flex: 0 0 90%; min-width: 0; margin: 0; scroll-snap-align: start; padding: 10px; }
-  .mv-dbody .comps > .card .plan { display: none; }
+  .mv .comps > .ct-card > .card { padding: 10px; }
+  .mv-dbody .comps > .card .plan, .mv-dbody .comps .ct-card .plan { display: none; }
   .mv .comps .five { margin-bottom: 6px; }
   .mv .comps .lc-alts { margin-top: 6px; }
   .mv-prac .pr-bar .prep, .mv-prac .prac-help, .mv-prac .now-h { display: none; }
