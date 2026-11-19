@@ -729,7 +729,7 @@
   function compCard(c, title, sub, compact, enemy, extra) {
     const C = COMPS[c.key];
     const five = ROLES.map((r) => { const s = c.slots[r]; if (!s) return `<div class="s"><span class="ic"></span></div>`;
-      return `<div class="s ${s.suggest ? "suggest" : ""} ${s.fixed ? "fixed" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.fixed ? `<span class="lv lvone">픽 완료</span>` : s.goal ? `<span class="lv lv3">목표</span>` : s.suggest ? `<span class="lv lv1">새로</span>` : lvTag({ lv: Math.max(1, Math.min(3, Math.round(s.lv))), one: s.lv > 3 })}</div>`; }).join("");
+      return `<div class="s ${s.suggest ? "suggest" : ""} ${s.fixed ? "fixed" : ""}"><span class="r">${ROLE_KO[r]}</span>${icon(s.id)}<span class="n">${esc(CH[s.id].ko)}</span>${s.fixed ? `<span class="lv lvone">픽 완료</span>` : s.goal ? `<span class="lv lv3">목표</span>` : s.suggest ? `<span class="lv lv1">새로</span>` : lvTag(E.levelOf(s.lv))}</div>`; }).join("");
     const filled = ROLES.map((r) => c.slots[r]).filter(Boolean);
     const first = filled.filter((s) => !s.suggest).sort((a, b) => b.lv - a.lv || CH[b.id].pos.length - CH[a.id].pos.length)[0];
     const last = filled.filter((s) => (window.KB.COUNTERS[s.id] || []).length && s !== first).sort((a, b) => (window.KB.COUNTERS[b.id] || []).length - (window.KB.COUNTERS[a.id] || []).length)[0];

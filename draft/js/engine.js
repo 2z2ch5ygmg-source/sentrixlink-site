@@ -181,6 +181,9 @@ window.Engine = (function () {
     return m;
   }
   const lvScore = (e) => (!e ? 0 : e.one ? 3.6 : 1 + (e.score != null ? e.score : MANUAL_SCORE[e.lv] || 0.2) * 2.6);
+  // 계산 점수(lvScore) → 화면 숙련도. 반올림하면 하(1.52)가 중으로 보였음(사용자 지적 11-19 「나서스 하로 낮췄는데 중」)
+  // 경계: 원챔 3.6, 상 = 직접 0.75·전적 0.6 이상(2.56~), 중 = 직접 0.45·전적 0.35 이상(1.91~), 그 아래 하
+  const levelOf = (v) => (v >= 3.5 ? { lv: 3, one: true } : { lv: v >= 2.55 ? 3 : v >= 1.9 ? 2 : 1, one: false });
   function statText(e) {
     if (!e) return "";
     const rec = e.rg ? ` · 최근 ${e.rg}판 ${e.rw}승` : "";
@@ -1770,7 +1773,7 @@ window.Engine = (function () {
   }
 
   return {
-    champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
+    champ, ko, j, poolMap, setOurTeam, scoutOf, statText, lvScore, levelOf, teamHasPools, fit, compScores, buildComp, teamComps, fearlessPlan,
     picks, bans, taken, available, openRoles, teamOf, guessRole, pickRole, scenarios, flexRoles, sylasRisk, pairBonus, direction, sideOf, whoOfSide,
     facts, nowFacts, cardPills, liveComps, goalAnchors, goalPlan, recommendBan, recommendPick, buildStrategy, laneStudy, lockedFor, pickPlan, keyThreats, metaInfo, metaText, muWr, predictRole, hoverInfo, recentOf, actualRole, stacksOf, groupsOf, duoSuggest, proDuo, practiceOf, practicePick, practiceText,
   };
