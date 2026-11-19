@@ -3,6 +3,27 @@
   const E = window.Engine;
   // 휴대폰 화면(폭 760px 이하): 화면마다 따로 그린다(PC 화면은 그대로)
   const MOB = matchMedia("(max-width: 760px)");
+  // ---------- 팀 공간(사용자 결정 11-19: 팀장 Riot 인증 + 초대 링크) ----------
+  // 초대 링크 #join=공간.열쇠 를 열면 이 브라우저에 열쇠를 두고 주소에서 지운다. 팀 자료(노트·자기평가·준비일 바꾸기·실시간 갱신)는 열쇠가 있어야 서버가 준다.
+  const KEY_SPACE = "sentrix-draft.space.v1";
+  let SPACE = null;
+  try { SPACE = JSON.parse(localStorage.getItem(KEY_SPACE) || "null"); } catch (e) { SPACE = null; }
+  if (SPACE && !(SPACE.id && SPACE.key)) SPACE = null;
+  const saveSpace = () => { try { if (SPACE) localStorage.setItem(KEY_SPACE, JSON.stringify(SPACE)); else localStorage.removeItem(KEY_SPACE); } catch (e) { /* 무시 */ } };
+  {
+    const m = location.hash.match(/^#join=([a-z0-9][a-z0-9-]{1,31})\.([A-Za-z0-9_-]{20,100})$/);
+    if (m) { SPACE = { id: m[1], key: m[2], name: "", joined: true }; saveSpace(); history.replaceState(null, "", location.pathname + location.search); }
+  }
+  const WURL = () => (window.RECENT_LIVE_URL || "").replace(/\/$/, "");
+  const spaceQ = () => (SPACE ? `space=${encodeURIComponent(SPACE.id)}` : "");
+  // 팀 자료 요청: 공간·열쇠를 붙이고, 401이면 열쇠가 바뀐 것으로 표시
+  async function wfetch(path, opts) {
+    const o = opts || {};
+    const url = `${WURL()}${path}${SPACE ? (path.includes("?") ? "&" : "?") + spaceQ() : ""}`;
+    const res = await fetch(url, { cache: "no-store", credentials: "omit", ...o, headers: { ...(o.headers || {}), ...(SPACE ? { "X-Team-Key": SPACE.key } : {}) } });
+    if (res.status === 401 && SPACE && !SPACE.bad) { SPACE.bad = true; saveSpace(); setTimeout(() => render(), 0); }
+    return res;
+  }
   const KEY = "sentrix-draft.v1";
   const CH = {};
   window.CHAMPIONS.forEach((c) => (CH[c.id] = c));
@@ -233,6 +254,8 @@
     const opts = (sel, excl, soloId) => S.teams.filter((t) => t.id !== excl && !t.solo).map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${esc(t.name)}</option>`).join("")
       + `<optgroup label="팀 자료 없이"><option value="${soloId}" ${sel === soloId ? "selected" : ""}>솔랭·자랭</option></optgroup>`;
     document.getElementById("ourSel").innerHTML = opts(S.ourTeam, null, SOLO.our);
+    const tb = document.getElementById("teamBtn");
+    if (tb) { tb.textContent = SPACE && !SPACE.bad ? `팀: ${SPACE.name || "팀 공간"}` : SPACE && SPACE.bad ? "팀 공간 · 열쇠 바뀜" : "팀 공간"; tb.classList.toggle("warnb", !!(SPACE && SPACE.bad)); }
     document.getElementById("enemySel").innerHTML = opts(S.enemyTeam, S.ourTeam, SOLO.enemy);
   }
 
@@ -810,12 +833,13 @@
     };
     const url = window.RECENT_LIVE_URL;
     if (!url || !ourT || ourT.solo || !before || before.status !== "ok") { reload(""); return; }
+    if (!SPACE) { chainEnemy = false; reload("실시간 갱신은 팀 공간에 들어온 뒤(「팀 공간」)"); return; }
     if (NIGHT.at !== before.at) { NIGHT.at = before.at; NIGHT.groups = {}; }
     if (!NIGHT.groups[ourT.id] && !(before.live && before.live[ourT.id])) NIGHT.groups[ourT.id] = (before.groups || {})[ourT.id] || [];
     const inc = NIGHT.groups[ourT.id] && before.since === (PREP.since || before.since) && kstMs(before.at) > 0;   // 기준일이 같을 때만 0시 자료에 더한다
     const ctl = typeof AbortController === "function" ? new AbortController() : null;
     const timer = setTimeout(() => ctl && ctl.abort(), 25000);
-    fetch(`${url.replace(/\/$/, "")}/groups?team=${encodeURIComponent(ourT.id)}${inc ? `&after=${kstMs(before.at)}` : ""}`, { signal: ctl ? ctl.signal : undefined, cache: "no-store", credentials: "omit" })
+    wfetch(`/groups?team=${encodeURIComponent(ourT.id)}${inc ? `&after=${kstMs(before.at)}` : ""}`, { signal: ctl ? ctl.signal : undefined })
       .then((r) => r.json().catch(() => ({})).then((j) => ({ ok: r.ok, status: r.status, j })))
       .then(({ ok, status, j }) => {
         clearTimeout(timer);
@@ -850,12 +874,13 @@
   const md = (d) => (d ? d.slice(5).replace("-", "/").replace(/^0/, "") : "");
   async function loadPrep() {
     if (!window.RECENT_LIVE_URL) return;
-    try { const d = await (await fetch(`${window.RECENT_LIVE_URL.replace(/\/$/, "")}/config`, { cache: "no-store" })).json(); if (d.status === "ok") { PREP.since = d.since; PREP.def = d.default; if (S.tab === "live" || S.tab === "enemy") render(); } } catch (e) { /* 그대로 */ }
+    try { const d = await (await fetch(`${WURL()}/config${SPACE ? "?" + spaceQ() : ""}`, { cache: "no-store" })).json(); if (d.status === "ok") { PREP.since = d.since; PREP.def = d.default; if (S.tab === "live" || S.tab === "enemy") render(); } } catch (e) { /* 그대로 */ }
   }
   async function savePrep(v) {
+    if (!SPACE) { PREP.msg = "팀 공간에 들어와야 바꿀 수 있습니다(「팀 공간」)."; render(); return; }
     PREP.msg = "저장 중…"; render();
     try {
-      const res = await fetch(`${window.RECENT_LIVE_URL.replace(/\/$/, "")}/config`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ since: v }) });
+      const res = await wfetch(`/config`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ since: v }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
       PREP.since = d.since; PREP.edit = false;
@@ -887,6 +912,7 @@
     const t = E.teamOf(S, "enemy"), R = window.RECENT;
     if ((prefreshing && !auto) || !t || t.solo || !R || R.status !== "ok" || !window.Practice) { if (cb && pCb === cb) { pCb = null; cb.done("상대 갱신 건너뜀"); } return; }
     clearTimeout(pTimer);
+    if (!SPACE) { S.ui.pState = { team: t.id, msg: "실시간 갱신은 팀 공간에 들어온 뒤(「팀 공간」)" }; const c = pCb; pCb = null; if (c) c.done("팀 공간 필요"); render(); return; }
     prefreshing = true; S.ui.pState = { team: t.id, msg: auto ? "남은 경기 이어 읽는 중…" : "" }; render();
     const done = (msg) => { prefreshing = false; S.ui.pState = { team: t.id, msg }; const c = pCb; pCb = null; if (c) c.done(msg); render(); };
     const pg = await practiceGames();
@@ -894,7 +920,7 @@
     const base = pg && pg.since === since && pg.teams && pg.teams[t.id] ? pg : null;   // 기준일이 같을 때만 0시 경기를 쓴다
     const ctl = typeof AbortController === "function" ? new AbortController() : null;
     const timer = setTimeout(() => ctl && ctl.abort(), 25000);
-    fetch(`${window.RECENT_LIVE_URL.replace(/\/$/, "")}/games?team=${encodeURIComponent(t.id)}${base ? `&after=${base.atMs}` : ""}`, { signal: ctl ? ctl.signal : undefined, cache: "no-store", credentials: "omit" })
+    wfetch(`/games?team=${encodeURIComponent(t.id)}${base ? `&after=${base.atMs}` : ""}`, { signal: ctl ? ctl.signal : undefined })
       .then((r) => r.json().catch(() => ({})).then((j) => ({ ok: r.ok, status: r.status, j })))
       .then(({ ok, status, j }) => {
         clearTimeout(timer);
@@ -1700,7 +1726,7 @@
         <div class="mv-ml"><span>피어리스</span>${seg("mode", S.series.mode, [["hard", "하드"], ["soft", "소프트"], ["off", "끔"]])}</div>
         <div class="mv-mb"><button class="btn primary" data-act="nextGame">세트 종료</button><button class="btn" data-act="saveSeries">밴픽 저장</button>
           <button class="btn" data-act="resetGame">이번 세트 다시</button><button class="btn ghost" data-act="resetSeries">시리즈 초기화</button></div></div>` : ""}
-      <div class="mv-mg"><button class="btn mv-wide ${S.tab === "vision" ? "primary" : ""}" data-act="mvision">시야 공부</button></div>
+      <div class="mv-mg mv-mb"><button class="btn" data-act="team">${SPACE && !SPACE.bad ? `팀: ${esc(SPACE.name || "팀 공간")}` : "팀 공간"}</button><button class="btn ${S.tab === "vision" ? "primary" : ""}" data-act="mvision">시야 공부</button></div>
       <div class="mv-mg"><b>데이터</b><div class="mv-mb three"><button class="btn" data-act="export">내보내기</button><button class="btn" data-act="import">불러오기</button><button class="btn ghost" data-act="wipe">처음 상태로</button></div></div>
       </section>`;
   }
@@ -1790,7 +1816,7 @@
     const t = team(S.ourTeam);
     const head = (n) => `<header class="mv-h"><b class="mv-title">피드백 노트</b><span class="mv-sub">팀 공유${n != null ? ` · ${n}개` : ""}</span>${noteUrl() ? `<button class="btn sm ghost mv-hb" data-act="nrefresh">새로고침</button>` : ""}</header>`;
     const wrap = (h) => `<div class="mv mv-notes">${h}</div>`;
-    if (!noteUrl()) return wrap(head() + `<p class="help mv-pad">${t && t.solo ? "솔랭·자랭 우리팀에는 노트를 쓸 수 없습니다. 「⋯」에서 우리 팀을 고르세요." : "팀 공유 저장소가 설정되지 않았습니다."}</p>`);
+    if (!noteUrl()) return wrap(head() + `<p class="help mv-pad">${t && t.solo ? "솔랭·자랭 우리팀에는 노트를 쓸 수 없습니다. 「⋯」에서 우리 팀을 고르세요." : "팀 공간에 들어오면 팀원과 노트를 나눕니다 — 「팀 공간」에서 팀을 만들거나 초대 링크로 들어오세요."}</p>`);
     if (NT.status === "error" && !NT.list) return wrap(head() + `<p class="help mv-pad">노트를 불러오지 못했습니다: ${esc(NT.err)} <button class="btn sm" data-act="nrefresh">다시 시도</button></p>`);
     if (!NT.list) return wrap(head() + `<p class="help mv-pad">노트 불러오는 중…</p>`);
     const f = S.ui.nf || {};
@@ -1908,6 +1934,9 @@
       case "ngame": S.ui.nf = { game: el.dataset.gk }; S.tab = "notes"; save(); render(); window.scrollTo(0, 0); break;
       case "nfpick": { const w = document.getElementById("nfWho"), c = document.getElementById("nfChamp");
         if (w) w.value = el.dataset.r; if (c && CH[el.dataset.c]) c.value = CH[el.dataset.c].ko; break; }
+      case "team": case "tclose": case "tback": case "tcopy": case "tleave": case "trotate": case "tstart": case "tcheck":
+        if ((a === "tclose") && ev.target !== el && el.classList.contains("modal-bg")) break;
+        teamAction(a); break;
       case "goaladd": addGoal(); break;
       case "goaldel": S.ui.goal = { ids: ((S.ui.goal && S.ui.goal.ids) || []).filter((x) => x !== el.dataset.id) }; save(); render(); break;
       case "goalclr": S.ui.goal = { ids: [] }; save(); render(); break;
@@ -2090,7 +2119,7 @@
 
   // ---------- 팀 공유 챔프폭 (js/config.js SELF_EVAL_SHARE_URL = Worker /selfeval) ----------
   // 우리 자기평가와 상대 챔프폭 메모를 링크를 받은 팀원끼리 같이 본다. 팀·라인별 칸 하나, 마지막 저장이 남는다.
-  const SH = { url: window.SELF_EVAL_SHARE_URL || "", status: window.SELF_EVAL_SHARE_URL ? "loading" : "unset", at: "", err: "", pending: {}, timers: {} };
+  const SH = { url: window.SELF_EVAL_SHARE_URL && SPACE ? window.SELF_EVAL_SHARE_URL : "", status: window.SELF_EVAL_SHARE_URL && SPACE ? "loading" : "unset", at: "", err: "", pending: {}, timers: {} };
   const seedP = (tid, r) => { const t = window.SEED_TEAMS.find((x) => x.id === tid); return (t && t.players[r]) || {}; };
   const normPool = (pool) => (pool || []).map((e) => (e[2] ? [e[0], 3, true] : [e[0], e[1]]));
   const sameJ = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -2106,7 +2135,7 @@
   async function pushShared(tid, r) {
     const k = tid + "|" + r, seq = SH.pending[k];
     try {
-      const res = await fetch(`${SH.url}/selfeval?team=${encodeURIComponent(tid)}&role=${r}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedBody(tid, r)) });
+      const res = await wfetch(`/selfeval?team=${encodeURIComponent(tid)}&role=${r}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sharedBody(tid, r)) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
       Object.assign(SH, { status: "ok", at: d.saved.at, err: "" });
@@ -2119,7 +2148,7 @@
     if (!SH.url) return;
     let changed = false;
     try {
-      const res = await fetch(`${SH.url}/selfeval?team=all`, { cache: "no-store" });
+      const res = await wfetch(`/selfeval?team=all`);
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
       S.teams.filter((t) => shareable(t.id)).forEach((t) => ROLES.forEach((r) => {
@@ -2149,10 +2178,10 @@
     } else shareNoteUpdate();
   }
   function shareNote() {
-    if (!SH.url) return "지금은 이 브라우저에만 저장됩니다(팀 공유 저장소 미설정) — 나누려면 상단 「데이터」에서 내보내기 하세요.";
+    if (!SH.url) return "지금은 이 브라우저에만 저장됩니다 — 팀원과 나누려면 「팀 공간」에서 팀을 만들거나 초대 링크로 들어오세요.";
     if (SH.status === "error") return `<b>팀 공유 저장 실패</b>(${esc(SH.err)}) — 이 브라우저에는 저장됐고, 다시 바꾸면 또 올립니다.`;
     if (Object.keys(SH.pending).length) return "팀 공유 저장 중…";
-    return `입력하면 링크를 받은 팀원 모두에게 공유됩니다${SH.at ? ` · 마지막 저장 ${esc(SH.at)}` : ""}.`;
+    return `입력하면 팀 공간${SPACE && SPACE.name ? ` 「${esc(SPACE.name)}」` : ""} 팀원에게만 공유됩니다${SH.at ? ` · 마지막 저장 ${esc(SH.at)}` : ""}.`;
   }
   // 라인마다 팀 공유 저장소에 올라간 때(없으면 「아직 안 올라옴」)
   function shareRoles(t) {
@@ -2171,12 +2200,12 @@
   const GAMEREF = {};   // 화면에 그린 게임 버튼 → 게임 정보
   const gameKeyRiot = (g) => `${g.date}|${g.queue}|${ROLES.map((r) => (g.picks && g.picks[r]) || "").join(",")}`;
   const noteTeam = () => { const t = team(S.ourTeam); return t && !t.solo ? t.id : null; };
-  const noteUrl = () => (SH.url && noteTeam() ? `${SH.url}/notes?team=${encodeURIComponent(noteTeam())}` : "");
+  const noteUrl = () => (SH.url ? `/notes` : "");   // 노트는 팀 공간마다 하나
   async function loadNotes() {
     if (!noteUrl()) { NT.status = "unset"; return; }
     NT.status = NT.list ? NT.status : "loading";
     try {
-      const res = await fetch(noteUrl(), { cache: "no-store" });
+      const res = await wfetch(noteUrl());
       const d = await res.json().catch(() => ({}));
       if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
       NT.list = d.notes; NT.status = "ok"; NT.err = "";
@@ -2184,7 +2213,7 @@
     if (S.tab === "notes" || S.tab === "our" || S.tab === "live") render();
   }
   async function sendNote(body) {
-    const res = await fetch(noteUrl(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const res = await wfetch(noteUrl(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     const d = await res.json().catch(() => ({}));
     if (!res.ok || d.status !== "ok") throw new Error(d.reason || "HTTP " + res.status);
     NT.list = d.notes; NT.status = "ok";
@@ -2221,7 +2250,7 @@
     const t = team(S.ourTeam);
     const head = `<div class="section-title"><h2>피드백 노트</h2><p>${t ? esc(t.name) : ""} · 링크를 받은 팀원 모두에게 공유</p>
       ${noteUrl() ? `<button class="btn sm primary" data-act="nnew">+ 노트 쓰기</button><button class="btn sm ghost" data-act="nrefresh">새로고침</button>` : ""}</div>`;
-    if (!noteUrl()) return head + `<div class="note">${t && t.solo ? "솔랭·자랭 우리팀에는 노트를 쓸 수 없습니다. 위에서 우리 팀을 고르세요." : "팀 공유 저장소가 설정되지 않았습니다."}</div>`;
+    if (!noteUrl()) return head + `<div class="note">${t && t.solo ? "솔랭·자랭 우리팀에는 노트를 쓸 수 없습니다. 위에서 우리 팀을 고르세요." : "팀 공간에 들어오면 팀원과 노트를 나눕니다 — 「팀 공간」에서 팀을 만들거나 초대 링크로 들어오세요."}</div>`;
     if (NT.status === "error" && !NT.list) return head + `<div class="note">노트를 불러오지 못했습니다: ${esc(NT.err)} <button class="btn sm" data-act="nrefresh">다시 시도</button></div>`;
     if (!NT.list) return head + `<div class="note">노트 불러오는 중…</div>`;
     const f = S.ui.nf || {};
@@ -2291,10 +2320,101 @@
   }
   function closeNoteForm() { NT.form = null; const r = document.getElementById("nmodal"); if (r) r.innerHTML = ""; }
 
-  if (SH.url) {
-    // 팀원이 새로 쓴 자기평가·피드백 노트도 보이게: 화면이 보이는 동안 45초마다, 다시 돌아왔을 때 읽는다
-    setInterval(() => { if (document.visibilityState === "visible") { pullShared(); if (S.tab === "notes" && !NT.form) loadNotes(); } }, 45000);
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") { pullShared(); if (S.tab === "notes" && !NT.form) loadNotes(); } });
+  // ---------- 「팀 공간」 창: 팀 만들기(팀장 아이콘 인증) · 초대 링크 · 링크 새로 만들기 · 나가기 ----------
+  const TM = { open: false, step: "form", nonce: "", icon: null, riot: "", name: "", msg: "", busy: false, link: "" };
+  const inviteLink = () => (SPACE ? `${location.origin}${location.pathname}#join=${SPACE.id}.${SPACE.key}` : "");
+  const ICON_IMG = (i) => `https://ddragon.leagueoflegends.com/cdn/${window.DDRAGON_VERSION}/img/profileicon/${i}.png`;
+  // 팀 공간에 들어온 직후: 공유 자료를 서버에서 다시 읽는다
+  function spaceJoined() {
+    SH.url = window.SELF_EVAL_SHARE_URL || ""; SH.status = SH.url ? "loading" : "unset";
+    NT.list = null; NT.status = "idle";
+    pullShared(); loadNotes(); loadPrep(); render();
+  }
+  async function checkSpace() {
+    if (!SPACE || !WURL()) return;
+    try {
+      const res = await wfetch(`/team/me`);
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === "ok") { SPACE.name = d.name; SPACE.owner = d.owner; SPACE.bad = false; saveSpace(); renderTop(); if (TM.open) renderTeam(); }
+    } catch (e) { /* 연결 안 되면 다음에 */ }
+  }
+  async function teamPost(op, body) {
+    const res = await fetch(`${WURL()}/team/${op}${op === "rotate" ? "?" + spaceQ() : ""}`, { method: "POST", cache: "no-store", credentials: "omit",
+      headers: { "Content-Type": "application/json", ...(op === "rotate" && SPACE ? { "X-Team-Key": SPACE.key } : {}) }, body: JSON.stringify(body || {}) });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok || d.status !== "ok") { const e = new Error(d.reason || "HTTP " + res.status); e.d = d; throw e; }
+    return d;
+  }
+  function renderTeam() {
+    let root = document.getElementById("tmodal");
+    if (!root) root = document.body.appendChild(Object.assign(document.createElement("div"), { id: "tmodal" }));
+    if (!TM.open) { root.innerHTML = ""; return; }
+    const msg = TM.msg ? `<p class="help tm-msg" role="status">${esc(TM.msg)}</p>` : `<p class="help tm-msg" role="status"></p>`;
+    let body;
+    if (SPACE && !SPACE.bad) {
+      body = `<p class="tm-name"><b>${esc(SPACE.name || "팀 공간")}</b>${SPACE.owner ? `<span class="help">팀장 인증 ${esc(SPACE.owner)}</span>` : ""}</p>
+        <p class="help">피드백 노트·자기평가·상대 챔프폭 메모·대회 준비일·실시간 갱신은 이 팀 공간 팀원만 보고 씁니다. 상대 팀이 우리 명단을 알아도 이 링크가 없으면 볼 수 없습니다.</p>
+        <label class="tm-l">팀원 초대 링크<span class="tm-link"><input class="input" id="tmLink" readonly value="${esc(inviteLink())}" aria-label="초대 링크"><button class="btn sm primary" data-act="tcopy">복사</button></span></label>
+        <p class="help">팀원에게만 보내세요. 링크를 연 브라우저가 이 팀 공간에 들어옵니다.</p>
+        ${msg}
+        <div class="dnav"><button class="btn sm" data-act="trotate">링크 새로 만들기</button><button class="btn sm ghost" data-act="tleave">이 브라우저에서 나가기</button></div>
+        <p class="help">링크가 새어 나갔으면 「링크 새로 만들기」 — 옛 링크로 들어온 브라우저는 모두 막히니 새 링크를 팀원에게 다시 보내 주세요.</p>`;
+    } else if (TM.step === "verify") {
+      body = `<ol class="tm-steps"><li>롤 클라이언트에서 <b>${esc(TM.riot)}</b> 계정으로 로그인</li>
+        <li>프로필 아이콘을 아래 기본 아이콘으로 바꾸기 <span class="tm-icon"><img src="${ICON_IMG(TM.icon)}" alt="기본 아이콘 ${TM.icon}번" width="56" height="56"><span class="help">${TM.icon}번</span></span></li>
+        <li>바꾼 뒤 「확인」 — 15분 안에. 확인이 끝나면 원래 아이콘으로 돌려도 됩니다.</li></ol>
+        ${msg}
+        <div class="dnav"><button class="btn primary" data-act="tcheck" ${TM.busy ? "disabled" : ""}>${TM.busy ? "확인 중…" : "확인"}</button><button class="btn ghost" data-act="tback">처음으로</button></div>`;
+    } else {
+      body = `${SPACE && SPACE.bad ? `<p class="warn">이 브라우저의 팀 공간 열쇠가 바뀌었습니다. 팀원에게 새 초대 링크를 받아 여세요.</p>` : ""}
+        <p class="help">초대 링크를 받았다면 그 링크를 열기만 하면 됩니다. 팀장은 아래에서 팀 공간을 만듭니다 — 우리 팀 계정 하나로 Riot 계정 주인임을 확인해서, 남이 우리 명단으로 「우리팀」을 만들지 못하게 합니다.</p>
+        <div class="tm-form"><label>팀 이름<input class="input" id="tmName" maxlength="30" value="${esc(TM.name)}" placeholder="예: 수빈이의아이들"></label>
+        <label>팀원 라이엇 ID(본인 계정)<input class="input" id="tmRiot" maxlength="42" value="${esc(TM.riot)}" placeholder="이름#태그"></label></div>
+        ${msg}
+        <div class="dnav"><button class="btn primary" data-act="tstart" ${TM.busy ? "disabled" : ""}>${TM.busy ? "확인 중…" : "팀 공간 만들기"}</button>${SPACE ? `<button class="btn ghost" data-act="tleave">열쇠 지우기</button>` : ""}</div>`;
+    }
+    root.innerHTML = `<div class="modal-bg" data-act="tclose"><div class="modal tmodal" role="dialog" aria-modal="true" aria-label="팀 공간">
+      <div class="modal-h"><h2>팀 공간</h2><button class="btn sm" data-act="tclose">닫기</button></div>${body}</div></div>`;
+  }
+  async function teamAction(a) {
+    const v = (id) => ((document.getElementById(id) || {}).value || "").trim();
+    if (a === "team") { TM.open = true; TM.msg = ""; MV.more = false; render(); renderTeam(); checkSpace(); return; }
+    if (a === "tclose") { TM.open = false; renderTeam(); return; }
+    if (a === "tback") { TM.step = "form"; TM.msg = ""; renderTeam(); return; }
+    if (a === "tcopy") { const i = document.getElementById("tmLink"); try { await navigator.clipboard.writeText(inviteLink()); TM.msg = "복사했습니다."; } catch (e) { if (i) { i.select(); TM.msg = "링크를 길게 눌러 복사하세요."; } } renderTeam(); return; }
+    if (a === "tleave") { if (!confirm("이 브라우저에서 팀 공간 열쇠를 지울까요? 다시 들어오려면 초대 링크가 필요합니다.")) return; SPACE = null; saveSpace(); SH.url = ""; SH.status = "unset"; NT.list = null; TM.step = "form"; TM.msg = ""; render(); renderTeam(); return; }
+    if (a === "trotate") {
+      if (!confirm("초대 링크를 새로 만들까요? 옛 링크로 들어온 팀원 브라우저는 모두 막히고, 새 링크를 다시 보내야 합니다.")) return;
+      try { const d = await teamPost("rotate"); SPACE = { ...SPACE, key: d.key, bad: false }; saveSpace(); TM.msg = "새 링크를 만들었습니다. 팀원에게 다시 보내 주세요."; }
+      catch (e) { TM.msg = "실패: " + e.message; }
+      renderTeam(); return;
+    }
+    if (a === "tstart") {
+      TM.name = v("tmName"); TM.riot = v("tmRiot").replace(/\s*#\s*/, "#");
+      if (!TM.name) { TM.msg = "팀 이름을 적어 주세요."; renderTeam(); return; }
+      if (!/^[^#]+#[^#]+$/.test(TM.riot)) { TM.msg = "라이엇 ID는 이름#태그 형식으로 적어 주세요."; renderTeam(); return; }
+      TM.busy = true; TM.msg = "계정 확인 중…"; renderTeam();
+      try { const d = await teamPost("start", { name: TM.name, riot: TM.riot }); Object.assign(TM, { step: "verify", nonce: d.nonce, icon: d.icon, msg: "" }); }
+      catch (e) { TM.msg = e.message; }
+      TM.busy = false; renderTeam(); return;
+    }
+    if (a === "tcheck") {
+      TM.busy = true; TM.msg = "아이콘 확인 중…"; renderTeam();
+      try {
+        const d = await teamPost("check", { nonce: TM.nonce });
+        SPACE = { id: d.space, key: d.key, name: d.name, owner: TM.riot }; saveSpace();
+        Object.assign(TM, { step: "form", nonce: "", msg: "팀 공간을 만들었습니다. 아래 초대 링크를 팀원에게 보내세요." });
+        spaceJoined();
+      } catch (e) { TM.msg = e.message; if (e.d && e.d.reason && /시간이 지났/.test(e.d.reason)) TM.step = "form"; }
+      TM.busy = false; renderTeam(); return;
+    }
+  }
+
+  {
+    // 팀원이 새로 쓴 자기평가·피드백 노트도 보이게: 화면이 보이는 동안 45초마다, 다시 돌아왔을 때 읽는다(팀 공간에 들어와 있을 때만)
+    const tick = () => { if (document.visibilityState === "visible" && SH.url) { pullShared(); if (S.tab === "notes" && !NT.form) loadNotes(); } };
+    setInterval(tick, 45000);
+    document.addEventListener("visibilitychange", tick);
   }
 
   // ---------- 픽 후보 정보 카드 (PC 전용: 마우스 올림·키보드 초점) ----------
@@ -2364,6 +2484,7 @@
   // 폭이 바뀌면(휴대폰 ↔ PC, 가로 돌림) 그 화면으로 다시 그림
   MOB.addEventListener("change", () => { MV.more = false; S.ui.sheet = false; render(); });
   render();
+  checkSpace();
   loadSelfEval();
   pullShared();
   loadNotes();

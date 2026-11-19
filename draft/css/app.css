@@ -947,6 +947,19 @@ footer { max-width: 1440px; margin: 0 auto; padding: 20px 16px 40px; color: var(
 .sv-g.focus, tr.focus td { background: var(--gold-bg); }
 .sv-g.focus { border-radius: 8px; padding: 6px; outline: 1px solid rgba(232, 182, 76, 0.5); }
 
+/* ---------- 팀 공간 창 (2026-11-19) ---------- */
+.tmodal { width: min(560px, 100%); display: grid; gap: 12px; }
+.tm-name { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 16px; }
+.tm-l { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.tm-link { display: flex; gap: 6px; } .tm-link .input { flex: 1; min-width: 0; font-size: 12px; }
+.tm-form { display: grid; gap: 10px; } .tm-form label { display: grid; gap: 4px; font-size: 13px; font-weight: 700; }
+.tm-steps { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 14px; line-height: 1.5; }
+.tm-icon { display: inline-flex; align-items: center; gap: 8px; margin-left: 6px; vertical-align: middle; }
+.tm-icon img { width: 56px; height: 56px; border-radius: 10px; border: 2px solid var(--gold); }
+.tm-msg:empty { display: none; }
+.btn.warnb { border-color: var(--bad); color: var(--bad); }
+@media (max-width: 760px) { .tmodal { max-height: 88dvh; } .tm-link .input { font-size: 16px; } }
+
 /* ---------- 목표 챔프 · 밴픽 설계 · 추천 조합 끌어서 넘기기 (2026-11-19) ---------- */
 .gl-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 12px; }
 .gl-l { font-size: 12px; font-weight: 800; color: var(--gold); }
