@@ -141,3 +141,28 @@
   .flw__arr{padding-top:32px;align-items:center}
   .flw__hub{align-self:center;margin-top:32px}
 }
+
+/* 2026-11-26 사업계획서 2R 검토: 첫 화면 아래 세 서비스 한 줄, 보고 1분 목표 표시, 휴대폰 첫 화면 설명서 단추 */
+.film__note{margin:0;font-size:13px;line-height:1.5;color:var(--muted-2)}
+.suite{background:var(--surface);border-block:1px solid var(--line-3)}
+.suite__in{display:flex;list-style:none;margin:0 auto;padding-top:20px;padding-bottom:8px}
+.suite__in li{flex:1 1 0;min-width:0}
+.suite__in li+li{border-left:1px solid var(--line-2)}
+.suite__in a{display:flex;flex-wrap:wrap;align-items:center;column-gap:10px;row-gap:2px;min-height:44px;padding:4px 24px;color:var(--ink);text-decoration:none}
+.suite__in li:first-child a{padding-left:0}
+.suite__in a:hover b{text-decoration:underline;text-underline-offset:3px}
+.suite__in a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.suite__in b{font-size:17px;font-weight:700}
+.suite__in span{font-size:15px;color:var(--muted)}
+.suite__note{margin:0 auto;padding-bottom:18px;font-size:14px;color:var(--muted-2)}
+@media (max-width:1023px){
+  .film__cta{display:flex;margin-top:2px}
+  .film__cta .btn--primary{display:none}
+  .film__cta .btn{height:40px;padding:0 16px;font-size:14px}
+  .film__note{font-size:12px}
+  .suite__in{flex-direction:column;padding-top:8px;padding-bottom:4px}
+  .suite__in li+li{border-left:0;border-top:1px solid var(--line-3)}
+  .suite__in a,.suite__in li:first-child a{padding:10px 0}
+  .suite__in b{font-size:16px}
+  .suite__in span{font-size:14px}
+}

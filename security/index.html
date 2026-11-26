@@ -6,6 +6,7 @@
 <title>보안과 데이터 — Sentrix Link</title>
 <meta name="description" content="Sentrix와 Sentrix HR에서 보는 범위, 로그인 기기, 위치 정보를 다루는 방식.">
 <link rel="canonical" href="https://sentrixlink.kr/security/">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Sentrix Link"><meta property="og:title" content="보안과 데이터 — Sentrix Link"><meta property="og:description" content="Sentrix와 Sentrix HR에서 보는 범위, 로그인 기기, 위치 정보를 다루는 방식."><meta property="og:url" content="https://sentrixlink.kr/security/"><meta property="og:image" content="https://sentrixlink.kr/static/img/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#F2F2F7">
 <link rel="icon" href="/static/img/sentrix-mark.png">
 <link rel="preload" href="/static/fonts/Pretendard-Bold.subset.woff2" as="font" type="font/woff2" crossorigin>
@@ -35,13 +36,20 @@
 <section class="stub">
 <div class="wrap stack">
 <h1 class="h2">보안과 데이터</h1>
-<p class="stub__note">역할과 조회 범위, 로그인과 기기 등록, 위치 정보, 기록과 보관, 외부로 나가는 정보를 이 페이지에서 자세히 설명할 예정입니다. 지금은 요약만 싣습니다.</p>
+<p class="stub__note">Sentrix와 Sentrix HR에서 누가 무엇을 보는지, 위치와 기록을 어떻게 다루는지 정리했습니다. 자세한 내용은 제품별 개인정보처리방침에 있습니다.</p>
 <ul class="facts">
 <li><strong>역할별 조회 범위</strong><span>본사는 회사 전체, 팀장은 자기 지점만 봅니다.</span></li>
 <li><strong>승인된 기기로 로그인</strong><span>새 기기는 팀장 승인 뒤에 씁니다.</span></li>
-<li><strong>위치는 출근 확인에</strong><span>근무지 반경 안에서 출근을 찍습니다.</span></li>
+<li><strong>위치는 출퇴근 순간에만</strong><span>출퇴근 버튼을 누를 때 한 번만 위치를 확인해 근무지 반경 안인지 판단합니다. 위치를 계속 따라가지 않습니다.</span></li>
+<li><strong>역할이 바뀌면 다시 로그인</strong><span>회사와 지점 단위로 볼 수 있는 범위를 나누고, 역할이나 권한이 바뀌면 로그인을 다시 하게 합니다.</span></li>
+<li><strong>암호화해 저장</strong><span>비밀번호, 생년월일, 경비원 신임교육 이수번호는 암호화해 저장하고, 주민등록번호는 받지 않습니다. 모든 통신은 HTTPS로만 주고받습니다.</span></li>
+<li><strong>기록은 남기고 점검</strong><span>로그인 시도 횟수를 제한하고, 접속과 변경 기록을 2년 동안 보관해 점검합니다.</span></li>
+<li><strong>서버는 Microsoft Azure</strong><span>서버와 데이터베이스, 첨부 파일은 출입 통제가 이루어지는 Microsoft Azure 데이터센터에 둡니다.</span></li>
+<li><strong>AI 도우미는 가리고 보냅니다</strong><span>전화번호는 보내기 전에 가리고, 질문과 답변 원문은 서버에 남기지 않습니다. 입력한 내용은 모델 학습에 쓰지 않습니다.</span></li>
+<li><strong>계약이 끝나면 돌려드리고 파기</strong><span>직원 · 근무 정보의 처리자는 고객사입니다. 계약이 끝나면 고객사에 돌려드린 뒤 파기합니다.</span></li>
 </ul>
-<a class="more" href="/privacy/">개인정보처리방침 보기</a>
+<a class="more" href="/privacy/sentrix/">Sentrix 개인정보처리방침</a>
+<a class="more" href="/privacy/sentrix-hr/">Sentrix HR 개인정보처리방침</a>
 </div>
 </section>
 
