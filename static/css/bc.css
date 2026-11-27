@@ -82,3 +82,47 @@
 /* HR 본사 구역: 제목 왼쪽 · 카드 오른쪽(제목 왼쪽에 카드만 가운데로 떠 보이지 않게) */
 @media (min-width:1024px){ .hq__in{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,620px);column-gap:72px;align-items:center} }
 @media (min-width:1024px){ .cp-block:has(.p-vis--bc){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,620px);column-gap:72px;align-items:center} }
+
+/* ---------- Sentrix HR 업체 링크 흐름(2026-11-28): 티켓 → 업체 링크 → 우리 현황판. 단계는 bc.js가 data-step으로 ---------- */
+.vl{margin:0;display:flex;flex-direction:column;gap:14px;width:100%;min-width:0}
+.vl__grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr);align-items:stretch}
+.vl__card{background:#fff;border:1px solid var(--line-3);border-radius:24px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px;min-width:0;box-shadow:0 24px 60px rgba(17,24,42,.06)}
+.vl__card--vendor{border-color:var(--line-btn)}
+.vl__arr{display:grid;place-items:center;color:var(--hint)}
+.vl__arr svg{width:24px;height:24px}
+.vl__who{margin:0;display:flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:var(--ink-2)}
+.vl__n{width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:800;flex:none}
+.vl__head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding-bottom:12px;border-bottom:1px solid var(--line-3)}
+.vl__head b{font-size:18px;font-weight:800;color:var(--ink)}
+.vl__head span{font-size:13px;color:var(--muted-2);white-space:nowrap}
+.vl__live{display:inline-flex;align-items:center;gap:6px;color:#16794A!important;font-weight:700}
+.vl__live::before{content:"";width:7px;height:7px;border-radius:50%;background:#1F9D60}
+.vl__kv{margin:0;display:grid;gap:8px}
+.vl__kv div{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;font-size:15px}
+.vl__kv dt{color:var(--muted-2)}
+.vl__kv dd{margin:0;font-weight:700;color:var(--ink)}
+.vl__state,.vl__next{margin:auto 0 0;display:inline-flex;align-items:center;gap:7px;align-self:flex-start;height:34px;padding:0 14px;border-radius:999px;font-size:14px;font-weight:700}
+.vl__state{background:var(--navy);color:#fff}
+.vl__next{background:var(--bg);color:var(--ink)}
+.vl__req{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;background:var(--bg)}
+.vl__req > span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.vl__req b{font-size:15px;font-weight:700;color:var(--ink)}
+.vl__req small{font-size:13px;color:var(--muted-2)}
+.vl__req em{font-style:normal;font-size:17px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.vl__rows{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vl__rows li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--line-3);border-radius:12px;font-size:14px}
+.vl__rows b{font-size:15px;font-weight:700;color:var(--ink)}
+.vl__rows span{color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vl__rows i{font-style:normal;font-size:13px;font-weight:700;color:var(--ink);white-space:nowrap}
+.vl__add{margin:auto 0 0;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;padding:0 6px 0 14px;border:1px dashed var(--line-btn);border-radius:12px;font-size:14px;color:var(--muted-2)}
+.vl__add b{height:32px;padding:0 14px;border-radius:999px;background:var(--navy);color:#fff;display:inline-flex;align-items:center;font-size:13px}
+.vl :is(.vl__s1,.vl__s2,.vl__s3){transition:opacity .45s,transform .45s cubic-bezier(.2,.7,.2,1),box-shadow .45s}
+.vl[data-step="0"] :is(.vl__s1,.vl__s2,.vl__s3),.vl[data-step="1"] :is(.vl__s2,.vl__s3),.vl[data-step="2"] .vl__s3{opacity:0;transform:translateY(6px)}
+.vl .is-new{box-shadow:0 0 0 2px var(--navy)}
+.vl__note{margin:0;font-size:16px;line-height:1.6;color:var(--muted)}
+@media (max-width:1023px){
+  .vl__grid{grid-template-columns:minmax(0,1fr);row-gap:0;max-width:520px;width:100%;margin:0 auto}
+  .vl__arr{height:40px}
+  .vl__arr svg{transform:rotate(90deg)}
+}
+@media (prefers-reduced-motion:reduce){.vl :is(.vl__s1,.vl__s2,.vl__s3){transition:none}}

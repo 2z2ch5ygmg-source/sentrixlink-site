@@ -41,3 +41,26 @@
   new IntersectionObserver(function (es) { seen = es[0].isIntersecting; seen ? run() : stop(); }, {threshold: 0.4}).observe(fig);
   document.addEventListener('visibilitychange', function () { document.hidden ? stop() : run(); });
 })();
+/* Sentrix HR 업체 링크 흐름: 티켓 → 업체 링크에 뜸 → 업체가 한 명씩 넣음 → 우리 현황판에 같이 들어옴(2026-11-28).
+   스크립트가 없거나 움직임 줄이기면 마지막 장면(data-step=3) 그대로. */
+(function () {
+  var fig = document.querySelector('[data-vl]');
+  if (!fig || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var counts = fig.querySelectorAll('.vl__c');
+  var step = 0, timer = null, seen = false;
+  function paint() {
+    fig.dataset.step = String(step);
+    var filled = Math.max(0, step - 1);
+    Array.prototype.forEach.call(counts, function (c) { c.textContent = String(filled); });
+    Array.prototype.forEach.call(fig.querySelectorAll('.is-new'), function (n) { n.classList.remove('is-new'); });
+    if (step > 0) Array.prototype.forEach.call(fig.querySelectorAll('.vl__s' + step), function (n) { n.classList.add('is-new'); });
+  }
+  function tick() {
+    if (step < 3) { step++; paint(); timer = setTimeout(tick, step < 3 ? 1500 : 3200); }
+    else { step = 0; paint(); timer = setTimeout(tick, 1200); }
+  }
+  function run() { if (!timer && seen && !document.hidden) { step = 0; paint(); timer = setTimeout(tick, 800); } }
+  function stop() { clearTimeout(timer); timer = null; step = 3; paint(); fig.querySelectorAll('.is-new').forEach(function (n) { n.classList.remove('is-new'); }); }
+  new IntersectionObserver(function (es) { seen = es[0].isIntersecting; seen ? run() : stop(); }, {threshold: 0.35}).observe(fig);
+  document.addEventListener('visibilitychange', function () { document.hidden ? stop() : run(); });
+})();
